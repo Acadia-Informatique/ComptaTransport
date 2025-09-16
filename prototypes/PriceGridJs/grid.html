@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<title>Prototype "Pricing Grid" engine</title>
+
+	<!-- TODO replace CDN links with served -->
+
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+
+  </head>
+  <body>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+
+	<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+	<!-- TODO check Vue / Bootstrap compatibility issues -->
+
+	<script src="./grid.js"></script>
+
+	<script type="text/javascript">
+
+		//TODO hydration functions
+
+
+	</script>
+
+	<style>
+	</style>
+
+</head>
+
+<body>
+	<div id="grid-builder">
+
+
+		<!-- <select name="category" v-model="pickedCateg" @change="selectCateg">
+			<option value="-undefined-">(sélectionnez une catégorie)</option>
+			<option v-for="form in forms" :value="form.category">%[form.formLabel]%</option>
+		</select>
+		<button @click="showState">ETAT</button>
+		<div>
+			<h1>%[myNewForm.formLabel]%</h1>
+			<div v-for="item in myNewForm.items" :key="item.$$$idkey">
+				<component :is="item.$$$type" :item="item"></component>
+				<hr>
+			</div>
+		</div> -->
+
+
+		<div class="container">
+			<div class="row">
+				<div class="col-10">
+					<pricinggrids-tabs :ui_state="ui_state"></pricinggrids-tabs>
+					<pricinggrids-grid :ui_state="ui_state"></pricinggrids-grid>
+				</div>
+
+				<pricinggrids-axisdeflist :currentGrid="ui_state.currentGrid">
+				</pricinggrids-axisdeflist>
+				<div class="col-2">
+					<pricingtest-form :ui_state="ui_state"></pricingtest-form>
+				</div>
+			</div>
+		</div>
+
+
+	</div>
+
+
+	<!-- =========================================================== -->
+	<!-- =============== Vue components ============================ -->
+
+	<!-- ========== (some) component templates ============== -->
+	<script type="text/x-template" id="PricingTest-Form-template">
+		<form id="" class="" @submit.prevent="">
+			<div class="mb-3">
+				<label class="form-label" for="inputPoids">Poids</label>
+				<input type="number" step="0.1" min="0" lang="en-US"
+				 class="form-control" id="inputPoids" placeholder="Poids (en kg)"
+				 v-model="ui_state.testPricedObj.poids">
+			</div>
+			<div class="mb-3">
+				<label class="form-label" for="inputPostCode">Code postal</label>
+				<input type="text" maxlength="5"
+				 class="form-control" id="inputPostCode" placeholder="Code postal"
+				 v-model="ui_state.testPricedObj.codePostal">
+			</div>
+			<button type="submit" class="btn btn-primary">Tester</button>
+			{{ JSON.stringify(ui_state.currentGrid.apply(ui_state.testPricedObj)) }}
+		</form>
+	</script>
+
+	<!-- ========== component logic ============== -->
+	<script type="module">
+
+		/* shared state for the page */
+		//const gridBuilderApp_UI = Vue.reactive( ui_state); TODO need explicit call ?!
+
+		const gridBuilderApp = Vue.createApp({
+			data() {
+				return {
+					ui_state: {
+						system: theSystem, //TODO start with empty / localstored
+						currentGrid: theSystem.grids[0], //TODO react to selection
+						testPricedObj: new CommandeALivrer("FCxxxxxx", 302 /*kg*/, "93420")
+					}
+				}
+			},
+			methods: {
+				// selectCateg() {
+				// 	console.log(this.myNewForm);
+				// },
+				// showState() {
+				// 	console.log(this.myNewForm);
+				// }
+			},
+		});
+
+
+		var PricingGrids_Tabs = {
+			props: {
+				ui_state: Object
+			},
+			methods: {
+				newGrid: function(){
+					let name = "Nouvelle grille"; //TODO find next good name
+					this.ui_state.system.grids.push(
+						new PricingGrid(name)
+					);
+				},
+				selectGrid: function(name){
+					this.ui_state.currentGrid = this.ui_state.system.findGridByName(name);
+				}
+
+			},
+			template: `
+				<ul class="nav nav-pills">
+					<li v-for="grid in ui_state.system.grids"
+						class="nav-item">
+						<a href="#" class="nav-link" :class="{active: ui_state.currentGrid.name == grid.name}" @click="selectGrid(grid.name)">{{grid.name}}</a>
+					</li>
+					<li class="nav-item">
+						<a href="#" class="nav-link bg-secondary text-white" @click="newGrid"> + </a>
+					</li>
+				</ul>`
+		};
+
+
+		var PricingGrids_AxisDefList = {
+			props: {
+				currentGrid: Object
+			},
+			methods: {
+				newAxis: function(){
+				},
+			},
+			template: `
+			`
+		};
+
+		var PricingGrids_GridCell = {
+			props: {
+				cell: Object
+			},
+			computed:{
+
+			},
+			template: `
+				<div>
+					<template v-if="cell">
+						<template v-if="cell.policy">
+							{{cell.policy.type}} <br>
+							<template v-if="cell.policy.type=='FixedPrice'">
+								<input v-model="cell.policy.price">
+							</template>
+							<template v-if="cell.policy.type=='PerVolumePrice'">
+								(arrondi <input v-model="cell.policy.rounding">)
+								<input v-model="cell.policy.price">
+							</template>
+						</template>
+						<template v-else>
+							NO POLICY
+						</template>
+					</template>
+					<template v-else>
+						NO CELL
+					</template>
+				</div>
+				`
+		};
+
+		var PricingGrids_Grid = {
+			props: {
+				ui_state: Object
+				//Note : not only "ui_state.currentGrid" is used : a policy can reference another grid !
+			},
+			computed:{
+				dimensionCount(){
+					return this.ui_state.currentGrid.dimensions.length;
+				}
+			},
+
+			template: `
+				<table class="table table-bordered">
+					<template v-if="dimensionCount==0">
+						<thead>
+							<tr>
+								<th>Toutes livraisons</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td><pricinggrids-gridcell :cell="ui_state.currentGrid.gridCellAt({
+								})"></pricinggrids-gridcell></td>
+							</tr>
+						</tbody>
+					</template>
+					<template v-else-if="dimensionCount==1">
+						{{void(
+							dim0 = ui_state.currentGrid.dimensions[0]
+						)}}
+						<thead>
+							<tr>
+								<th>{{ dim0.name }}</th>
+								<th>Prix</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr v-for="categ_dim0 in dim0.categories" >
+								<th>{{ categ_dim0.value }}</th>
+								<td><pricinggrids-gridcell :cell="ui_state.currentGrid.gridCellAt({
+									[dim0.name]: categ_dim0.value
+								})"></pricinggrids-gridcell></td>
+							</tr>
+						</tbody>
+					</template>
+					<template v-else-if="dimensionCount==2">
+						{{void(
+							dim0 = ui_state.currentGrid.dimensions[0],
+							dim1 = ui_state.currentGrid.dimensions[1]
+						)}}
+						<thead>
+							<tr>
+								<th rowspan="2">{{ dim0.name }}</th>
+								<th :colspan="dim1.categories.length">
+									{{ dim1.name }}
+								</th>
+							</tr>
+							<tr>
+								<th v-for="categ_dim1 in dim1.categories">
+									{{ categ_dim1.value }}
+								</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr v-for="categ_dim0 in dim0.categories" >
+								<th>{{ categ_dim0.value }}</th>
+								<td v-for="categ_dim1 in dim1.categories"
+								 ><pricinggrids-gridcell :cell="ui_state.currentGrid.gridCellAt({
+									[dim0.name]: categ_dim0.value,
+									[dim1.name]: categ_dim1.value
+								})"></pricinggrids-gridcell></td>
+							</tr>
+						</tbody>
+					</template>
+					<template v-else>
+						<tbody><tr><td>
+							Dimensions &gt; 3 non support&eacute; !
+						</td></tr></tbody>
+					</template>
+				</table>` // Note : une solution générale est possible, mais un peu illisible... et moins souple sur le rendu.
+		};
+
+
+
+
+		var PricingTest_Form = {
+			props: {
+				ui_state: Object
+			},
+			template: '#PricingTest-Form-template'
+		};
+
+
+
+
+
+		/* Components for Item types */
+
+		// var ItemCheck = {
+		// 	delimiters: ['%[', ']%'],
+		// 	props: {
+		// 		item: {
+		// 			type: Object,
+		// 		}
+		// 	},
+		// 	computed: {
+		// 		alertLevel() {
+		// 			//this.item.mainValue; /* <- reactivity hack = "gratuitous" access */;
+		// 			return this.item.alertLvl();
+		// 		}
+		// 	},
+		// 	template: `
+		// 	<div :class="alertLevel" class="itemComponent shadow py-2 px-2 mb-2 rounded">
+		// 	<p class="mb-2">%[item.label]%</p>
+		// 		<div class="row g-1">
+		// 			<div class="col">
+		// 				<input type="radio" class="btn-check" :id="'ok_' +item.$$$idkey" value="ok" v-model="this.item.mainValue" />
+		// 				<label class="w-100 px-2 btn btn-sm btn-outline-success" :for="'ok_' + item.$$$idkey"><i class="fas fa-check fa-sm"></i> Ok</label>
+		// 			</div>
+		// 			<div class="col">
+		// 				<input type="radio" class="btn-check" :id="'nok_' + item.$$$idkey" value="nok" v-model="this.item.mainValue" />
+		// 				<label class="w-100 px-2 btn btn-sm btn-outline-danger" :for="'nok_' + item.$$$idkey"><i class="fas fa-times fa-sm"></i> Pas ok</label>
+		// 			</div>
+		// 			<div class="col">
+		// 				<input type="radio" class="btn-check" :id="'none_' + item.$$$idkey" value="none" v-model="this.item.mainValue" />
+		// 				<label class="w-100 px-2 btn btn-sm btn-outline-secondary" :for="'none_' + item.$$$idkey"><i class="fas fa-question fa-sm"></i> A faire</label>
+		// 			</div>
+		// 		</div>
+		// 	</div>
+		// 	`
+		// };
+
+		// var ItemTemperature = {
+		// 	delimiters: ['%[', ']%'],
+		// 	props: {
+		// 		item: {
+		// 			type: Object,
+		// 		},
+		// 	},
+		// 	computed: {
+		// 		alertLevel() {
+		// 			//this.item.mainValue; /* <- reactivity hack = "gratuitous" access */;
+		// 			return this.item.alertLvl();
+		// 		}
+		// 	},
+		// 	template: `
+		// 	<div :class="alertLevel" class="itemComponent shadow-sm py-1 px-2 mb-2 rounded">
+		// 		<div v-if="item.isLabelEdit" class="col-10 col-sm-5 mb-2 rounded">
+		// 			<input type="text" class="form-control form-control-sm" v-model="item.label">
+		// 		</div>
+		// 		<div v-else>
+		// 		<p class="mb-2">%[item.label]%</p>
+		// 		</div>
+		// 		<div class="input-group input-group-sm mb-2">
+		// 			<div class="col-md-4">
+		// 				<input :class="alertLevel" class="form-control form-control-sm inputComponent" type="number" step="0.1" v-model="item.mainValue" placeholder="Saisir la température" :name="item.label">
+		// 			</div>
+		// 			<span class="input-group-text">°C </span>
+		// 		</div>
+		// 	</div>
+		// 	`
+		// };
+
+		// var ItemContentLevel = {
+		// 	delimiters: ['%[', ']%'],
+		// 	props: {
+		// 		item: {
+		// 			type: Object,
+		// 		},
+		// 	},
+		// 	computed: {
+		// 		alertLevel() {
+		// 			//this.item.mainValue; /* <- reactivity hack = "gratuitous" access */;
+		// 			return this.item.alertLvl();
+		// 		}
+		// 	},
+		// 	template: `
+		// 	<div :class="alertLevel" class="itemComponent rounded shadow-sm py-1 px-2 mb-2">
+		// 		<p class="mb-2">%[item.label]%</p>
+		// 		<div class="input-group input-group-sm mb-2">
+		// 			<div class="col-md-4">
+		// 				<input :class="alertLevel" class="form-control form-control-sm inputComponent" type="number" step="0.1" v-model="item.mainValue" placeholder="Saisir la teneur" :name="item.label">
+		// 			</div>
+		// 			<span class="input-group-text"> % </span>
+		// 		</div>
+		// 	</div>
+		// 	`
+		// };
+
+		// var ItemRepeatGroup = {
+		// 	delimiters: ['%[', ']%'],
+		// 	props: {
+		// 		item: {
+		// 			type: Object,
+		// 		},
+		// 	},
+		// 	methods: {
+		// 		addNewItem() {
+		// 			let copyItem = JSON.parse(JSON.stringify(this.item.itemBase));
+		// 			// LCQPlanManager.injectAdditionalProperties(copyItem);
+		// 			// BizzinjectVueProperties(copyItem);
+		// 			injectVueProperties_item(copyItem);
+
+
+		// 			let copyItemInc = this.item.items.length + 1;
+		// 			copyItem.label = copyItem.label + " " + copyItemInc;
+
+		// 			this.item.items.push(copyItem);
+		// 		},
+		// 		removeItem(id) {
+		// 			this.item.items.splice(id, 1);
+		// 		}
+		// 	},
+		// 	computed: {
+		// 		alertLevel() {
+		// 			this.item.items; /* <- reactivity hack = "gratuitous" access */;
+		// 			return this.item.alertLvl();
+		// 		}
+		// 	},
+		// 	template: `
+		// 	<div :class="alertLevel" class="shadow-sm mb-1 rounded">
+		// 		<div v-for="(subItem, index) in item.items" :key="subItem.$$$idkey">
+		// 			<component :is="subItem.$$$type" :item="subItem" ></component>
+		// 			<button type="button" class="rounded btn btn-sm btn-outline-info m-2 ms-3" @click="removeItem(index)">Supprimer</button>
+		// 		</div>
+		// 	</div>
+		// 	<div>
+		// 		<button type="button" class="btn btn-sm btn-outline-primary my-2 w-100" @click="addNewItem">Ajouter %[item.itemBase.label]%</button>
+		// 	</div>
+		// 	`
+		// };
+
+		// var ItemCompoundGroup = {
+		// 	delimiters: ['%[', ']%'],
+		// 	props: {
+		// 		item: {
+		// 			type: Object,
+		// 		},
+		// 	},
+		// 	computed: {
+		// 		alertLevel() {
+		// 			this.item.items; /* <- reactivity hack = "gratuitous" access */;
+		// 			return this.item.alertLvl();
+		// 		}
+		// 	},
+		// 	template: `
+		// 	<div :class="alertLevel" class="itemGroupComponent shadow-sm p-1 ps-2 pt-2 mb-2 rounded">
+		// 		<p class="col-5 mb-2"><input class="form-control form-control-sm rounded" v-model.trim="item.label"></p>
+		// 		<div v-for="subItem in item.items" :key="subItem.$$$idkey">
+		// 			<component :is="subItem.$$$type" :item="subItem" class="shadow-sm"></component>
+		// 		</div>
+		// 	</div>
+		// 	`
+		// };
+
+
+		gridBuilderApp.component("pricinggrids-tabs", PricingGrids_Tabs);
+		gridBuilderApp.component("pricinggrids-grid", PricingGrids_Grid);
+		gridBuilderApp.component("pricinggrids-gridcell", PricingGrids_GridCell);
+		gridBuilderApp.component("pricinggrids-axisdeflist", PricingGrids_AxisDefList);
+
+
+
+
+		gridBuilderApp.component("pricingtest-form", PricingTest_Form);
+
+
+		// appLCQForm.component("lcq-item-temperature", ItemTemperature);
+		// appLCQForm.component("lcq-item-contentLevel", ItemContentLevel);
+		// appLCQForm.component("lcq-item-repeatGroup", ItemRepeatGroup);
+		// appLCQForm.component("lcq-item-compoundGroup", ItemCompoundGroup);
+		gridBuilderApp.mount('#grid-builder');
+	</script>
+
+</body>
+
+
+
+</html>
