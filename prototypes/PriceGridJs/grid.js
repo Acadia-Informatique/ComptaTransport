@@ -64,7 +64,7 @@ class PricingSystem {
 	}
 
 	findGridByName(name) {
-		return this.grids.filter(g => g.name == name).reduce((acc, g) => g, null);
+		return this.grids.find(g => g.name == name);
 	}
 }
 
@@ -101,7 +101,7 @@ class PricingGrid {
 					throw new Error("Unsupported type of Pricing Policy : " + policy.type);
 				}
 			}
-			return [gridCell, amount];
+			return {gridCell, amount};
 		}
 	}
 
@@ -182,6 +182,89 @@ class PricingGrid {
 		return isMatching;
 	}
 
+	/**
+	 * append a new default dimension to the grid
+	 */
+	addNewDimension(){
+		let name = "dim"; // default name
+		let type = "EnumCategory"; // default type
+
+		// find a non-used name
+		while (this.dimensions.find( dim => dim.name == name)){ name += "*"; }
+
+		// TODO move defaulting for each type somewhere else
+		let defaultDimension;
+		switch(type){
+			case "EnumCategory":
+				defaultDimension = {name, raw_name:"", categories:[{value: "All", enum: []}] };
+				break;
+			case "ThresholdCategory":
+				defaultDimension = {name, raw_name:"", categories:[{value: "All", threshold: 0}] };
+				break;
+			default:
+				throw new Error("Unsupported type of Dimension : " + type);
+		}
+
+		// readjust existing grid cells
+		// => all existing cells goe to 1st category of new dimension
+		let defaultCategoryVal = defaultDimension.categories[0].value;
+		for (let cell of this.gridCells){
+			cell.coords[name] = defaultCategoryVal
+		}
+
+		// finally, add dimension
+		this.dimensions.push(defaultDimension);
+	}
+
+	/**
+	 * Remove a named dimension from the grid
+	 */
+	removeDimension(name){
+		let removedDimIdx = this.dimensions.findIndex( dim => dim.name == name);
+		if (removedDimIdx == -1) throw new Error("No such dimension : " + name);
+		let removedDimension = this.dimensions[removedDimIdx];
+
+		// readjust existing grid cells
+		// => keep cells matching the 1st category in removed dimension
+		let remainingDimensions = this.dimensions.filter( (dim, idx) => idx != removedDimIdx);
+
+		function collectRemainingKeys(dimensions, keyVal){
+			if (dimensions.length == 0){
+				return [ {[keyVal.k]: keyVal.v} ];
+			} else {
+				let childDim = dimensions[0];
+				let results = [];
+				for (let childCat of childDim.categories){
+					let childResults = collectRemainingKeys(dimensions.slice(1), {k:childDim.name, v:childCat.value});
+					for (let cr of childResults){
+						if (keyVal != null) {
+							let obj = { [keyVal.k]: keyVal.v, ...cr};
+							results.push(obj);
+						} else{
+							results.push(cr);
+						}
+					}
+				}
+				return results;
+			}
+		}
+		let remainingKeys = collectRemainingKeys(remainingDimensions, null);
+		let newGridCells = [];
+		for (let coords of remainingKeys){
+			let coordsPlus = {[removedDimension.name]: removedDimension.categories[0].value, ...coords};
+
+			let policy = null;
+			let oldCell = this.gridCellAt(coordsPlus);
+			if (oldCell) policy = oldCell.policy;
+
+			let newCell = {coords, policy};
+			newGridCells.push(newCell);
+		}
+		this.gridCells = newGridCells;
+
+		// finally, remove dimension
+		this.dimensions.splice(removedDimIdx, 1);
+	}
 }
 
 

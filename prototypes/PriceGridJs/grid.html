@@ -6,10 +6,14 @@
 
 	<title>Prototype "Pricing Grid" engine</title>
 
-	<!-- TODO replace CDN links with served -->
+	<!-- TODO replace CDN links with self-served -->
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
 
 	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
 
+
+
+	<script src="./ConfirmDialog.js"></script>
   </head>
   <body>
 	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
@@ -34,39 +38,82 @@
 
 <body>
 	<div id="grid-builder">
-
-
-		<!-- <select name="category" v-model="pickedCateg" @change="selectCateg">
-			<option value="-undefined-">(sélectionnez une catégorie)</option>
-			<option v-for="form in forms" :value="form.category">%[form.formLabel]%</option>
-		</select>
-		<button @click="showState">ETAT</button>
-		<div>
-			<h1>%[myNewForm.formLabel]%</h1>
-			<div v-for="item in myNewForm.items" :key="item.$$$idkey">
-				<component :is="item.$$$type" :item="item"></component>
-				<hr>
-			</div>
-		</div> -->
-
-
-		<div class="container">
-			<div class="row">
-				<div class="col-10">
-					<pricinggrids-tabs :ui_state="ui_state"></pricinggrids-tabs>
-					<pricinggrids-grid :ui_state="ui_state"></pricinggrids-grid>
+		<div class="container-fluid"><div class="row">
+			<div class="accordion shadow col-12 col-lg-3 order-lg-last" id="tool-pane">
+				<div class="accordion-item">
+					<h2 class="accordion-header">
+						<button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+							Test shipping fee
+						</button>
+					</h2>
+					<div id="collapseOne" class="accordion-collapse collapse show" data-bs-parent="#tool-pane">
+						<div class="accordion-body">
+							<pricingtest-form :ui_state="ui_state"></pricingtest-form>
+						</div>
+					</div>
 				</div>
+				<div class="accordion-item">
+					<h2 class="accordion-header">
+						<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+							Load / Save Data
+						</button>
+					</h2>
+					<div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#tool-pane">
+						<div class="accordion-body">
+							TODO add some menus
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-12 col-lg-9">
+				<pricinggrids-tabs :ui_state="ui_state"></pricinggrids-tabs>
+				<pricinggrids-grid :ui_state="ui_state"></pricinggrids-grid>
+				<pricinggrids-dim-list :grid="ui_state.currentGrid"></pricinggrids-dim-list>
+			</div>
+		</div></div>
 
-				<pricinggrids-axisdeflist :currentGrid="ui_state.currentGrid">
-				</pricinggrids-axisdeflist>
-				<div class="col-2">
-					<pricingtest-form :ui_state="ui_state"></pricingtest-form>
+		<!-- Modal dialog template for generic ConfirmDialog -->
+		<div class="modal fade" id="modal-confirm-dialog" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+			<div class="modal-dialog">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title"></h5>
+						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					</div>
+					<div class="modal-body">
+						<div class="msg"></div>
+					</div>
+					<div class="modal-footer">
+						<button type="button" id="button-template" class="btn col mx-2"></button>
+					</div>
 				</div>
 			</div>
 		</div>
 
 
+		<!-- Modal dialog template for Cell customizer -->
+		<div class="modal"  id="grid-cell-customizer" tabindex="-1">
+			<div class="modal-dialog modal-dialog-scrollable modal-fullscreen-md-down">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title">Modal title</h5>
+						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					</div>
+					<div class="modal-body">
+
+						... TODO Policy form ...
+
+
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+						<button type="button" class="btn btn-primary">Save changes</button>
+					</div>
+				</div>
+			</div>
+		</div>
 	</div>
+
 
 
 	<!-- =========================================================== -->
@@ -87,8 +134,10 @@
 				 class="form-control" id="inputPostCode" placeholder="Code postal"
 				 v-model="ui_state.testPricedObj.codePostal">
 			</div>
-			<button type="submit" class="btn btn-primary">Tester</button>
-			{{ JSON.stringify(ui_state.currentGrid.apply(ui_state.testPricedObj)) }}
+			{{ void({gridCell, amount} = ui_state.currentGrid.apply(ui_state.testPricedObj)) }}
+			<div> <!--class="text-truncate" -->{{ JSON.stringify(gridCell) }}</div>
+
+			Amount : {{ amount }}
 		</form>
 	</script>
 
@@ -109,12 +158,7 @@
 				}
 			},
 			methods: {
-				// selectCateg() {
-				// 	console.log(this.myNewForm);
-				// },
-				// showState() {
-				// 	console.log(this.myNewForm);
-				// }
+				// TODO UI state management (loading, etc.)
 			},
 		});
 
@@ -148,17 +192,62 @@
 		};
 
 
-		var PricingGrids_AxisDefList = {
+		var PricingGrids_DimensionList = {
+			props: {
+				grid: Object
+			},
+			methods: {
+				newDimension: function(){
+					this.grid.addNewDimension();
+				},
+				removeDimension:function(name){
+					this.grid.removeDimension(name);
+				}
+			},
+
+			template: `
+				<table class="table table-bordered mt-3">
+					<thead>
+						<tr>
+							<th>Dimensions</th>
+							<th style="width: 40px;">
+								<a href="#" class="float-end" @click="newDimension">
+									<i class="bi bi-plus-lg"></i>
+								</a>
+							</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr v-for="dim in grid.dimensions">
+							<td>
+								{{ dim.name }}
+								<ul>
+									<li v-for="cat in dim.categories">
+										{{ cat.value }}
+									</li>
+								</ul>
+							</td>
+							<td>
+								<a href="#" class="float-end" @click="removeDimension(dim.name)">
+									<i class="bi bi-x-lg"></i>
+								</a>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+
+			`
+		};
+
+		var _PricingGrids_AbstractDimension = {
 			props: {
 				currentGrid: Object
 			},
 			methods: {
-				newAxis: function(){
-				},
-			},
-			template: `
-			`
+
+			}
 		};
+
 
 		var PricingGrids_GridCell = {
 			props: {
@@ -168,16 +257,19 @@
 
 			},
 			template: `
-				<div>
+				<div class="form-group">
+					<a class="float-end" data-bs-toggle="modal" data-bs-target="#grid-cell-customizer">
+						<i class="bi bi-three-dots"></i>
+					</a>
 					<template v-if="cell">
 						<template v-if="cell.policy">
 							{{cell.policy.type}} <br>
 							<template v-if="cell.policy.type=='FixedPrice'">
-								<input v-model="cell.policy.price">
+								<input class="form-control input-sm col-sm-5" v-model="cell.policy.price">
 							</template>
 							<template v-if="cell.policy.type=='PerVolumePrice'">
 								(arrondi <input v-model="cell.policy.rounding">)
-								<input v-model="cell.policy.price">
+								<input class="form-control input-sm col-sm-5" v-model="cell.policy.price">
 							</template>
 						</template>
 						<template v-else>
@@ -287,181 +379,19 @@
 
 
 
-		/* Components for Item types */
-
-		// var ItemCheck = {
-		// 	delimiters: ['%[', ']%'],
-		// 	props: {
-		// 		item: {
-		// 			type: Object,
-		// 		}
-		// 	},
-		// 	computed: {
-		// 		alertLevel() {
-		// 			//this.item.mainValue; /* <- reactivity hack = "gratuitous" access */;
-		// 			return this.item.alertLvl();
-		// 		}
-		// 	},
-		// 	template: `
-		// 	<div :class="alertLevel" class="itemComponent shadow py-2 px-2 mb-2 rounded">
-		// 	<p class="mb-2">%[item.label]%</p>
-		// 		<div class="row g-1">
-		// 			<div class="col">
-		// 				<input type="radio" class="btn-check" :id="'ok_' +item.$$$idkey" value="ok" v-model="this.item.mainValue" />
-		// 				<label class="w-100 px-2 btn btn-sm btn-outline-success" :for="'ok_' + item.$$$idkey"><i class="fas fa-check fa-sm"></i> Ok</label>
-		// 			</div>
-		// 			<div class="col">
-		// 				<input type="radio" class="btn-check" :id="'nok_' + item.$$$idkey" value="nok" v-model="this.item.mainValue" />
-		// 				<label class="w-100 px-2 btn btn-sm btn-outline-danger" :for="'nok_' + item.$$$idkey"><i class="fas fa-times fa-sm"></i> Pas ok</label>
-		// 			</div>
-		// 			<div class="col">
-		// 				<input type="radio" class="btn-check" :id="'none_' + item.$$$idkey" value="none" v-model="this.item.mainValue" />
-		// 				<label class="w-100 px-2 btn btn-sm btn-outline-secondary" :for="'none_' + item.$$$idkey"><i class="fas fa-question fa-sm"></i> A faire</label>
-		// 			</div>
-		// 		</div>
-		// 	</div>
-		// 	`
-		// };
-
-		// var ItemTemperature = {
-		// 	delimiters: ['%[', ']%'],
-		// 	props: {
-		// 		item: {
-		// 			type: Object,
-		// 		},
-		// 	},
-		// 	computed: {
-		// 		alertLevel() {
-		// 			//this.item.mainValue; /* <- reactivity hack = "gratuitous" access */;
-		// 			return this.item.alertLvl();
-		// 		}
-		// 	},
-		// 	template: `
-		// 	<div :class="alertLevel" class="itemComponent shadow-sm py-1 px-2 mb-2 rounded">
-		// 		<div v-if="item.isLabelEdit" class="col-10 col-sm-5 mb-2 rounded">
-		// 			<input type="text" class="form-control form-control-sm" v-model="item.label">
-		// 		</div>
-		// 		<div v-else>
-		// 		<p class="mb-2">%[item.label]%</p>
-		// 		</div>
-		// 		<div class="input-group input-group-sm mb-2">
-		// 			<div class="col-md-4">
-		// 				<input :class="alertLevel" class="form-control form-control-sm inputComponent" type="number" step="0.1" v-model="item.mainValue" placeholder="Saisir la température" :name="item.label">
-		// 			</div>
-		// 			<span class="input-group-text">°C </span>
-		// 		</div>
-		// 	</div>
-		// 	`
-		// };
-
-		// var ItemContentLevel = {
-		// 	delimiters: ['%[', ']%'],
-		// 	props: {
-		// 		item: {
-		// 			type: Object,
-		// 		},
-		// 	},
-		// 	computed: {
-		// 		alertLevel() {
-		// 			//this.item.mainValue; /* <- reactivity hack = "gratuitous" access */;
-		// 			return this.item.alertLvl();
-		// 		}
-		// 	},
-		// 	template: `
-		// 	<div :class="alertLevel" class="itemComponent rounded shadow-sm py-1 px-2 mb-2">
-		// 		<p class="mb-2">%[item.label]%</p>
-		// 		<div class="input-group input-group-sm mb-2">
-		// 			<div class="col-md-4">
-		// 				<input :class="alertLevel" class="form-control form-control-sm inputComponent" type="number" step="0.1" v-model="item.mainValue" placeholder="Saisir la teneur" :name="item.label">
-		// 			</div>
-		// 			<span class="input-group-text"> % </span>
-		// 		</div>
-		// 	</div>
-		// 	`
-		// };
-
-		// var ItemRepeatGroup = {
-		// 	delimiters: ['%[', ']%'],
-		// 	props: {
-		// 		item: {
-		// 			type: Object,
-		// 		},
-		// 	},
-		// 	methods: {
-		// 		addNewItem() {
-		// 			let copyItem = JSON.parse(JSON.stringify(this.item.itemBase));
-		// 			// LCQPlanManager.injectAdditionalProperties(copyItem);
-		// 			// BizzinjectVueProperties(copyItem);
-		// 			injectVueProperties_item(copyItem);
-
-
-		// 			let copyItemInc = this.item.items.length + 1;
-		// 			copyItem.label = copyItem.label + " " + copyItemInc;
-
-		// 			this.item.items.push(copyItem);
-		// 		},
-		// 		removeItem(id) {
-		// 			this.item.items.splice(id, 1);
-		// 		}
-		// 	},
-		// 	computed: {
-		// 		alertLevel() {
-		// 			this.item.items; /* <- reactivity hack = "gratuitous" access */;
-		// 			return this.item.alertLvl();
-		// 		}
-		// 	},
-		// 	template: `
-		// 	<div :class="alertLevel" class="shadow-sm mb-1 rounded">
-		// 		<div v-for="(subItem, index) in item.items" :key="subItem.$$$idkey">
-		// 			<component :is="subItem.$$$type" :item="subItem" ></component>
-		// 			<button type="button" class="rounded btn btn-sm btn-outline-info m-2 ms-3" @click="removeItem(index)">Supprimer</button>
-		// 		</div>
-		// 	</div>
-		// 	<div>
-		// 		<button type="button" class="btn btn-sm btn-outline-primary my-2 w-100" @click="addNewItem">Ajouter %[item.itemBase.label]%</button>
-		// 	</div>
-		// 	`
-		// };
-
-		// var ItemCompoundGroup = {
-		// 	delimiters: ['%[', ']%'],
-		// 	props: {
-		// 		item: {
-		// 			type: Object,
-		// 		},
-		// 	},
-		// 	computed: {
-		// 		alertLevel() {
-		// 			this.item.items; /* <- reactivity hack = "gratuitous" access */;
-		// 			return this.item.alertLvl();
-		// 		}
-		// 	},
-		// 	template: `
-		// 	<div :class="alertLevel" class="itemGroupComponent shadow-sm p-1 ps-2 pt-2 mb-2 rounded">
-		// 		<p class="col-5 mb-2"><input class="form-control form-control-sm rounded" v-model.trim="item.label"></p>
-		// 		<div v-for="subItem in item.items" :key="subItem.$$$idkey">
-		// 			<component :is="subItem.$$$type" :item="subItem" class="shadow-sm"></component>
-		// 		</div>
-		// 	</div>
-		// 	`
-		// };
 
 
 		gridBuilderApp.component("pricinggrids-tabs", PricingGrids_Tabs);
+
 		gridBuilderApp.component("pricinggrids-grid", PricingGrids_Grid);
 		gridBuilderApp.component("pricinggrids-gridcell", PricingGrids_GridCell);
-		gridBuilderApp.component("pricinggrids-axisdeflist", PricingGrids_AxisDefList);
 
+		gridBuilderApp.component("pricinggrids-dim-list", PricingGrids_DimensionList);
 
 
 
 		gridBuilderApp.component("pricingtest-form", PricingTest_Form);
 
-
-		// appLCQForm.component("lcq-item-temperature", ItemTemperature);
-		// appLCQForm.component("lcq-item-contentLevel", ItemContentLevel);
-		// appLCQForm.component("lcq-item-repeatGroup", ItemRepeatGroup);
-		// appLCQForm.component("lcq-item-compoundGroup", ItemCompoundGroup);
 		gridBuilderApp.mount('#grid-builder');
 	</script>
 
