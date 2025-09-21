@@ -67,7 +67,9 @@
 			</div>
 			<div class="col-12 col-lg-9">
 				<pricinggrids-tabs :ui_state="ui_state"></pricinggrids-tabs>
-				<pricinggrids-grid :ui_state="ui_state"></pricinggrids-grid>
+				<div class="container-fluid overflow-auto">
+					<pricinggrids-grid :grid="ui_state.currentGrid"></pricinggrids-grid>
+				</div>
 				<pricinggrids-dim-list :grid="ui_state.currentGrid"></pricinggrids-dim-list>
 			</div>
 		</div></div>
@@ -239,23 +241,21 @@
 			`
 		};
 
-		var _PricingGrids_AbstractDimension = {
-			props: {
-				currentGrid: Object
-			},
-			methods: {
+		// var _PricingGrids_AbstractDimension = {
+		// 	props: {
+		// 		currentGrid: Object
+		// 	},
+		// 	methods: {
 
-			}
-		};
+		// 	}
+		// };
 
 
 		var PricingGrids_GridCell = {
 			props: {
 				cell: Object
 			},
-			computed:{
-
-			},
+			emits: ["initCell"],
 			template: `
 				<div class="form-group">
 					<a class="float-end" data-bs-toggle="modal" data-bs-target="#grid-cell-customizer">
@@ -278,6 +278,9 @@
 					</template>
 					<template v-else>
 						NO CELL
+						<button @click="$emit('initCell')">
+							<i class="bi bi-file-earmark-plus"></i>
+						</button>
 					</template>
 				</div>
 				`
@@ -285,12 +288,19 @@
 
 		var PricingGrids_Grid = {
 			props: {
-				ui_state: Object
-				//Note : not only "ui_state.currentGrid" is used : a policy can reference another grid !
+				grid: Object
+				//TODO pass the full grid system : a policy can reference another grid !
 			},
 			computed:{
 				dimensionCount(){
-					return this.ui_state.currentGrid.dimensions.length;
+					return this.grid.dimensions.length;
+				}
+			},
+			methods:{
+				initCell: function(coords){
+					this.grid.gridCells.push(
+						{coords, policy: { type: "FixedPrice", price: 0} } //TODO real defaulting
+					);
 				}
 			},
 
@@ -304,14 +314,14 @@
 						</thead>
 						<tbody>
 							<tr>
-								<td><pricinggrids-gridcell :cell="ui_state.currentGrid.gridCellAt({
+								<td><pricinggrids-gridcell :cell="grid.gridCellAt({
 								})"></pricinggrids-gridcell></td>
 							</tr>
 						</tbody>
 					</template>
 					<template v-else-if="dimensionCount==1">
 						{{void(
-							dim0 = ui_state.currentGrid.dimensions[0]
+							dim0 = this.grid.dimensions[0]
 						)}}
 						<thead>
 							<tr>
@@ -320,18 +330,21 @@
 							</tr>
 						</thead>
 						<tbody>
-							<tr v-for="categ_dim0 in dim0.categories" >
+							<tr v-for="categ_dim0 in dim0.categories">
 								<th>{{ categ_dim0.value }}</th>
-								<td><pricinggrids-gridcell :cell="ui_state.currentGrid.gridCellAt({
-									[dim0.name]: categ_dim0.value
-								})"></pricinggrids-gridcell></td>
+								<td>
+									<pricinggrids-gridcell
+										@initCell="initCell({[dim0.name]: categ_dim0.value})"
+										:cell="grid.gridCellAt({[dim0.name]: categ_dim0.value})">
+									</pricinggrids-gridcell>
+								</td>
 							</tr>
 						</tbody>
 					</template>
 					<template v-else-if="dimensionCount==2">
 						{{void(
-							dim0 = ui_state.currentGrid.dimensions[0],
-							dim1 = ui_state.currentGrid.dimensions[1]
+							dim0 = this.grid.dimensions[0],
+							dim1 = this.grid.dimensions[1]
 						)}}
 						<thead>
 							<tr>
@@ -349,11 +362,56 @@
 						<tbody>
 							<tr v-for="categ_dim0 in dim0.categories" >
 								<th>{{ categ_dim0.value }}</th>
-								<td v-for="categ_dim1 in dim1.categories"
-								 ><pricinggrids-gridcell :cell="ui_state.currentGrid.gridCellAt({
-									[dim0.name]: categ_dim0.value,
-									[dim1.name]: categ_dim1.value
-								})"></pricinggrids-gridcell></td>
+								<td v-for="categ_dim1 in dim1.categories">
+									<pricinggrids-gridcell
+										@initCell="initCell({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value})" :cell="grid.gridCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value})">
+									</pricinggrids-gridcell>
+								</td>
+							</tr>
+						</tbody>
+					</template>
+					<template v-else-if="dimensionCount==3">
+						{{void(
+							dim0 = grid.dimensions[0],
+							dim1 = grid.dimensions[1],
+							dim2 = grid.dimensions[2]
+						)}}
+						<thead>
+							<tr>
+								<th rowspan="4">{{ dim0.name }}</th>
+								<th :colspan="dim2.categories.length * dim1.categories.length">
+									{{ dim2.name }}
+								</th>
+							</tr>
+							<tr>
+								<th v-for="categ_dim2 in dim2.categories" :colspan="dim1.categories.length">
+									{{ categ_dim2.value }}
+								</th>
+							</tr>
+							<tr>
+								<th v-for="categ_dim2 in dim2.categories" :colspan="dim1.categories.length">
+									{{ dim1.name }}
+								</th>
+							</tr>
+							<tr>
+								<template v-for="categ_dim2 in dim2.categories">
+								<th v-for="categ_dim1 in dim1.categories">
+									{{ categ_dim1.value }}
+								</th>
+								</template>
+							</tr>
+						</thead>
+						<tbody>
+							<tr v-for="categ_dim0 in dim0.categories" >
+								<th>{{ categ_dim0.value }}</th>
+								<template v-for="categ_dim2 in dim2.categories">
+								<td v-for="categ_dim1 in dim1.categories">
+									<pricinggrids-gridcell
+										@initCell="initCell({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value, [dim2.name]: categ_dim2.value})"
+										:cell="grid.gridCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value, [dim2.name]: categ_dim2.value})">
+									</pricinggrids-gridcell>
+								</td>
+								</template>
 							</tr>
 						</tbody>
 					</template>

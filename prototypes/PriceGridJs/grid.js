@@ -196,7 +196,7 @@ class PricingGrid {
 		let defaultDimension;
 		switch(type){
 			case "EnumCategory":
-				defaultDimension = {name, raw_name:"", categories:[{value: "All", enum: []}] };
+				defaultDimension = {name, raw_name:"", categories:[{value: "Rouge", enum: []}, {value: "Noir", enum: []}] };
 				break;
 			case "ThresholdCategory":
 				defaultDimension = {name, raw_name:"", categories:[{value: "All", threshold: 0}] };
@@ -294,9 +294,12 @@ pricingGrid_acadia_b2b.dimensions =
 			raw_name: "departement",
 			type: "EnumCategory",
 			categories : [
-				{value: "A", enum: [77,75]},
-				{value: "B", enum: [93]},
-				{value: "Corse", enum: [20]},
+				{value: "Zone 01", enum:[75,77,78,91,92,93,94,95,2,8,10,14,18,27,28,36,37,41,45,51,58,59,60,61,62,72,76,80,89]},
+				{value: "Zone 02", enum:[1,3,7,15,21,23,24,26,29,35,39,42,43,44,47,48,49,50,52,53,54,55,63,69,70,71,86,87,88]},
+				{value: "Zone 03", enum:[16,17,19,22,25,33,38,56,57,67,68,73,74,79,85,90]},
+				{value: "Zone 04", enum:[6,9,11,12,13,30,31,32,34,40,46,64,66,81,82,84]},
+				{value: "Zone 05", enum:[4,5,65,83,98]},
+				{value: "Corse",   enum:[20]},
 			]
 		},
 	]
@@ -305,17 +308,10 @@ pricingGrid_acadia_b2b.dimensions =
 pricingGrid_acadia_b2b.gridCells =
 	[
 		{
-			coords: {wcat:"0-5 kg", zone:"A"},
+			coords: {wcat:"0-5 kg", zone:"Zone 01"},
 			policy: {
 				type: "FixedPrice",
 				price: 9.9
-			}
-		},
-		{
-			coords: {wcat:"0-5 kg", zone:"B"},
-			policy: {
-				type: "FixedPrice",
-				price: 10.9
 			}
 		},
 		{
@@ -326,7 +322,7 @@ pricingGrid_acadia_b2b.gridCells =
 			}
 		},
 		{
-			coords: {wcat:"5-100 kg", zone:"A"},
+			coords: {wcat:"5-100 kg", zone:"Zone 01"},
 			policy: {
 				type: "FixedPrice",
 				price: 54.9
@@ -347,7 +343,7 @@ pricingGrid_acadia_b2b.gridCells =
 			}
 		},
 		{
-			coords: {wcat:"100+ kg", zone:"A"},
+			coords: {wcat:"100+ kg", zone:"Zone 01"},
 			policy: {
 				type: "PerVolumePrice",
 				dimension: "poids",
@@ -364,11 +360,16 @@ pricingGrid_acadia_b2b.gridCells =
 				price: 4.7
 			}
 		},
-		/*{
+		{
 			coords: {wcat:"100+ kg", zone:"Corse"},
-			on fait pas
+			policy: {
+				type: "PerVolumePrice",
+				dimension: "poids",
+				rounding: 10,
+				price: 99
+			}
 		}
-		*/
+
 	]
 ;
 
