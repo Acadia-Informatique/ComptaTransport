@@ -12,6 +12,8 @@ class CommandeALivrer {
 		let dptStr = this.codePostal ? this.codePostal.substring(0,2) : "-1";
 		let departement = parseInt(dptStr, 10);
 		return {
+			truc: "truc",
+			poids : this.poids,
 			poidsEntier: Math.ceil(this.poids),
 			departement: departement
 		};
@@ -169,37 +171,38 @@ class PricingGrid {
 		return gridCoordinates;
 	}
 
-	// Returns true for a match.
-	// Important note : an item is matching a grid cell even when the grid cell is "loosely defined".
+	/** Returns true for a match.
+	 * Important note : comparison is done *only* when a property is defined on both side,
+	 * so "loose" matching is possible.
+	 */
 	_matchCoords(searchedCoords, gridCoords){
 		let isMatching = true;
 		for (let coordName in searchedCoords){
-			if (coordName in gridCoords){
-				if (gridCoords[coordName] != searchedCoords[coordName])
-					isMatching = false;
+			if (coordName in gridCoords && gridCoords[coordName] != searchedCoords[coordName]){
+				isMatching = false;
 			}
 		}
 		return isMatching;
 	}
 
 	/**
-	 * append a new default dimension to the grid
+	 * append a new default dimension to the grid.
+	 * @param type among "ThresholdCategory", "EnumCategory", etc.
+	 * @returns created dimension
 	 */
-	addNewDimension(){
-		let name = "dim"; // default name
-		let type = "EnumCategory"; // default type
-
+	addNewDimension(type){
 		// find a non-used name
+		let name = "dim";
 		while (this.dimensions.find( dim => dim.name == name)){ name += "*"; }
 
 		// TODO move defaulting for each type somewhere else
 		let defaultDimension;
 		switch(type){
 			case "EnumCategory":
-				defaultDimension = {name, raw_name:"", categories:[{value: "Rouge", enum: []}, {value: "Noir", enum: []}] };
+				defaultDimension = {type, name, raw_name:"", categories:[{value: "All", enum: []}] };
 				break;
 			case "ThresholdCategory":
-				defaultDimension = {name, raw_name:"", categories:[{value: "All", threshold: 0}] };
+				defaultDimension = {type, name, raw_name:"", categories:[{value: "All", threshold: 0}] };
 				break;
 			default:
 				throw new Error("Unsupported type of Dimension : " + type);
@@ -214,14 +217,13 @@ class PricingGrid {
 
 		// finally, add dimension
 		this.dimensions.push(defaultDimension);
+		return defaultDimension;
 	}
 
 	/**
-	 * Remove a named dimension from the grid
+	 * Remove a dimension from the grid, by index.
 	 */
-	removeDimension(name){
-		let removedDimIdx = this.dimensions.findIndex( dim => dim.name == name);
-		if (removedDimIdx == -1) throw new Error("No such dimension : " + name);
+	removeDimension(removedDimIdx){
 		let removedDimension = this.dimensions[removedDimIdx];
 
 		// readjust existing grid cells
@@ -265,6 +267,32 @@ class PricingGrid {
 		// finally, remove dimension
 		this.dimensions.splice(removedDimIdx, 1);
 	}
+
+	/**
+	 * Rename a dimension.
+	 * @param oldName
+	 * @param newName
+	 */
+	renameDimension(oldName, newName){
+		let oldNamedDim = this.dimensions.find( dim => dim.name == oldName);
+		let newNamedDim = this.dimensions.find( dim => dim.name == newName);
+		if (!oldNamedDim) throw new Error("Cannot rename dimension, name not found : " + oldName);
+		if (newNamedDim) throw new Error("Cannot rename dimension, new name already used : " + newName);
+
+		oldNamedDim.name = newName;
+
+		this.gridCells.forEach(cell => {
+			cell.coords[newName] = cell.coords[oldName];
+			delete cell.coords[oldName];
+		});
+	}
+
+	// /**
+	//  * @returns named dimension, undefined if not found
+	//  */
+	// getDimensionByName(name){
+	// 	return this.dimensions.find( dim => dim.name == name);
+	// }
 }
 
 

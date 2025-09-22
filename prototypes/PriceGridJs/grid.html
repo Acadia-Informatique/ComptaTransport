@@ -32,6 +32,34 @@
 	</script>
 
 	<style>
+		.dimension-buttons {
+			width: 6em;
+			display: inline-flex;
+			flex-flow: column wrap;
+
+		}
+		.dimension-buttons > button {
+			border: none;
+		}
+
+		/** List animations */
+		.list-move, /* apply transition to moving elements */
+		.list-enter-active,
+		.list-leave-active {
+		transition: all 0.5s ease;
+		}
+
+		.list-enter-from,
+		.list-leave-to {
+		opacity: 0;
+		transform: translateX(30px);
+		}
+
+		/* ensure leaving items are taken out of layout flow so that moving
+		animations can be calculated correctly. */
+		.list-leave-active {
+		position: absolute;
+		}
 	</style>
 
 </head>
@@ -70,7 +98,7 @@
 				<div class="container-fluid overflow-auto">
 					<pricinggrids-grid :grid="ui_state.currentGrid"></pricinggrids-grid>
 				</div>
-				<pricinggrids-dim-list :grid="ui_state.currentGrid"></pricinggrids-dim-list>
+				<pricinggrids-dim-list :ui_state="ui_state"></pricinggrids-dim-list>
 			</div>
 		</div></div>
 
@@ -155,12 +183,39 @@
 					ui_state: {
 						system: theSystem, //TODO start with empty / localstored
 						currentGrid: theSystem.grids[0], //TODO react to selection
-						testPricedObj: new CommandeALivrer("FCxxxxxx", 302 /*kg*/, "93420")
+
+						editingDimName: "",
+						editingDimCopy: null,
+
+
+						testPricedObj: new CommandeALivrer("FCxxxxxx", 302 /*kg*/, "93420"),
+
+						confirmCancel: function(callback){
+							let continueFunc = ()=>{
+								this.editingDimName = "";
+								this.editingDimCopy = null;
+								callback();
+							};
+
+							if (this.editingDimCopy) {
+								confirm_dialog("Modification en cours, abandonner ?", {
+									label:'Continuer', class: 'btn-primary',
+									handler: continueFunc
+								}, {
+									label:'Annuler', class: 'btn-secondary',
+								});
+							} else {
+								continueFunc();
+							}
+
+						}
 					}
 				}
 			},
 			methods: {
 				// TODO UI state management (loading, etc.)
+
+
 			},
 		});
 
@@ -177,7 +232,9 @@
 					);
 				},
 				selectGrid: function(name){
-					this.ui_state.currentGrid = this.ui_state.system.findGridByName(name);
+					this.ui_state.confirmCancel(
+						()=>{ this.ui_state.currentGrid = this.ui_state.system.findGridByName(name); }
+					);
 				}
 
 			},
@@ -194,61 +251,169 @@
 		};
 
 
+		var _AbstractDimension = {
+			props: {
+				dimension: Object,
+				isEditing: Boolean,
+				editingDimCopy: Object,
+			},
+			methods: {
+
+			}
+		};
+
+
 		var PricingGrids_DimensionList = {
 			props: {
-				grid: Object
+				ui_state: Object
+			},
+			data(){
+				return {
+					newDimType:"ThresholdCategory"
+				}
 			},
 			methods: {
 				newDimension: function(){
-					this.grid.addNewDimension();
+					this.ui_state.confirmCancel(()=>{
+						let newDim = this.ui_state.currentGrid.addNewDimension(this.newDimType);
+						this.editDimension_start(newDim.name);
+					});
 				},
-				removeDimension:function(name){
-					this.grid.removeDimension(name);
-				}
+				removeDimension:function(idx){
+					let removedDim = this.ui_state.currentGrid.dimensions[idx];
+					confirm_dialog(`Êtes-vous sûr de vouloir supprimer la dimension "${removedDim.name}" ?`, {
+						label:'Continuer', class: 'btn-primary',
+						handler : ()=>{ this.ui_state.currentGrid.removeDimension(idx)}
+					}, {
+						label:'Abandonner', class: 'btn-secondary',
+					});
+				},
+				moveDimension:function(fromIdx, offset){
+					let dimensions = this.ui_state.currentGrid.dimensions;
+					let toIdx = fromIdx + offset;
+					if (fromIdx < 0 || fromIdx >= dimensions.length) throw new Error("'From' index out of range");
+					if (toIdx < 0 || toIdx >= dimensions.length) throw new Error("'To' index out of range");
+					[dimensions[fromIdx], dimensions[toIdx]] = [dimensions[toIdx], dimensions[fromIdx]];
+				},
+				isMovable: function(fromIdx, offset){
+					let dimensions = this.ui_state.currentGrid.dimensions;
+					let toIdx = fromIdx + offset;
+					return (toIdx >= 0 && toIdx < dimensions.length);
+				},
+				editDimension_start:function(name){
+					this.ui_state.confirmCancel(()=>{
+						let editingDim = this.ui_state.currentGrid.dimensions.find( dim => dim.name == name);
+						if (!editingDim) throw new Error(`Dimension "${name}" cannot be found for editing.`);
+
+						this.ui_state.editingDimCopy = JSON.parse(JSON.stringify(editingDim));
+						this.ui_state.editingDimName = name;
+					});
+				},
+				editDimension_end:function(){
+					let editingDimName = this.ui_state.editingDimName;
+					let editingDim = this.ui_state.currentGrid.dimensions.find( dim => dim.name == editingDimName);
+					if (!editingDim) throw new Error("Cannot save to dimension : " + editingDimName);
+
+					// retransfer copy
+					if (this.ui_state.editingDimCopy.name != editingDimName) {
+						if (this.ui_state.currentGrid.dimensions.find( dim => dim.name == this.ui_state.editingDimCopy.name)){
+							alert_dialog(`Renommage de dimension impossible, "${this.ui_state.editingDimCopy.name}" déjà utilisé.`);
+							return; // cancel save
+						} else {
+							this.ui_state.currentGrid.renameDimension(editingDimName, this.ui_state.editingDimCopy.name);
+							this.ui_state.editingDimName = this.ui_state.editingDimCopy.name;
+						}
+					}
+
+					this.ui_state.editingDimName = "";
+					this.ui_state.editingDimCopy = null;
+				},
+
+				editDimension_abort:function(){
+					this.ui_state.editingDimName = "";
+					this.ui_state.editingDimCopy = null;
+				},
+
+
+			},
+			components :{
+				ThresholdCategoryDimension:{
+					extends: _AbstractDimension,
+					template:
+						`<div v-if="isEditing">
+							Nom: <input v-model="editingDimCopy.name"></input>
+
+						</div>
+						<div v-else>
+							"{{ dimension.name }}" : par seuil de "{{ dimension.raw_name }}"
+							<ul>
+								<li v-for="cat in dimension.categories">
+									{{ cat.value }}
+								</li>
+							</ul>
+						</div>`
+				},
+				EnumCategoryDimension:{
+					extends: _AbstractDimension,
+					template:
+						`<div v-if="isEditing">
+							Nom: <input v-model="editingDimCopy.name"></input>
+						</div>
+						<div v-else>
+							"{{ dimension.name }}" : par groupe de "{{ dimension.raw_name }}"
+							<ul>
+								<li v-for="cat in dimension.categories">
+									{{ cat.value }}
+								</li>
+							</ul>
+						</div>`
+				},
+
+
 			},
 
 			template: `
-				<table class="table table-bordered mt-3">
-					<thead>
-						<tr>
-							<th>Dimensions</th>
-							<th style="width: 40px;">
-								<a href="#" class="float-end" @click="newDimension">
-									<i class="bi bi-plus-lg"></i>
-								</a>
-							</th>
-						</tr>
-					</thead>
-					<tbody>
-						<tr v-for="dim in grid.dimensions">
-							<td>
-								{{ dim.name }}
-								<ul>
-									<li v-for="cat in dim.categories">
-										{{ cat.value }}
-									</li>
-								</ul>
-							</td>
-							<td>
-								<a href="#" class="float-end" @click="removeDimension(dim.name)">
-									<i class="bi bi-x-lg"></i>
-								</a>
-							</td>
-						</tr>
-					</tbody>
-				</table>
+				<ul class="list-group">
+					<TransitionGroup name="list">
+					<li v-for="(dim, dimIdx) in ui_state.currentGrid.dimensions" class="list-group-item" :key="dim.name">
+						<div class="container-fluid"><div class="row">
+							<div class="col-2 dimension-buttons">
+								<template v-if="dim.name==ui_state.editingDimName">
+									<button v-if="isMovable(dimIdx,-1)" class="bi bi-caret-up-fill" @click="moveDimension(dimIdx,-1)">
+									</button><button v-else class="bi bi-caret-up" disabled></button>
+									<button v-if="isMovable(dimIdx,+1)" class="bi bi-caret-down-fill" @click="moveDimension(dimIdx,+1)">
+									</button><button v-else class="bi bi-caret-down" disabled></button>
+									<button class="bi bi-x-lg" @click="removeDimension(dimIdx)">
+									</button>
+									<button @click="editDimension_end">Save</button>
+									<button @click="editDimension_abort">Cancel</button>
+								</template>
+								<template v-else>
+									<button class="bi bi-pencil-square" @click="editDimension_start(dim.name)">
+									</button>
+								</template>
+							</div>
+							<component class="col-10" :is="dim.type+'Dimension'"
+							 :dimension="dim" :editingDimCopy="ui_state.editingDimCopy"
+							 :isEditing="dim.name==ui_state.editingDimName"></component>
+						</div></div>
+					</li>
+					</TransitionGroup>
+					<li class="list-group-item">
+						<button class="btn btn-secondary" @click="newDimension">
+							Ajouter une dimension
+						</button>
+						de type
+						<select v-model="newDimType">
+							<option disabled value="">Type de dimension</option>
+							<option value="ThresholdCategory">Par seuil</option>
+							<option value="EnumCategory">Par énumération</option>
+						</select>
+					</li>
 
+				</ul>
 			`
 		};
-
-		// var _PricingGrids_AbstractDimension = {
-		// 	props: {
-		// 		currentGrid: Object
-		// 	},
-		// 	methods: {
-
-		// 	}
-		// };
 
 
 		var PricingGrids_GridCell = {
@@ -445,7 +610,6 @@
 		gridBuilderApp.component("pricinggrids-gridcell", PricingGrids_GridCell);
 
 		gridBuilderApp.component("pricinggrids-dim-list", PricingGrids_DimensionList);
-
 
 
 		gridBuilderApp.component("pricingtest-form", PricingTest_Form);
