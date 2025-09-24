@@ -32,14 +32,10 @@
 	</script>
 
 	<style>
-		.dimension-buttons {
-			width: 6em;
-			display: inline-flex;
-			flex-flow: column wrap;
-
-		}
-		.dimension-buttons > button {
-			border: none;
+		.gridCell input {
+			width:4em;
+			border:lightgrey 1px dotted;
+			padding: 0.2em 0.5em;
 		}
 
 		/** List animations */
@@ -103,7 +99,7 @@
 		</div></div>
 
 		<!-- Modal dialog template for generic ConfirmDialog -->
-		<div class="modal fade" id="modal-confirm-dialog" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+		<div class="modal" id="modal-confirm-dialog" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
 			<div class="modal-dialog">
 				<div class="modal-content">
 					<div class="modal-header">
@@ -126,18 +122,23 @@
 			<div class="modal-dialog modal-dialog-scrollable modal-fullscreen-md-down">
 				<div class="modal-content">
 					<div class="modal-header">
-						<h5 class="modal-title">Modal title</h5>
+						<h5 class="modal-title">Cellule de grille</h5>
 						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 					</div>
 					<div class="modal-body">
+							policy: {
+								type: "PerVolumePrice",
+								attribute: "poids",
+								rounding: 10,
+								price: 4.4
+							}
 
-						... TODO Policy form ...
-
-
+						<input type="radio" value="FixedPrice" v-model="ui_state.editingPolicyCopy.type">Forfait</input> <br>
+						<input type="radio" value="PerVolumePrice" v-model="ui_state.editingPolicyCopy.type">Au volume</input><br>
 					</div>
 					<div class="modal-footer">
-						<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-						<button type="button" class="btn btn-primary">Save changes</button>
+						<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abandonner</button>
+						<button type="button" class="btn btn-primary">Sauvegarder</button>
 					</div>
 				</div>
 			</div>
@@ -156,13 +157,13 @@
 				<label class="form-label" for="inputPoids">Poids</label>
 				<input type="number" step="0.1" min="0" lang="en-US"
 				 class="form-control" id="inputPoids" placeholder="Poids (en kg)"
-				 v-model="ui_state.testPricedObj.poids">
+				 v-model.number="ui_state.testPricedObj.poids">
 			</div>
 			<div class="mb-3">
 				<label class="form-label" for="inputPostCode">Code postal</label>
 				<input type="text" maxlength="5"
 				 class="form-control" id="inputPostCode" placeholder="Code postal"
-				 v-model="ui_state.testPricedObj.codePostal">
+				 v-model.trim="ui_state.testPricedObj.codePostal">
 			</div>
 			{{ void({gridCell, amount} = ui_state.currentGrid.apply(ui_state.testPricedObj)) }}
 			<div> <!--class="text-truncate" -->{{ JSON.stringify(gridCell) }}</div>
@@ -184,6 +185,13 @@
 						system: theSystem, //TODO start with empty / localstored
 						currentGrid: theSystem.grids[0], //TODO react to selection
 
+						editingPolicyCopy: {
+							type: "PerVolumePrice",
+							attribute: "poids",
+							rounding: 10,
+							price: 4.4
+						}, //TODO XXXXXXXXXXXXXXXXXXX
+
 						editingDimName: "",
 						editingDimCopy: null,
 
@@ -198,7 +206,7 @@
 							};
 
 							if (this.editingDimCopy) {
-								confirm_dialog("Modification en cours, abandonner ?", {
+								confirm_dialog("Dimension","Modification en cours, abandonner ?",{
 									label:'Continuer', class: 'btn-primary',
 									handler: continueFunc
 								}, {
@@ -254,11 +262,22 @@
 		var _AbstractDimension = {
 			props: {
 				dimension: Object,
-				isEditing: Boolean,
-				editingDimCopy: Object,
+				ui_state: Object
 			},
-			methods: {
+			data(){
+				let typicalRawCoords = Object.entries(this.ui_state.testPricedObj.getPPGRawCoordinates()); //arguably typical ?...
 
+				let numericRawCoords =  typicalRawCoords.filter(([k,v]) => typeof v == "number").map(([k,v]) => k);
+				let stringRawCoords =  typicalRawCoords.filter(([k,v]) =>typeof v == "string").map(([k,v]) => k);
+				return {
+					numericRawCoords,
+					stringRawCoords
+				}
+			},
+			computed: {
+				isEditing(){
+					return (this.dimension.name == this.ui_state.editingDimName);
+				}
 			}
 		};
 
@@ -273,35 +292,41 @@
 				}
 			},
 			methods: {
-				newDimension: function(){
+				newDimension(){
 					this.ui_state.confirmCancel(()=>{
 						let newDim = this.ui_state.currentGrid.addNewDimension(this.newDimType);
-						this.editDimension_start(newDim.name);
+						this.editDimension_start(null, newDim.name);
 					});
 				},
-				removeDimension:function(idx){
+				removeDimension(idx){
 					let removedDim = this.ui_state.currentGrid.dimensions[idx];
-					confirm_dialog(`Êtes-vous sûr de vouloir supprimer la dimension "${removedDim.name}" ?`, {
+					confirm_dialog("Dimension",`Êtes-vous sûr de vouloir supprimer la dimension "${removedDim.name}" ?`,{
 						label:'Continuer', class: 'btn-primary',
-						handler : ()=>{ this.ui_state.currentGrid.removeDimension(idx)}
+						handler : ()=>{
+							this.ui_state.currentGrid.removeDimension(idx);
+							this.ui_state.editingDimName = "";
+							this.ui_state.editingDimCopy = null;
+						}
 					}, {
 						label:'Abandonner', class: 'btn-secondary',
 					});
 				},
-				moveDimension:function(fromIdx, offset){
+				moveDimension(fromIdx, offset){
 					let dimensions = this.ui_state.currentGrid.dimensions;
 					let toIdx = fromIdx + offset;
 					if (fromIdx < 0 || fromIdx >= dimensions.length) throw new Error("'From' index out of range");
 					if (toIdx < 0 || toIdx >= dimensions.length) throw new Error("'To' index out of range");
 					[dimensions[fromIdx], dimensions[toIdx]] = [dimensions[toIdx], dimensions[fromIdx]];
 				},
-				isMovable: function(fromIdx, offset){
+				isMovable(fromIdx, offset){
 					let dimensions = this.ui_state.currentGrid.dimensions;
 					let toIdx = fromIdx + offset;
 					return (toIdx >= 0 && toIdx < dimensions.length);
 				},
-				editDimension_start:function(name){
+				editDimension_start(event, name){
 					this.ui_state.confirmCancel(()=>{
+						if (event) this._clearEditing(event);
+
 						let editingDim = this.ui_state.currentGrid.dimensions.find( dim => dim.name == name);
 						if (!editingDim) throw new Error(`Dimension "${name}" cannot be found for editing.`);
 
@@ -309,27 +334,56 @@
 						this.ui_state.editingDimName = name;
 					});
 				},
-				editDimension_end:function(){
-					let editingDimName = this.ui_state.editingDimName;
-					let editingDim = this.ui_state.currentGrid.dimensions.find( dim => dim.name == editingDimName);
-					if (!editingDim) throw new Error("Cannot save to dimension : " + editingDimName);
+				editDimension_end(event){
+					let form = event.target.closest("form.needs-validation")
 
-					// retransfer copy
-					if (this.ui_state.editingDimCopy.name != editingDimName) {
-						if (this.ui_state.currentGrid.dimensions.find( dim => dim.name == this.ui_state.editingDimCopy.name)){
-							alert_dialog(`Renommage de dimension impossible, "${this.ui_state.editingDimCopy.name}" déjà utilisé.`);
-							return; // cancel save
-						} else {
-							this.ui_state.currentGrid.renameDimension(editingDimName, this.ui_state.editingDimCopy.name);
-							this.ui_state.editingDimName = this.ui_state.editingDimCopy.name;
-						}
+					// 1) Validate form
+					// 1.a) name unicity check
+					let name_field = form.querySelector("#dim-name");
+					let oldName = this.ui_state.editingDimName;
+					let newName = this.ui_state.editingDimCopy.name;
+
+					if (newName != oldName
+					  &&  this.ui_state.currentGrid.dimensions.find( dim => dim.name == newName)){
+						name_field.setCustomValidity("dupe");
+					} else {
+						name_field.setCustomValidity("");
+					}
+					// 1.b) validate other attribs
+					if (!form.checkValidity()) {
+						event.preventDefault();
+						event.stopPropagation();
+						form.classList.add('was-validated')
+						return;
 					}
 
-					this.ui_state.editingDimName = "";
-					this.ui_state.editingDimCopy = null;
+					// 2) Save form
+					let editingDim = this.ui_state.currentGrid.dimensions.find( dim => dim.name == oldName);
+					if (!editingDim) throw new Error("Cannot save to dimension : " + oldName);
+
+					// 2.a) adjust new name if needed
+					if (oldName != newName) this.ui_state.currentGrid.renameDimension(oldName, newName);
+
+					// 2.b) prune all categories with no value
+					this.ui_state.editingDimCopy.categories = this.ui_state.editingDimCopy.categories.filter(c => !(typeof c.value == "string" && c.value==""));
+
+					// 2.c) ... *then* copy other attribs
+					Object.assign(editingDim, this.ui_state.editingDimCopy);
+
+					// 2.d) update cells for categories change
+					this.ui_state.currentGrid.updateCellsFromDimensions();
+
+					this._clearEditing(event);
 				},
 
-				editDimension_abort:function(){
+				editDimension_abort(event){
+					this._clearEditing(event);
+				},
+
+				_clearEditing(event){
+					let form = event.target.closest("form.needs-validation")
+					form.classList.remove('was-validated');
+
 					this.ui_state.editingDimName = "";
 					this.ui_state.editingDimCopy = null;
 				},
@@ -339,31 +393,128 @@
 			components :{
 				ThresholdCategoryDimension:{
 					extends: _AbstractDimension,
+					computed:{
+						categoryThresholdList: {
+							get() {
+								return this.ui_state.editingDimCopy.categories.map(c => c.value).join(";");
+							},
+							set(value) {
+								let asCleanStr = value.replaceAll(/[^\d.]+/g, ";");
+								let asNumbers = asCleanStr.split(";").map(s => parseFloat(s, 10)).filter(n => n >=0);
+								let asUniqueNumbers = [ ...new Set(asNumbers)];
+								let categoryValues = asUniqueNumbers.sort((a, b) => a - b);
+
+								let newCategories = categoryValues.map( v => ({value:v}) );
+								this.ui_state.editingDimCopy.categories = newCategories;
+							}
+						}
+					},
 					template:
 						`<div v-if="isEditing">
-							Nom: <input v-model="editingDimCopy.name"></input>
+							<div class="input-group mb-3">
+								<input id="dim-name" class="form-control" placeholder="Nom interne" v-model.trim="ui_state.editingDimCopy.name" required>
+								<span class="input-group-text">par seuil de</span>
+								<select class="form-control" v-model="ui_state.editingDimCopy.raw_name" required>
+									<option disabled value="">Coordonnée brute</option>
+									<option v-for="k in numericRawCoords" :value="k">
+										{{ k }}
+									</option>
+								</select>
+								<div class="invalid-feedback">
+									Nom interne unique et non-vide (et court de préférence)
+								</div>
+							</div>
+							<label class="form-label" for="dim-categoryThresholdList">Liste des seuils</label>
+							<input class="form-control" id="dim-categoryThresholdList" v-model.lazy="categoryThresholdList">
+						</div>
+						<div v-else>
+							"{{ dimension.name }}" : par seuil de "{{ dimension.raw_name }}"
+							(<span v-for="(cat, i) in dimension.categories">{{i?" - ":""}}{{ cat.value }}</span>)
+						</div>`
+				},
+				EnumCategoryDimension:{
+					extends: _AbstractDimension,
+					computed: {
+						categoryAlerts(){
+							let categoryAlerts = [];
+							const categories = this.ui_state.editingDimCopy.categories;
 
+							// category values (="names")
+							let categoryNames = categories.map(c => c.value);
+							if (categoryNames.includes("")){
+								categoryAlerts.push(`Attention, les catégories sans nom seront supprimées !`);
+							}
+
+							categoryNames = categoryNames.filter(v => v!="");
+							{
+								const dupes =  Array.from(new Set(categoryNames.filter((item, i) => categoryNames.indexOf(item) !== i)));
+								if (dupes.length > 0){
+									categoryAlerts.push(`Les noms de catégorie suivants sont en doublon : ${dupes}.`);
+								}
+							}
+
+							// intra-category dupes
+							for (const cat of categories){
+								const dupes =  Array.from(new Set(cat.enum.filter((item, i) => cat.enum.indexOf(item) !== i)));
+								if (dupes.length > 0){
+									categoryAlerts.push(`La catégorie "${cat.value}" contient les doublons suivants : ${dupes}.`);
+								}
+							}
+							// cross-category dupes
+							for (let x=0; x<categories.length; x++){
+								for (let y=0; y<categories.length; y++){
+									if (x >= y) continue;
+									const catx = categories[x], caty = categories[y];
+									const sx = new Set(catx.enum), sy = new Set(caty.enum);
+									//const dupes = sx.intersection(sy); exists since... 2024. A bit too fresh for me
+									const dupes = Array.from(new Set([...sx].filter(v => sy.has(v))));
+									if (dupes.length > 0){
+										categoryAlerts.push(`Les catégories "${catx.value}" et "${caty.value}" contiennent en commun : ${dupes}.`);
+									}
+								}
+							}
+							return categoryAlerts;
+						}
+					},
+					methods:{
+						addCategory(){
+							this.ui_state.editingDimCopy.categories.push({value:"<Nouv.>", enum:[]}); //TODO defaulting
+						}
+					},
+					template:
+						`<div v-if="isEditing">
+							<div class="input-group mb-3">
+								<input id="dim-name" class="form-control" placeholder="Nom interne" v-model.trim="ui_state.editingDimCopy.name" required>
+								<span class="input-group-text">par seuil de</span>
+								<select class="form-control" v-model="ui_state.editingDimCopy.raw_name" required>
+									<option disabled value="">Coordonnée brute</option>
+									<option v-for="k in stringRawCoords" :value="k">
+										{{ k }}
+									</option>
+								</select>
+								<div class="invalid-feedback">
+									Nom interne unique et non-vide (et court de préférence)
+								</div>
+							</div>
+
+							<label class="form-label">Catégories</label>
+							<div class="container">
+								<div class="input-group" v-for="cat in ui_state.editingDimCopy.categories">
+									<input class="form-control" v-model.trim="cat.value" style="flex-grow: 0; flex-basis:6em">
+									<span class="input-group-text">:</span>
+									<splitting-input class="form-control" v-model="cat.enum"></splitting-input>
+								</div>
+								<button type="button" @click="addCategory" class="btn btn-outline-secondary bi bi-plus-lg"></button>
+								<ul v-if="categoryAlerts.length>0" class="alert alert-warning fade show" role="alert">
+									<li v-for="ca in categoryAlerts">{{ ca }}</li>
+								</ul>
+							</div>
 						</div>
 						<div v-else>
 							"{{ dimension.name }}" : par seuil de "{{ dimension.raw_name }}"
 							<ul>
 								<li v-for="cat in dimension.categories">
-									{{ cat.value }}
-								</li>
-							</ul>
-						</div>`
-				},
-				EnumCategoryDimension:{
-					extends: _AbstractDimension,
-					template:
-						`<div v-if="isEditing">
-							Nom: <input v-model="editingDimCopy.name"></input>
-						</div>
-						<div v-else>
-							"{{ dimension.name }}" : par groupe de "{{ dimension.raw_name }}"
-							<ul>
-								<li v-for="cat in dimension.categories">
-									{{ cat.value }}
+									<strong>{{ cat.value }}</strong> : <em>{{ cat.enum.join(", ") }}</em>
 								</li>
 							</ul>
 						</div>`
@@ -376,27 +527,24 @@
 				<ul class="list-group">
 					<TransitionGroup name="list">
 					<li v-for="(dim, dimIdx) in ui_state.currentGrid.dimensions" class="list-group-item" :key="dim.name">
-						<div class="container-fluid"><div class="row">
-							<div class="col-2 dimension-buttons">
+						<form class="container-fluid needs-validation"><div class="row">
+							<div class="dimension-buttons d-inline-flex flex-row flex-md-column col-md-2">
 								<template v-if="dim.name==ui_state.editingDimName">
-									<button v-if="isMovable(dimIdx,-1)" class="bi bi-caret-up-fill" @click="moveDimension(dimIdx,-1)">
-									</button><button v-else class="bi bi-caret-up" disabled></button>
-									<button v-if="isMovable(dimIdx,+1)" class="bi bi-caret-down-fill" @click="moveDimension(dimIdx,+1)">
-									</button><button v-else class="bi bi-caret-down" disabled></button>
-									<button class="bi bi-x-lg" @click="removeDimension(dimIdx)">
-									</button>
-									<button @click="editDimension_end">Save</button>
-									<button @click="editDimension_abort">Cancel</button>
+									<button type="button" class="btn btn-outline-primary mb-1" @click="editDimension_abort">Cancel</button>
+									<button type="button" class="btn btn-outline-primary mb-1" @click="removeDimension(dimIdx)">Delete</button>
+									<button type="button" class="btn btn-outline-primary mb-1" @click="editDimension_end">Save</button>
 								</template>
 								<template v-else>
-									<button class="bi bi-pencil-square" @click="editDimension_start(dim.name)">
-									</button>
+									<button type="button" class="btn btn-secondary mb-1 bi bi-pencil-square" @click="editDimension_start($event, dim.name)"></button>
+									<button type="button" class="btn btn-secondary mb-1 bi bi-caret-up-fill" @click="moveDimension(dimIdx,-1)" :disabled="!isMovable(dimIdx,-1)"></button>
+									<button type="button" class="btn btn-secondary mb-1 bi bi-caret-down-fill" @click="moveDimension(dimIdx,+1)" :disabled="!isMovable(dimIdx,+1)"></button>
 								</template>
 							</div>
-							<component class="col-10" :is="dim.type+'Dimension'"
-							 :dimension="dim" :editingDimCopy="ui_state.editingDimCopy"
-							 :isEditing="dim.name==ui_state.editingDimName"></component>
-						</div></div>
+							<div class="col-10">
+								<component :is="dim.type+'Dimension'"
+									:dimension="dim" :ui_state="ui_state"></component>
+							</div>
+						</div></form>
 					</li>
 					</TransitionGroup>
 					<li class="list-group-item">
@@ -420,32 +568,27 @@
 			props: {
 				cell: Object
 			},
-			emits: ["initCell"],
 			template: `
-				<div class="form-group">
+				<div class="gridCell">
 					<a class="float-end" data-bs-toggle="modal" data-bs-target="#grid-cell-customizer">
 						<i class="bi bi-three-dots"></i>
 					</a>
 					<template v-if="cell">
 						<template v-if="cell.policy">
-							{{cell.policy.type}} <br>
 							<template v-if="cell.policy.type=='FixedPrice'">
-								<input class="form-control input-sm col-sm-5" v-model="cell.policy.price">
+								<input v-model.number="cell.policy.price">
 							</template>
 							<template v-if="cell.policy.type=='PerVolumePrice'">
-								(arrondi <input v-model="cell.policy.rounding">)
-								<input class="form-control input-sm col-sm-5" v-model="cell.policy.price">
+								<input v-model.number="cell.policy.price">*{{cell.policy.attribute}}
+								(arrondi à <input type="number" step="1" min="1" v-model.number="cell.policy.rounding">)
 							</template>
 						</template>
 						<template v-else>
-							NO POLICY
+							<span class="badge bg-danger">NO POLICY</span>
 						</template>
 					</template>
 					<template v-else>
-						NO CELL
-						<button @click="$emit('initCell')">
-							<i class="bi bi-file-earmark-plus"></i>
-						</button>
+						<span class="badge bg-danger">NO CELL</span>
 					</template>
 				</div>
 				`
@@ -462,10 +605,30 @@
 				}
 			},
 			methods:{
-				initCell: function(coords){
-					this.grid.gridCells.push(
-						{coords, policy: { type: "FixedPrice", price: 0} } //TODO real defaulting
-					);
+				categoryLabel(dimension, category, categoryIndex){
+					let label;
+					switch (dimension.type) {
+						case "ThresholdCategory":
+							let nextCategory = categoryIndex < dimension.categories.length - 1
+							 ? dimension.categories[categoryIndex+1]
+							 : null;
+							 switch (dimension.raw_name){
+								case "poids" : {
+									label = nextCategory
+									 ? `${category.value} - ${nextCategory.value} kg`
+									 : `${category.value}+ kg`;
+								} break;
+								case "poidsEntier": {
+									label = nextCategory
+									 ? `${category.value} - ${nextCategory.value - 1} kg`
+									 : `${category.value}+ kg`;
+								} break;
+							 }
+
+						case "EnumCategory":
+						default:
+					}
+					return label ?? category.value;
 				}
 			},
 
@@ -495,11 +658,10 @@
 							</tr>
 						</thead>
 						<tbody>
-							<tr v-for="categ_dim0 in dim0.categories">
-								<th>{{ categ_dim0.value }}</th>
+							<tr v-for="(categ_dim0, categIdx_dim0) in dim0.categories">
+								<th>{{ categoryLabel(dim0, categ_dim0, categIdx_dim0) }}</th>
 								<td>
 									<pricinggrids-gridcell
-										@initCell="initCell({[dim0.name]: categ_dim0.value})"
 										:cell="grid.gridCellAt({[dim0.name]: categ_dim0.value})">
 									</pricinggrids-gridcell>
 								</td>
@@ -519,17 +681,17 @@
 								</th>
 							</tr>
 							<tr>
-								<th v-for="categ_dim1 in dim1.categories">
-									{{ categ_dim1.value }}
+								<th v-for="(categ_dim1, categIdx_dim1) in dim1.categories">
+									{{ categoryLabel(dim1, categ_dim1, categIdx_dim1) }}
 								</th>
 							</tr>
 						</thead>
 						<tbody>
-							<tr v-for="categ_dim0 in dim0.categories" >
-								<th>{{ categ_dim0.value }}</th>
+							<tr v-for="(categ_dim0, categIdx_dim0) in dim0.categories" >
+								<th>{{ categoryLabel(dim0, categ_dim0, categIdx_dim0) }}</th>
 								<td v-for="categ_dim1 in dim1.categories">
 									<pricinggrids-gridcell
-										@initCell="initCell({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value})" :cell="grid.gridCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value})">
+										:cell="grid.gridCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value})">
 									</pricinggrids-gridcell>
 								</td>
 							</tr>
@@ -549,8 +711,8 @@
 								</th>
 							</tr>
 							<tr>
-								<th v-for="categ_dim2 in dim2.categories" :colspan="dim1.categories.length">
-									{{ categ_dim2.value }}
+								<th v-for="(categ_dim2, categIdx_dim2) in dim2.categories" :colspan="dim1.categories.length">
+									{{ categoryLabel(dim2, categ_dim2, categIdx_dim2) }}
 								</th>
 							</tr>
 							<tr>
@@ -560,19 +722,18 @@
 							</tr>
 							<tr>
 								<template v-for="categ_dim2 in dim2.categories">
-								<th v-for="categ_dim1 in dim1.categories">
-									{{ categ_dim1.value }}
+								<th v-for="(categ_dim1, categIdx_dim1) in dim1.categories">
+									{{ categoryLabel(dim1, categ_dim1, categIdx_dim1) }}
 								</th>
 								</template>
 							</tr>
 						</thead>
 						<tbody>
-							<tr v-for="categ_dim0 in dim0.categories" >
-								<th>{{ categ_dim0.value }}</th>
+							<tr v-for="(categ_dim0, categIdx_dim0) in dim0.categories" >
+								<th>{{ categoryLabel(dim0, categ_dim0, categIdx_dim0) }}</th>
 								<template v-for="categ_dim2 in dim2.categories">
 								<td v-for="categ_dim1 in dim1.categories">
 									<pricinggrids-gridcell
-										@initCell="initCell({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value, [dim2.name]: categ_dim2.value})"
 										:cell="grid.gridCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value, [dim2.name]: categ_dim2.value})">
 									</pricinggrids-gridcell>
 								</td>
@@ -598,11 +759,30 @@
 			template: '#PricingTest-Form-template'
 		};
 
+		/** Splitting to array */
+		var SplittingInput = {
+			props: {
+				modelValue: Array
+			},
+			emits: ['update:modelValue'],
+			computed: {
+				value: {
+					get() {
+						return this.modelValue.join(" ; ");
+					},
+					set(value) {
+						let arrValue =  value.split(";").map(s => s.trim());
+						//if you arrValue.sort(); you'll need to .lazy the v-model in template
+						this.$emit('update:modelValue', arrValue);
+					}
+				}
+			},
+			template: `<input v-model="value" />`
+		};
 
 
 
-
-
+		gridBuilderApp.component("splitting-input", SplittingInput);
 
 		gridBuilderApp.component("pricinggrids-tabs", PricingGrids_Tabs);
 

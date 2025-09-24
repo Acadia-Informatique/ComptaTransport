@@ -4,49 +4,25 @@ class CommandeALivrer {
 	constructor(numero, poids, codePostal){
 		this.numero = numero;
 		this.poids = poids;
+		this.pays = "France";
 		this.codePostal = codePostal;
+		this.prefTransportLourd = "";
 	}
 
 	// from interface "pricedObject" : return common Pricing Policy Grid raw coordinates as object
 	getPPGRawCoordinates(){
-		let dptStr = this.codePostal ? this.codePostal.substring(0,2) : "-1";
-		let departement = parseInt(dptStr, 10);
+		let departement = (this.pays=="France" && this.codePostal &&  this.codePostal.length==5) ? this.codePostal.substring(0,2) : "00";
 		return {
-			truc: "truc",
 			poids : this.poids,
 			poidsEntier: Math.ceil(this.poids),
-			departement: departement
+			pays: this.pays, // TODO lookup ISO 3166-1 alpha-2 or alpha-3 codes
+			departement,
+			prefTransportLourd: this.prefTransportLourd
 		};
 	}
 }
 
 /*
-class Dimension {
-	constructor(name) {
-		this.name = name;
-	}
-}
-
-class CategoryDimension extends Dimension {
-	constructor(name, categories) {
-		super(name);
-		this.categories = categories;
-	}
-}
-/*
-class ThresholdCategoryDimension extends CategoryDimension {
-	constructor(name, thresholds) {
-		super(name);
-		this.thresholds = thresholds;
-	}
-} TODO sur les categories[i], trier et générer en auto les *.value en fonction des *.threshold
-
-class EnumCategoryDimension extends CategoryDimension {
-	constructor(name, thresholds) {
-		super(name);
-		this.thresholds = thresholds;
-	}
-}
 
 // TODO ajouter système de délégation de grille dans les Policy (avec report de frais, ex. BTC en poids élevé = BTB + 3,10 ou 20 €)
 
@@ -94,8 +70,7 @@ class PricingGrid {
 					amount = policy.price;
 				} break;
 				case "PerVolumePrice": {
-					let volume = pricedObject[policy.dimension];
-					console.warn(volume, pricedObject);
+					let volume = pricedObject[policy.attribute];
 					let roundedVolume = policy.rounding * Math.ceil(volume / policy.rounding);
 					amount = roundedVolume * policy.price;
 				} break;
@@ -117,7 +92,7 @@ class PricingGrid {
 	gridCellAt(gridCoordinates){
 		// collect all applicable grid cells...
 		let applicablePolicies = [];
-		for (let cell of this.gridCells){
+		for (const cell of this.gridCells){
 			if (this._matchCoords(gridCoordinates, cell.coords)){
 				applicablePolicies.push(cell);
 			}
@@ -142,13 +117,13 @@ class PricingGrid {
 	//translate raw coordinates to grid coordinates (= apply category definitions)
 	_toGridCoordinates(rawCoordinates){
 		let gridCoordinates = {};
-		for (let dimension of this.dimensions) {
+		for (const dimension of this.dimensions) {
 			let rawValue = rawCoordinates[dimension.raw_name];
 			let categoryValue = null;
 			switch(dimension.type){
 				case "ThresholdCategory": {
-					for (let category of dimension.categories){
-						if (rawValue >= category.threshold){
+					for (const category of dimension.categories){
+						if (rawValue >= category.value){
 							categoryValue = category.value;
 							// keep last fitting category
 						}
@@ -156,7 +131,7 @@ class PricingGrid {
 
 				} break;
 				case "EnumCategory": {
-					for (let category of dimension.categories){
+					for (const category of dimension.categories){
 						if (category.enum.includes(rawValue)){
 							categoryValue = category.value;
 							break; // pick 1st matching category
@@ -177,7 +152,7 @@ class PricingGrid {
 	 */
 	_matchCoords(searchedCoords, gridCoords){
 		let isMatching = true;
-		for (let coordName in searchedCoords){
+		for (const coordName in searchedCoords){
 			if (coordName in gridCoords && gridCoords[coordName] != searchedCoords[coordName]){
 				isMatching = false;
 			}
@@ -202,7 +177,7 @@ class PricingGrid {
 				defaultDimension = {type, name, raw_name:"", categories:[{value: "All", enum: []}] };
 				break;
 			case "ThresholdCategory":
-				defaultDimension = {type, name, raw_name:"", categories:[{value: "All", threshold: 0}] };
+				defaultDimension = {type, name, raw_name:"", categories:[{value: 0}] };
 				break;
 			default:
 				throw new Error("Unsupported type of Dimension : " + type);
@@ -211,7 +186,7 @@ class PricingGrid {
 		// readjust existing grid cells
 		// => all existing cells goe to 1st category of new dimension
 		let defaultCategoryVal = defaultDimension.categories[0].value;
-		for (let cell of this.gridCells){
+		for (const cell of this.gridCells){
 			cell.coords[name] = defaultCategoryVal
 		}
 
@@ -229,30 +204,9 @@ class PricingGrid {
 		// readjust existing grid cells
 		// => keep cells matching the 1st category in removed dimension
 		let remainingDimensions = this.dimensions.filter( (dim, idx) => idx != removedDimIdx);
-
-		function collectRemainingKeys(dimensions, keyVal){
-			if (dimensions.length == 0){
-				return [ {[keyVal.k]: keyVal.v} ];
-			} else {
-				let childDim = dimensions[0];
-				let results = [];
-				for (let childCat of childDim.categories){
-					let childResults = collectRemainingKeys(dimensions.slice(1), {k:childDim.name, v:childCat.value});
-					for (let cr of childResults){
-						if (keyVal != null) {
-							let obj = { [keyVal.k]: keyVal.v, ...cr};
-							results.push(obj);
-						} else{
-							results.push(cr);
-						}
-					}
-				}
-				return results;
-			}
-		}
-		let remainingKeys = collectRemainingKeys(remainingDimensions, null);
+		let remainingKeys = PricingGrid.getAllAvailableCoords(remainingDimensions);
 		let newGridCells = [];
-		for (let coords of remainingKeys){
+		for (const coords of remainingKeys){
 			let coordsPlus = {[removedDimension.name]: removedDimension.categories[0].value, ...coords};
 
 			let policy = null;
@@ -287,6 +241,53 @@ class PricingGrid {
 		});
 	}
 
+
+	static getAllAvailableCoords(dimensions){
+		let coords = [{}];
+		for (const dim of dimensions){
+			let newCoords = [];
+			for (const cat of dim.categories){
+				for (const c of coords){
+					newCoords.push({[dim.name]: cat.value, ...c});
+				}
+			}
+			coords = newCoords;
+		}
+		return coords;
+	}
+
+
+	updateCellsFromDimensions() {
+		let newGridCells = [];
+		for (const c of PricingGrid.getAllAvailableCoords(this.dimensions)){
+			let cell = this.gridCellAt(c);
+			let newPolicy;
+			if (cell && cell.policy)
+				newPolicy = JSON.parse(JSON.stringify(cell.policy));
+			else {
+				newPolicy = {
+					type: "FixedPrice",
+					price: 0
+				}; // TODO proper default
+			}
+			let newCell = {coords:c, policy:newPolicy};
+			newGridCells.push(newCell);
+		}
+
+		this.gridCells = newGridCells;
+	}
+	// 	dimension, categories){
+
+
+	// 	case "ThresholdCategory":
+
+	// }
+	// 	let defaultDimension;
+	// 	switch(type){
+	// 		case "EnumCategory":
+	// 			defaultDimension = {type, name, raw_name:"", categories:[{value: "All", enum: []}] };
+	// 			break;
+
 	// /**
 	//  * @returns named dimension, undefined if not found
 	//  */
@@ -309,12 +310,13 @@ pricingGrid_acadia_b2b.dimensions =
 	[
 		{
 			name: "wcat",
-			raw_name : "poidsEntier",
+			raw_name : "poids",
 			type: "ThresholdCategory",
 			categories : [
-				{value: "0-5 kg", threshold: 0},
-				{value: "5-100 kg", threshold: 5},
-				{value: "100+ kg", threshold: 100}
+				{value: 0},
+				{value: 5},
+				{value: 100}
+				//5;7;9;12;15;20;25;30;40;45;50;55;60;70;80;90;100
 			]
 		},
 		{
@@ -322,12 +324,12 @@ pricingGrid_acadia_b2b.dimensions =
 			raw_name: "departement",
 			type: "EnumCategory",
 			categories : [
-				{value: "Zone 01", enum:[75,77,78,91,92,93,94,95,2,8,10,14,18,27,28,36,37,41,45,51,58,59,60,61,62,72,76,80,89]},
-				{value: "Zone 02", enum:[1,3,7,15,21,23,24,26,29,35,39,42,43,44,47,48,49,50,52,53,54,55,63,69,70,71,86,87,88]},
-				{value: "Zone 03", enum:[16,17,19,22,25,33,38,56,57,67,68,73,74,79,85,90]},
-				{value: "Zone 04", enum:[6,9,11,12,13,30,31,32,34,40,46,64,66,81,82,84]},
-				{value: "Zone 05", enum:[4,5,65,83,98]},
-				{value: "Corse",   enum:[20]},
+				{value: "Zone 01", enum:["75","77","78","91","92","93","94","95","02","08","10","14","18","27","28","36","37","41","45","51","58","59","60","61","62","72","76","80","89"]},
+				{value: "Zone 02", enum:["01","03","07","15","21","23","24","26","29","35","39","42","43","44","47","48","49","50","52","53","54","55","63","69","70","71","86","87","88"]},
+				{value: "Zone 03", enum:["16","17","19","22","25","33","38","56","57","67","68","73","74","79","85","90"]},
+				{value: "Zone 04", enum:["06","09","11","12","13","30","31","32","34","40","46","64","66","81","82","84"]},
+				{value: "Zone 05", enum:["04","05","65","83","98"]},
+				{value: "Corse",   enum:["20"]},
 			]
 		},
 	]
@@ -336,63 +338,47 @@ pricingGrid_acadia_b2b.dimensions =
 pricingGrid_acadia_b2b.gridCells =
 	[
 		{
-			coords: {wcat:"0-5 kg", zone:"Zone 01"},
+			coords: {wcat:0, zone:"Zone 01"},
 			policy: {
 				type: "FixedPrice",
 				price: 9.9
 			}
 		},
 		{
-			coords: {wcat:"0-5 kg", zone:"Corse"},
+			coords: {wcat:0, zone:"Corse"},
 			policy: {
 				type: "FixedPrice",
 				price: 99.9
 			}
 		},
 		{
-			coords: {wcat:"5-100 kg", zone:"Zone 01"},
+			coords: {wcat:5, zone:"Zone 01"},
 			policy: {
 				type: "FixedPrice",
 				price: 54.9
 			}
 		},
 		{
-			coords: {wcat:"5-100 kg", zone:"B"},
-			policy: {
-				type: "FixedPrice",
-				price: 55.9
-			}
-		},
-		{
-			coords: {wcat:"5-100 kg", zone:"Corse"},
+			coords: {wcat:5, zone:"Corse"},
 			policy: {
 				type: "FixedPrice",
 				price: 549.9
 			}
 		},
 		{
-			coords: {wcat:"100+ kg", zone:"Zone 01"},
+			coords: {wcat:100, zone:"Zone 01"},
 			policy: {
 				type: "PerVolumePrice",
-				dimension: "poids",
+				attribute: "poids",
 				rounding: 10,
 				price: 4.4
 			}
 		},
 		{
-			coords: {wcat:"100+ kg", zone:"B"},
+			coords: {wcat:100, zone:"Corse"},
 			policy: {
 				type: "PerVolumePrice",
-				dimension: "poids",
-				rounding: 10,
-				price: 4.7
-			}
-		},
-		{
-			coords: {wcat:"100+ kg", zone:"Corse"},
-			policy: {
-				type: "PerVolumePrice",
-				dimension: "poids",
+				attribute: "poids",
 				rounding: 10,
 				price: 99
 			}
@@ -414,11 +400,11 @@ pricingGrid_acadia_b2c.dimensions =
 			raw_name : "poidsEntier",
 			type: "ThresholdCategory",
 			categories : [
-				{value: "0-5 kg", threshold: 0},
-				{value: "5-8 kg", threshold: 5},
-				{value: "8-11 kg", threshold: 8},
-				{value: "11-15 kg", threshold: 11},
-				{value: "15+ kg", threshold: 15},
+				{value: 0},
+				{value: 5},
+				{value: 8},
+				{value: 11},
+				{value: 15},
 			]
 		}
 	]
@@ -427,38 +413,38 @@ pricingGrid_acadia_b2c.dimensions =
 pricingGrid_acadia_b2c.gridCells =
 	[
 		{
-			coords: {wcat:"0-5 kg"},
+			coords: {wcat:0},
 			policy: {
 				type: "FixedPrice",
 				price: 13.9
 			}
 		},
 		{
-			coords: {wcat:"5-8 kg"},
+			coords: {wcat:5},
 			policy: {
 				type: "FixedPrice",
 				price: 15.9
 			}
 		},
 		{
-			coords: {wcat:"8-11 kg"},
+			coords: {wcat:8},
 			policy: {
 				type: "FixedPrice",
 				price: 18.9
 			}
 		},
 		{
-			coords: {wcat:"11-15 kg"},
+			coords: {wcat:11},
 			policy: {
 				type: "FixedPrice",
 				price: 20.9
 			}
 		},
 		{
-			coords: {wcat:"15+ kg"},
+			coords: {wcat:15},
 			policy: {
 				type: "PerVolumePrice",
-				dimension: "poids",
+				attribute: "poids",
 				rounding: 10,
 				price: 7.4
 			}
@@ -473,6 +459,4 @@ let uneCommande = new CommandeALivrer("FCxxxxxx", 302 /*kg*/, "93420");
 
 let xxx = pricingGrid_acadia_b2b.apply(uneCommande);
 
-
-
-console.log(xxx);
+//console.log(xxx);
