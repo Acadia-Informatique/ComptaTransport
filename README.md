@@ -29,7 +29,7 @@ Factures[/"`Commandes Client
 		'Frais de port')* `"/]
 GrilleAca[Grille tarifaire Acadia]
 GrilleAca@{shape: docs}
-Clients[/Listing Clients/]
+Clients[/Listing Clients "spéciaux"/]
 Tarifs(Politique tarifaire Acadia)
 Controle[[Contrôle quotidien]]
 
@@ -64,7 +64,7 @@ GrillePresta@{shape: docs}
 
 CtrlQ[[Contrôle quotidien]]
 Factures[/"`Factures Client Acadia
-		*(avec Frais de port justifiés)* `"/]
+  *(avec Frais de port justifiés)* `"/]
 
 Reconcil["`**Réconciliation**
         *basée sur : 
@@ -86,7 +86,28 @@ Reconcil ---> Controle
 GrillePresta ---> Controle
 ```
 
-
+### Initialisation des n° de référence chez Acadia
+```mermaid
+sequenceDiagram    
+    actor Cust as Site Web
+    box Office
+    actor Commercial
+    participant ERP as X3    
+    end
+    box Entrepôt    
+    participant WMS as Logitrack
+    actor Logistique
+    end
+    Cust->>+ERP: Commande Web (WBxxxx)
+    Commercial->>ERP:"À préparer"
+    ERP->>WMS:Transmission commande (CMVxxxx)
+    activate WMS
+    WMS->>Logistique:Préparation commande    
+    Logistique->>ERP:"Valider"
+    ERP-->>-Logistique: Numéro de Facture (FCxxx)
+    Logistique->>WMS: "à expédier"
+    deactivate WMS
+```    
 
 ## Prototypes
 Parfois les analyses seront complétées par des démos interactives, qui permettent de démontrer la bonne compréhension de certains concepts fonctionnels. Mais des versions plus abouties peuvent également servir de prototypes de l'application réelle.
