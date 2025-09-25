@@ -32,42 +32,58 @@
 	</script>
 
 	<style>
-		.gridCell input {
+		/** Bootstrap overrides */
+		.accordion {
+			--bs-accordion-btn-color: black;
+			--bs-accordion-btn-bg: rgb(32, 211, 194);
+			--bs-accordion-active-color: white;
+			--bs-accordion-active-bg: rgb(0, 0, 172);
+		}
+
+		/** App specifics */
+		.gridCell {
+			position: relative; /* for absolute children*/
+		}
+		.gridCell input[type=number] {
 			width:4em;
 			border:lightgrey 1px dotted;
-			padding: 0.2em 0.5em;
+			padding: 0.1em 0.2em;
+			text-align:right
+		}
+		.gridCell .secondary {
+			font-size: 80%;
 		}
 
 		/** List animations */
 		.list-move, /* apply transition to moving elements */
 		.list-enter-active,
 		.list-leave-active {
-		transition: all 0.5s ease;
+			transition: all 0.5s ease;
 		}
 
 		.list-enter-from,
 		.list-leave-to {
-		opacity: 0;
-		transform: translateX(30px);
+			opacity: 0;
+			transform: translateX(30px);
 		}
 
 		/* ensure leaving items are taken out of layout flow so that moving
 		animations can be calculated correctly. */
 		.list-leave-active {
-		position: absolute;
+			position: absolute;
 		}
 	</style>
 
 </head>
 
 <body>
-	<div id="grid-builder">
-		<div class="container-fluid"><div class="row">
+	<div id="pricinggrids-builder">
+		<div class="container-fluid mt-2 mb-3"><div class="row">
 			<div class="accordion shadow col-12 col-lg-3 order-lg-last" id="tool-pane">
 				<div class="accordion-item">
 					<h2 class="accordion-header">
 						<button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
-							Test shipping fee
+							Test frais livraison
 						</button>
 					</h2>
 					<div id="collapseOne" class="accordion-collapse collapse show" data-bs-parent="#tool-pane">
@@ -79,7 +95,7 @@
 				<div class="accordion-item">
 					<h2 class="accordion-header">
 						<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
-							Load / Save Data
+							Charger / Enregistrer
 						</button>
 					</h2>
 					<div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#tool-pane">
@@ -92,7 +108,7 @@
 			<div class="col-12 col-lg-9">
 				<pricinggrids-tabs :ui_state="ui_state"></pricinggrids-tabs>
 				<div class="container-fluid overflow-auto">
-					<pricinggrids-grid :grid="ui_state.currentGrid"></pricinggrids-grid>
+					<pricinggrids-grid :grid="ui_state.currentGrid" @edit-grid-cell="(cell)=>editGridCell_start(cell)"></pricinggrids-grid>
 				</div>
 				<pricinggrids-dim-list :ui_state="ui_state"></pricinggrids-dim-list>
 			</div>
@@ -126,19 +142,34 @@
 						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 					</div>
 					<div class="modal-body">
-							policy: {
-								type: "PerVolumePrice",
-								attribute: "poids",
-								rounding: 10,
-								price: 4.4
-							}
-
-						<input type="radio" value="FixedPrice" v-model="ui_state.editingPolicyCopy.type">Forfait</input> <br>
-						<input type="radio" value="PerVolumePrice" v-model="ui_state.editingPolicyCopy.type">Au volume</input><br>
+						<ul>
+							<li><input type="radio" v-model="ui_state.editingPolicyCopy.type" value="XXXXXX"> Réutiliser la précédente :</input>
+								COPIE DE LA PRECEDENTE OUVERTE
+							</li>
+							<li><input type="radio" v-model="ui_state.editingPolicyCopy.type" value="FixedPrice"> Forfait</input>
+								<ul>
+									<li>de <input type="number" v-model="ui_state.editingPolicyCopy.price"></input></li>
+								</ul>
+							</li>
+							<li><input type="radio" v-model="ui_state.editingPolicyCopy.type" value="PerVolumePrice"> Au volume</input>
+								<ul>
+									<li>Prix au
+										<select v-model="ui_state.editingPolicyCopy.attribute" required>
+											<option disabled value="">Coordonnée brute</option>
+											<option v-for="k in numericRawCoords" :value="k">
+												{{ k }}
+											</option>
+										</select>,
+									</li>
+									<li>arrondi au <input type="number" step="1" min="1" v-model.number="ui_state.editingPolicyCopy.rounding"> supérieur</input></li>
+									<li>de : <input type="number" v-model.number="ui_state.editingPolicyCopy.price"> par unité</input>
+								</ul>
+							</li>
+						</ul>
 					</div>
 					<div class="modal-footer">
 						<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abandonner</button>
-						<button type="button" class="btn btn-primary">Sauvegarder</button>
+						<button type="button" class="btn btn-primary" @click="editGridCell_end">Sauvegarder</button>
 					</div>
 				</div>
 			</div>
@@ -174,6 +205,10 @@
 
 	<!-- ========== component logic ============== -->
 	<script type="module">
+		let typicalRawCoords = Object.entries(new CommandeALivrer("", 0, "01000").getPPGRawCoordinates()); //arguably typical ?...
+
+		const numericRawCoords =  typicalRawCoords.filter(([k,v]) => typeof v == "number").map(([k,v]) => k);
+		const stringRawCoords =  typicalRawCoords.filter(([k,v]) =>typeof v == "string").map(([k,v]) => k);
 
 		/* shared state for the page */
 		//const gridBuilderApp_UI = Vue.reactive( ui_state); TODO need explicit call ?!
@@ -181,22 +216,27 @@
 		const gridBuilderApp = Vue.createApp({
 			data() {
 				return {
-					ui_state: {
-						system: theSystem, //TODO start with empty / localstored
-						currentGrid: theSystem.grids[0], //TODO react to selection
+					numericRawCoords,
+					stringRawCoords,
+
+					ui_state: { // TODO utiliser un bus global ?...
+						//start TODO XXXXXXXXXXXXXXXXXXX funky defaults
+						system: theSystem,
+						currentGrid: theSystem.grids[0], //ensure it exists ?
 
 						editingPolicyCopy: {
 							type: "PerVolumePrice",
 							attribute: "poids",
 							rounding: 10,
-							price: 4.4
-						}, //TODO XXXXXXXXXXXXXXXXXXX
+							price: 0
+						},
+						//end TODO XXXXXXXXXXXXXXXXXXX
 
 						editingDimName: "",
 						editingDimCopy: null,
 
 
-						testPricedObj: new CommandeALivrer("FCxxxxxx", 302 /*kg*/, "93420"),
+						testPricedObj: new CommandeALivrer("FCxxxxxx", 10 /*kg*/, "93420"),
 
 						confirmCancel: function(callback){
 							let continueFunc = ()=>{
@@ -221,6 +261,11 @@
 				}
 			},
 			methods: {
+				editGridCell_start(cell){
+					console.log("3points on" , cell);
+				},
+				editGridCell_end(){
+				}
 				// TODO UI state management (loading, etc.)
 
 
@@ -234,10 +279,12 @@
 			},
 			methods: {
 				newGrid: function(){
-					let name = "Nouvelle grille"; //TODO find next good name
-					this.ui_state.system.grids.push(
-						new PricingGrid(name)
-					);
+					let name = window.prompt("Nom de la nouvelle grille"); //TODO real grid management, with delete and rename/relabel
+					if (name) {
+						this.ui_state.system.grids.push(
+							new PricingGrid(name)
+						);
+					}
 				},
 				selectGrid: function(name){
 					this.ui_state.confirmCancel(
@@ -247,13 +294,13 @@
 
 			},
 			template: `
-				<ul class="nav nav-pills">
+				<ul class="nav nav-tabs">
 					<li v-for="grid in ui_state.system.grids"
 						class="nav-item">
 						<a href="#" class="nav-link" :class="{active: ui_state.currentGrid.name == grid.name}" @click="selectGrid(grid.name)">{{grid.name}}</a>
 					</li>
 					<li class="nav-item">
-						<a href="#" class="nav-link bg-secondary text-white" @click="newGrid"> + </a>
+						<a href="#" class="nav-link bi bi-plus-lg" @click="newGrid"></a>
 					</li>
 				</ul>`
 		};
@@ -265,10 +312,6 @@
 				ui_state: Object
 			},
 			data(){
-				let typicalRawCoords = Object.entries(this.ui_state.testPricedObj.getPPGRawCoordinates()); //arguably typical ?...
-
-				let numericRawCoords =  typicalRawCoords.filter(([k,v]) => typeof v == "number").map(([k,v]) => k);
-				let stringRawCoords =  typicalRawCoords.filter(([k,v]) =>typeof v == "string").map(([k,v]) => k);
 				return {
 					numericRawCoords,
 					stringRawCoords
@@ -300,7 +343,8 @@
 				},
 				removeDimension(idx){
 					let removedDim = this.ui_state.currentGrid.dimensions[idx];
-					confirm_dialog("Dimension",`Êtes-vous sûr de vouloir supprimer la dimension "${removedDim.name}" ?`,{
+					confirm_dialog("Dimension",`Êtes-vous sûr de vouloir supprimer la dimension "${removedDim.name}" ?
+									(Vous perdrez alors toutes les cellules correspondantes)`,{
 						label:'Continuer', class: 'btn-primary',
 						handler : ()=>{
 							this.ui_state.currentGrid.removeDimension(idx);
@@ -396,7 +440,7 @@
 					computed:{
 						categoryThresholdList: {
 							get() {
-								return this.ui_state.editingDimCopy.categories.map(c => c.value).join(";");
+								return this.ui_state.editingDimCopy.categories.map(c => c.value).join(" ; ");
 							},
 							set(value) {
 								let asCleanStr = value.replaceAll(/[^\d.]+/g, ";");
@@ -568,19 +612,23 @@
 			props: {
 				cell: Object
 			},
+			emits: ["editGridCell"],
 			template: `
 				<div class="gridCell">
-					<a class="float-end" data-bs-toggle="modal" data-bs-target="#grid-cell-customizer">
-						<i class="bi bi-three-dots"></i>
+					<a class="position-absolute top-0 end-0" data-bs-toggle="modal" data-bs-target="#grid-cell-customizer"
+					  @click="$emit('editGridCell', cell)">
+						<i class="bi bi-three-dots-vertical"></i>
 					</a>
 					<template v-if="cell">
 						<template v-if="cell.policy">
 							<template v-if="cell.policy.type=='FixedPrice'">
-								<input v-model.number="cell.policy.price">
+								<input type="number" v-model.number="cell.policy.price">
 							</template>
 							<template v-if="cell.policy.type=='PerVolumePrice'">
-								<input v-model.number="cell.policy.price">*{{cell.policy.attribute}}
-								(arrondi à <input type="number" step="1" min="1" v-model.number="cell.policy.rounding">)
+								<input type="number" v-model.number="cell.policy.price">*{{cell.policy.attribute}}
+								<div class="secondary">
+									(arrondi à <input type="number" step="1" min="1" v-model.number="cell.policy.rounding">)
+								</div>
 							</template>
 						</template>
 						<template v-else>
@@ -604,6 +652,7 @@
 					return this.grid.dimensions.length;
 				}
 			},
+			emits: ["editGridCell"],
 			methods:{
 				categoryLabel(dimension, category, categoryIndex){
 					let label;
@@ -631,7 +680,7 @@
 					return label ?? category.value;
 				}
 			},
-
+			emits: ["editGridCell"] /* bubble up*/,
 			template: `
 				<table class="table table-bordered">
 					<template v-if="dimensionCount==0">
@@ -642,8 +691,12 @@
 						</thead>
 						<tbody>
 							<tr>
-								<td><pricinggrids-gridcell :cell="grid.gridCellAt({
-								})"></pricinggrids-gridcell></td>
+								<td>
+									<pricinggrids-gridcell
+									  @edit-grid-cell="(cell)=>$emit('editGridCell', cell)"
+									  :cell="grid.gridCellAt({})">
+									</pricinggrids-gridcell>
+								</td>
 							</tr>
 						</tbody>
 					</template>
@@ -662,7 +715,8 @@
 								<th>{{ categoryLabel(dim0, categ_dim0, categIdx_dim0) }}</th>
 								<td>
 									<pricinggrids-gridcell
-										:cell="grid.gridCellAt({[dim0.name]: categ_dim0.value})">
+									  @edit-grid-cell="(cell)=>$emit('editGridCell', cell)"
+									  :cell="grid.gridCellAt({[dim0.name]: categ_dim0.value})">
 									</pricinggrids-gridcell>
 								</td>
 							</tr>
@@ -691,7 +745,8 @@
 								<th>{{ categoryLabel(dim0, categ_dim0, categIdx_dim0) }}</th>
 								<td v-for="categ_dim1 in dim1.categories">
 									<pricinggrids-gridcell
-										:cell="grid.gridCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value})">
+									  @edit-grid-cell="(cell)=>$emit('editGridCell', cell)"
+									  :cell="grid.gridCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value})">
 									</pricinggrids-gridcell>
 								</td>
 							</tr>
@@ -734,7 +789,8 @@
 								<template v-for="categ_dim2 in dim2.categories">
 								<td v-for="categ_dim1 in dim1.categories">
 									<pricinggrids-gridcell
-										:cell="grid.gridCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value, [dim2.name]: categ_dim2.value})">
+									  @edit-grid-cell="(cell)=>$emit('editGridCell', cell)"
+									  :cell="grid.gridCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value, [dim2.name]: categ_dim2.value})">
 									</pricinggrids-gridcell>
 								</td>
 								</template>
@@ -794,7 +850,7 @@
 
 		gridBuilderApp.component("pricingtest-form", PricingTest_Form);
 
-		gridBuilderApp.mount('#grid-builder');
+		gridBuilderApp.mount('#pricinggrids-builder');
 	</script>
 
 </body>
