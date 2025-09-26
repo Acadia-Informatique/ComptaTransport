@@ -26,9 +26,26 @@
 
 	<script type="text/javascript">
 
-		//TODO hydration functions
-
-
+		class CommandeALivrer extends AbstractPricedObject {
+			constructor(numero, poids, codePostal){
+				super();
+				this.numero = numero;
+				this.poids = poids;
+				this.pays = "France";
+				this.codePostal = codePostal;
+				this.transporteurHN = "";
+			}
+			getPPGRawCoordinates(){
+				let departement = (this.pays=="France" && this.codePostal &&  this.codePostal.length==5) ? this.codePostal.substring(0,2) : "00";
+				return {
+						poids : this.poids,
+						poidsEntier: Math.ceil(this.poids),
+						pays: this.pays, // TODO lookup ISO 3166-1 alpha-2 or alpha-3 codes
+						departement,
+						transporteurHN: this.transporteurHN
+				};
+			}
+		}
 	</script>
 
 	<style>
@@ -196,10 +213,33 @@
 				 class="form-control" id="inputPostCode" placeholder="Code postal"
 				 v-model.trim="ui_state.testPricedObj.codePostal">
 			</div>
-			{{ void({gridCell, amount} = ui_state.currentGrid.apply(ui_state.testPricedObj)) }}
-			<div> <!--class="text-truncate" -->{{ JSON.stringify(gridCell) }}</div>
+			<div class="mb-3">
+				<label class="form-label" for="inputCountry">Pays</label>
+				<select class="form-control" id="inputCountry" v-model="ui_state.testPricedObj.pays">
+					<option value="">(Inconnu)</option>
+					<option value="France">France</option>
+					<option value="Belgique">Belgique</option>
+					<option value="Hongrie">Hongrie</option>
+				</select>
+			</div>
+			<div class="mb-3">
+				<label class="form-label" for="inputTransporteurHN">Transporteur HN</label>
+				<select class="form-control" id="inputTransporteurHN" v-model="ui_state.testPricedObj.transporteurHN">
+					<option disabled value="">Choisissez un transport</option>
+					<option value="Schenker std">Schenker std</option>
+					<option value="Schenker premium">Schenker premium</option>
+					<option value="Geodis MES">Geodis MES</option>
+					<option value="Geodis ATX">Geodis ATX</option>
+				</select>
+			</div>
 
-			Amount : {{ amount }}
+
+
+
+			{{ void(returnVal = ui_state.system.applyGrid(ui_state.currentGrid.name, ui_state.testPricedObj) )}}
+			<div> <!--class="text-truncate" -->{{ JSON.stringify(returnVal) }}</div>
+
+			<div class="fs-2">Amount : {{ returnVal?.amount }}</div>
 		</form>
 	</script>
 
@@ -281,9 +321,9 @@
 				newGrid: function(){
 					let name = window.prompt("Nom de la nouvelle grille"); //TODO real grid management, with delete and rename/relabel
 					if (name) {
-						this.ui_state.system.grids.push(
-							new PricingGrid(name)
-						);
+						let newGrid = new PricingGrid(name);
+						newGrid.updateCellsFromDimensions();
+						this.ui_state.system.grids.push(newGrid);
 					}
 				},
 				selectGrid: function(name){
@@ -473,7 +513,7 @@
 						</div>
 						<div v-else>
 							"{{ dimension.name }}" : par seuil de "{{ dimension.raw_name }}"
-							(<span v-for="(cat, i) in dimension.categories">{{i?" - ":""}}{{ cat.value }}</span>)
+							({{ dimension.categories.map(c=>c.value).join(", ") }})
 						</div>`
 				},
 				EnumCategoryDimension:{
@@ -624,11 +664,21 @@
 							<template v-if="cell.policy.type=='FixedPrice'">
 								<input type="number" v-model.number="cell.policy.price">
 							</template>
-							<template v-if="cell.policy.type=='PerVolumePrice'">
+							<template v-else-if="cell.policy.type=='PerVolumePrice'">
 								<input type="number" v-model.number="cell.policy.price">*{{cell.policy.attribute}}
 								<div class="secondary">
 									(arrondi à <input type="number" step="1" min="1" v-model.number="cell.policy.rounding">)
 								</div>
+							</template>
+							<template v-else-if="cell.policy.type=='DelegatedPrice'">
+								voir grille {{ cell.policy.delegated_gridName }}
+								{{ cell.policy.delegated_additiveAmount??0==0
+								  ? "+ ajout "+ cell.policy.delegated_additiveAmount + "€"
+								  : "" }}
+							</template>
+							<template v-else>
+								<span class="badge bg-danger">UNKNOWN</span>
+								 {{ cell.policy.type }}
 							</template>
 						</template>
 						<template v-else>

@@ -1,48 +1,63 @@
 "use strict";
 
-class CommandeALivrer {
-	constructor(numero, poids, codePostal){
-		this.numero = numero;
-		this.poids = poids;
-		this.pays = "France";
-		this.codePostal = codePostal;
-		this.prefTransportLourd = "";
-	}
+//TODO Proper JS module
 
-	// from interface "pricedObject" : return common Pricing Policy Grid raw coordinates as object
+
+/**
+ * AbstractPricedObject is a sample base class for Object to be priced.
+ * Duck-typing really requires a proper getPPGRawCoordinates() method.
+ */
+class AbstractPricedObject {
+
+	/**
+	 * Returns a relevant Pricing Policy Grid raw coordinates object.
+	 * @returns an Object where attributes are the coordinates to be fed in PricingGrids.
+	 */
 	getPPGRawCoordinates(){
-		let departement = (this.pays=="France" && this.codePostal &&  this.codePostal.length==5) ? this.codePostal.substring(0,2) : "00";
-		return {
-			poids : this.poids,
-			poidsEntier: Math.ceil(this.poids),
-			pays: this.pays, // TODO lookup ISO 3166-1 alpha-2 or alpha-3 codes
-			departement,
-			prefTransportLourd: this.prefTransportLourd
-		};
+		throw new Error("Method getPPGRawCoordinates() must be implemented to return an 'coordinates' Object");
 	}
 }
 
+
 /*
-
-// TODO ajouter système de délégation de grille dans les Policy (avec report de frais, ex. BTC en poids élevé = BTB + 3,10 ou 20 €)
-
 class PricingPolicy {
 
 }
 */
 
-// TODO serialize / hydration for all GridStystem participants... use only rehydration constructors ?!
+// TODO serialize / hydration for all GridStystem participants
 
 class PricingSystem {
-	constructor(jsonStr) {
+	constructor(name) {
+		this.name = name;
 		this.grids = [];
-		if (jsonStr) {
-			//TODO hydration
-		}
 	}
 
 	findGridByName(name) {
 		return this.grids.find(g => g.name == name);
+	}
+
+	applyGrid(gridName, pricedObject){
+		let grid = this.findGridByName(gridName);
+		if (grid) {
+
+			let returnVal = grid.apply(pricedObject); //{gridCell, amount}
+			let policy = returnVal?.gridCell?.policy;
+			if (policy?.type == "DelegatedPrice"){
+				let nestedReturnVal = this.applyGrid(policy.delegated_gridName, pricedObject);
+				return {
+					gridCell:returnVal.gridCell,
+					amount: nestedReturnVal.amount + policy.delegated_additiveAmount,
+					nested: nestedReturnVal
+				};
+
+			} else {
+				return returnVal;
+			}
+
+		} else {
+			throw new Error(`Grid "${gridName}" not found in system "${this.name}".`);
+		}
 	}
 }
 
@@ -61,7 +76,7 @@ class PricingGrid {
 	apply(pricedObject){
 		let gridCell = this._findGridCellFor(pricedObject);
 		if (gridCell == null){
-			return "NOT SUPPORTED";
+			return undefined;//throw new Error("No cell defined");
 		} else {
 			let policy = gridCell.policy;
 			let amount = null;
@@ -74,11 +89,14 @@ class PricingGrid {
 					let roundedVolume = policy.rounding * Math.ceil(volume / policy.rounding);
 					amount = roundedVolume * policy.price;
 				} break;
+				case "DelegatedPrice": {
+					amount = null;
+				} break;
 				default : {
 					throw new Error("Unsupported type of Pricing Policy : " + policy.type);
 				}
 			}
-			return {gridCell, amount};
+			return {gridCell, amount};// TODO define a proper interface for this critical value
 		}
 	}
 
@@ -276,24 +294,6 @@ class PricingGrid {
 
 		this.gridCells = newGridCells;
 	}
-	// 	dimension, categories){
-
-
-	// 	case "ThresholdCategory":
-
-	// }
-	// 	let defaultDimension;
-	// 	switch(type){
-	// 		case "EnumCategory":
-	// 			defaultDimension = {type, name, raw_name:"", categories:[{value: "All", enum: []}] };
-	// 			break;
-
-	// /**
-	//  * @returns named dimension, undefined if not found
-	//  */
-	// getDimensionByName(name){
-	// 	return this.dimensions.find( dim => dim.name == name);
-	// }
 }
 
 
@@ -301,7 +301,7 @@ class PricingGrid {
 
 
 
-const theSystem = new PricingSystem();
+const theSystem = new PricingSystem("ACADIA");
 
 let pricingGrid_acadia_b2b = new PricingGrid("ACA-BTB");
 theSystem.grids.push(pricingGrid_acadia_b2b);
@@ -315,8 +315,22 @@ pricingGrid_acadia_b2b.dimensions =
 			categories : [
 				{value: 0},
 				{value: 5},
+				{value: 7},
+				{value: 9},
+				{value: 12},
+				{value: 15},
+				{value: 20},
+				{value: 25},
+				{value: 30},
+				{value: 40},
+				{value: 45},
+				{value: 50},
+				{value: 55},
+				{value: 60},
+				{value: 70},
+				{value: 80},
+				{value: 90},
 				{value: 100}
-				//5;7;9;12;15;20;25;30;40;45;50;55;60;70;80;90;100
 			]
 		},
 		{
@@ -348,30 +362,110 @@ pricingGrid_acadia_b2b.gridCells =
 			coords: {wcat:0, zone:"Corse"},
 			policy: {
 				type: "FixedPrice",
-				price: 99.9
+				price: 9.9 + 35
 			}
 		},
 		{
 			coords: {wcat:5, zone:"Zone 01"},
 			policy: {
 				type: "FixedPrice",
-				price: 54.9
+				price: 10.9
 			}
 		},
 		{
 			coords: {wcat:5, zone:"Corse"},
 			policy: {
 				type: "FixedPrice",
-				price: 549.9
+				price: 10.9 + 35
 			}
 		},
+
+		{coords: {wcat:7, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 11.9}},
+		{coords: {wcat:7, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 11.9 + 35}},
+
+		{coords: {wcat:9, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 13.9}},
+		{coords: {wcat:9, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 13.9 + 35}},
+
+		{coords: {wcat:12, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 14.9}},
+		{coords: {wcat:12, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 14.9 + 35}},
+
+		{coords: {wcat:15, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 18.9}},
+		{coords: {wcat:15, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 18.9 + 35}},
+
+		{coords: {wcat:20, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 23.9}},
+		{coords: {wcat:20, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 23.9 + 35}},
+
+		{coords: {wcat:25, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 27.9}},
+		{coords: {wcat:25, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 27.9 + 35}},
+
+		{coords: {wcat:30, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 29.9}},
+		{coords: {wcat:30, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 29.9 + 35}},
+
+		{coords: {wcat:40, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 34.9}},
+		{coords: {wcat:40, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 34.9 + 35}},
+
+		{coords: {wcat:45, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 36.9}},
+		{coords: {wcat:45, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 36.9 + 35}},
+
+		{coords: {wcat:50, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 40.9}},
+		{coords: {wcat:50, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 40.9 + 35}},
+
+		{coords: {wcat:55, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 42.9}},
+		{coords: {wcat:55, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 42.9 + 35}},
+
+		{coords: {wcat:60, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 44.9}},
+		{coords: {wcat:60, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 44.9 + 35}},
+
+		{coords: {wcat:70, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 46.9}},
+		{coords: {wcat:70, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 46.9 + 35}},
+
+		{coords: {wcat:80, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 49.9}},
+		{coords: {wcat:80, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 49.9 + 35}},
+
+		{coords: {wcat:90, zone:"Zone 01"}, policy: {type: "FixedPrice",
+				price: 54.9}},
+		{coords: {wcat:90, zone:"Corse"}, policy: {type: "FixedPrice",
+				price: 54.9 + 35}},
+
+
+
+
+
 		{
 			coords: {wcat:100, zone:"Zone 01"},
 			policy: {
 				type: "PerVolumePrice",
 				attribute: "poids",
 				rounding: 10,
-				price: 4.4
+				price: 3.6
 			}
 		},
 		{
@@ -380,7 +474,7 @@ pricingGrid_acadia_b2b.gridCells =
 				type: "PerVolumePrice",
 				attribute: "poids",
 				rounding: 10,
-				price: 99
+				price: 5
 			}
 		}
 
@@ -405,6 +499,13 @@ pricingGrid_acadia_b2c.dimensions =
 				{value: 8},
 				{value: 11},
 				{value: 15},
+				{value: 20},
+				{value: 25},
+				{value: 30},
+				{value: 40},
+				{value: 45},
+				{value: 50},
+				{value: 100},
 			]
 		}
 	]
@@ -440,23 +541,51 @@ pricingGrid_acadia_b2c.gridCells =
 				price: 20.9
 			}
 		},
+
+		{coords: {wcat:15}, policy: {type: "FixedPrice", price: 23.9}},
+		{coords: {wcat:20}, policy: {type: "FixedPrice", price: 26.9}},
+		{coords: {wcat:25}, policy: {type: "FixedPrice", price: 30.9}},
+		{coords: {wcat:30}, policy: {type: "FixedPrice", price: 32.9}},
+		{coords: {wcat:40}, policy: {type: "FixedPrice", price: 37.9}},
+		{coords: {wcat:45}, policy: {type: "FixedPrice", price: 39.9}},
+
 		{
-			coords: {wcat:15},
+			coords: {wcat:50},
 			policy: {
-				type: "PerVolumePrice",
-				attribute: "poids",
-				rounding: 10,
-				price: 7.4
+				type: "DelegatedPrice",
+				delegated_gridName: "ACA-BTB",
+				delegated_additiveAmount: 10
+			}
+		},
+		{
+			coords: {wcat:100},
+			policy: {
+				type: "DelegatedPrice",
+				delegated_gridName: "ACA-BTB",
+				delegated_additiveAmount: 20
 			}
 		}
+
 	]
 ;
 
 
+var uneCommande = new class extends AbstractPricedObject {
+	constructor(poids, codePostal){
+		super();
+		this.poids = poids;
+		this.codePostal = codePostal;
+	}
 
-// TEST
-let uneCommande = new CommandeALivrer("FCxxxxxx", 302 /*kg*/, "93420");
+	getPPGRawCoordinates(){
+		let departement = this.codePostal.substring(0,2);
+		return {
+			poids : this.poids,
+			poidsEntier: Math.ceil(this.poids),
+			departement,
+		};
+	}
+}(45 /*kg*/, "93420");
 
-let xxx = pricingGrid_acadia_b2b.apply(uneCommande);
-
-//console.log(xxx);
+let xxx = theSystem.applyGrid("ACA-BTB", uneCommande);
+console.log(xxx);
