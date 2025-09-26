@@ -160,26 +160,47 @@
 					</div>
 					<div class="modal-body">
 						<ul>
-							<li><input type="radio" v-model="ui_state.editingPolicyCopy.type" value="XXXXXX"> Réutiliser la précédente :</input>
-								COPIE DE LA PRECEDENTE OUVERTE
+							<div class="alert alert-warning">TRAVAUX EN COURS</div>
+							<li><input type="radio" v-model="ui_state.editingPolicyChoice" value="copy">
+								Réutiliser la précédente :</input>
+								TODO BOUTON COPIE DE LA PRECEDENTE OUVERTE
 							</li>
-							<li><input type="radio" v-model="ui_state.editingPolicyCopy.type" value="FixedPrice"> Forfait</input>
+							<li><input type="radio" v-model="ui_state.editingPolicyChoice" value="FixedPrice">
+								Prix Fixe</input>
 								<ul>
-									<li>de <input type="number" v-model="ui_state.editingPolicyCopy.price"></input></li>
+									<li>de <input type="number" v-model="ui_state.editingPolicyCopy1.price"></input></li>
 								</ul>
 							</li>
-							<li><input type="radio" v-model="ui_state.editingPolicyCopy.type" value="PerVolumePrice"> Au volume</input>
+							<li><input type="radio" v-model="ui_state.editingPolicyChoice" value="PerVolumePrice">
+								Au volume</input>
 								<ul>
 									<li>Prix au
-										<select v-model="ui_state.editingPolicyCopy.attribute" required>
+										<select v-model="ui_state.editingPolicyCopy2.attribute" required>
 											<option disabled value="">Coordonnée brute</option>
 											<option v-for="k in numericRawCoords" :value="k">
 												{{ k }}
 											</option>
 										</select>,
 									</li>
-									<li>arrondi au <input type="number" step="1" min="1" v-model.number="ui_state.editingPolicyCopy.rounding"> supérieur</input></li>
-									<li>de : <input type="number" v-model.number="ui_state.editingPolicyCopy.price"> par unité</input>
+									<li>arrondi au <input type="number" step="1" min="1" v-model.number="ui_state.editingPolicyCopy2.rounding"> supérieur</input></li>
+									<li>de : <input type="number" v-model.number="ui_state.editingPolicyCopy2.price"> par unité</input>
+								</ul>
+							</li>
+							<li><input type="radio" v-model="ui_state.editingPolicyChoice" value="DelegatedPrice">
+								Voir une autre grille</input>
+								<ul>
+									<li>
+										<select v-model="ui_state.editingPolicyCopy3.delegated_gridName" required>
+											<option disabled value="">Choisissez une grille</option>
+											<option v-for="k in ui_state.system.grids.map(g=>g.name)" :value="k">
+												{{ k }}
+											</option>
+											<!-- TODO filter out current -->
+										</select>
+									</li>
+									<li>
+										Frais supplémentaire (optionnel) <input type="number" v-model="ui_state.editingPolicyCopy3.delegated_additiveAmount"></input>
+									</li>
 								</ul>
 							</li>
 						</ul>
@@ -264,11 +285,24 @@
 						system: theSystem,
 						currentGrid: theSystem.grids[0], //ensure it exists ?
 
-						editingPolicyCopy: {
+						// TODO encore plus Q&D que d'hab', for demo
+						editingPolicyCell: null,
+						editingPolicyCopy0: null,
+						editingPolicyChoice: "copy", //or a real policy type
+						editingPolicyCopy1: {
+							type: "FixedPrice",
+							price: 0
+						},
+						editingPolicyCopy2: {
 							type: "PerVolumePrice",
 							attribute: "poids",
 							rounding: 10,
 							price: 0
+						},
+						editingPolicyCopy3: {
+							type: "DelegatedPrice",
+							delegated_gridName: "",
+							delegated_additiveAmount: 0
 						},
 						//end TODO XXXXXXXXXXXXXXXXXXX
 
@@ -302,9 +336,39 @@
 			},
 			methods: {
 				editGridCell_start(cell){
-					console.log("3points on" , cell);
+					this.ui_state.editingPolicyCell = cell;
+
+					this.ui_state.editingPolicyCopy0 = JSON.parse(JSON.stringify(cell?.policy));
+					switch(cell?.policy?.type){
+						case "FixedPrice": {
+							this.ui_state.editingPolicyChoice = "FixedPrice";
+							this.ui_state.editingPolicyCopy1 = JSON.parse(JSON.stringify(cell.policy));
+						} break;
+						case "PerVolumePrice": {
+							this.ui_state.editingPolicyChoice = "PerVolumePrice";
+							this.ui_state.editingPolicyCopy2 = JSON.parse(JSON.stringify(cell.policy));
+						} break;
+						case "DelegatedPrice": {
+							this.ui_state.editingPolicyChoice = "DelegatedPrice";
+							this.ui_state.editingPolicyCopy3 = JSON.parse(JSON.stringify(cell.policy));
+						} break;
+						default:
+					}
 				},
 				editGridCell_end(){
+					if (!this.ui_state.editingPolicyCell) return;
+					switch(this.ui_state.editingPolicyChoice){
+						case "FixedPrice": {
+							this.ui_state.editingPolicyCell.policy = JSON.parse(JSON.stringify(this.ui_state.editingPolicyCopy1));
+						} break;
+						case "PerVolumePrice": {
+							this.ui_state.editingPolicyCell.policy = JSON.parse(JSON.stringify(this.ui_state.editingPolicyCopy2));
+						} break;
+						case "DelegatedPrice": {
+							this.ui_state.editingPolicyCell.policy = JSON.parse(JSON.stringify(this.ui_state.editingPolicyCopy3));
+						} break;
+						default:
+					}
 				}
 				// TODO UI state management (loading, etc.)
 
