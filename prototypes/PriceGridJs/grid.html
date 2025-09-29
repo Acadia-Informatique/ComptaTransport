@@ -49,7 +49,7 @@
 	</script>
 
 	<style>
-		/** Bootstrap overrides */
+		/** Bootstrap global overrides */
 		.accordion {
 			--bs-accordion-btn-color: black;
 			--bs-accordion-btn-bg: rgb(32, 211, 194);
@@ -57,12 +57,21 @@
 			--bs-accordion-active-bg: rgb(0, 0, 172);
 		}
 
+
 		/** App specifics */
-		.gridCell {
+		table.gridTable {
+			--bs-border-color: rgb(80, 80, 80);
+			--bs-border-width: 2px;
+		}
+		table.gridTable th.gridHead {
+			--bs-table-bg: rgb(246, 255, 164);
+		}
+
+		.gridCell, .gridHead {
 			position: relative; /* for absolute children*/
 		}
 		.gridCell input[type=number] {
-			width:4em;
+			width:4.5em;
 			border:lightgrey 1px dotted;
 			padding: 0.1em 0.2em;
 			text-align:right
@@ -125,7 +134,7 @@
 			<div class="col-12 col-lg-9">
 				<pricinggrids-tabs :ui_state="ui_state"></pricinggrids-tabs>
 				<div class="container-fluid overflow-auto">
-					<pricinggrids-grid :grid="ui_state.currentGrid" @edit-grid-cell="(cell)=>editGridCell_start(cell)"></pricinggrids-grid>
+					<pricinggrids-grid :ui_state="ui_state"></pricinggrids-grid>
 				</div>
 				<pricinggrids-dim-list :ui_state="ui_state"></pricinggrids-dim-list>
 			</div>
@@ -150,69 +159,7 @@
 		</div>
 
 
-		<!-- Modal dialog template for Cell customizer -->
-		<div class="modal"  id="grid-cell-customizer" tabindex="-1">
-			<div class="modal-dialog modal-dialog-scrollable modal-fullscreen-md-down">
-				<div class="modal-content">
-					<div class="modal-header">
-						<h5 class="modal-title">Cellule de grille</h5>
-						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-					</div>
-					<div class="modal-body">
-						<ul>
-							<div class="alert alert-warning">TRAVAUX EN COURS</div>
-							<li><input type="radio" v-model="ui_state.editingPolicyChoice" value="copy">
-								Réutiliser la précédente :</input>
-								TODO BOUTON COPIE DE LA PRECEDENTE OUVERTE
-							</li>
-							<li><input type="radio" v-model="ui_state.editingPolicyChoice" value="FixedPrice">
-								Prix Fixe</input>
-								<ul>
-									<li>de <input type="number" v-model="ui_state.editingPolicyCopy1.price"></input></li>
-								</ul>
-							</li>
-							<li><input type="radio" v-model="ui_state.editingPolicyChoice" value="PerVolumePrice">
-								Au volume</input>
-								<ul>
-									<li>Prix au
-										<select v-model="ui_state.editingPolicyCopy2.attribute" required>
-											<option disabled value="">Coordonnée brute</option>
-											<option v-for="k in numericRawCoords" :value="k">
-												{{ k }}
-											</option>
-										</select>,
-									</li>
-									<li>arrondi au <input type="number" step="1" min="1" v-model.number="ui_state.editingPolicyCopy2.rounding"> supérieur</input></li>
-									<li>de : <input type="number" v-model.number="ui_state.editingPolicyCopy2.price"> par unité</input>
-								</ul>
-							</li>
-							<li><input type="radio" v-model="ui_state.editingPolicyChoice" value="DelegatedPrice">
-								Voir une autre grille</input>
-								<ul>
-									<li>
-										<select v-model="ui_state.editingPolicyCopy3.delegated_gridName" required>
-											<option disabled value="">Choisissez une grille</option>
-											<option v-for="k in ui_state.system.grids.map(g=>g.name)" :value="k">
-												{{ k }}
-											</option>
-											<!-- TODO filter out current -->
-										</select>
-									</li>
-									<li>
-										Frais supplémentaire (optionnel) <input type="number" v-model="ui_state.editingPolicyCopy3.delegated_additiveAmount"></input>
-									</li>
-								</ul>
-							</li>
-						</ul>
-					</div>
-					<div class="modal-footer">
-						<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abandonner</button>
-						<button type="button" class="btn btn-primary" @click="editGridCell_end">Sauvegarder</button>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
+	</div><!-- app end -->
 
 
 
@@ -220,8 +167,322 @@
 	<!-- =============== Vue components ============================ -->
 
 	<!-- ========== (some) component templates ============== -->
+
+	<script type="text/x-template" id="PricingGrids_Grid-template">
+		<table class="table table-bordered table-hover table-sm gridTable">
+			<template v-if="dimensionCount==0">
+				<thead class="table-dark">
+					<tr>
+						<th>Toutes livraisons</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td>
+							<pricinggrids-gridcell
+								@edit-grid-cell="(cell)=>editGridCell_start(cell)"
+								:cell="grid.ensureCellAt({})">
+							</pricinggrids-gridcell>
+						</td>
+					</tr>
+				</tbody>
+			</template>
+			<template v-else-if="dimensionCount==1">
+				{{void(
+					dim0 = grid.dimensions[0]
+				)}}
+				<thead class="table-dark">
+					<tr>
+						<th>{{ dim0.name }}</th>
+						<th>Prix</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr v-for="(categ_dim0, categIdx_dim0) in dim0.categories">
+						<th class="gridHead">{{ categoryLabel(dim0, categ_dim0, categIdx_dim0) }}</th>
+						<td>
+							<pricinggrids-gridcell
+								@edit-grid-cell="(cell)=>editGridCell_start(cell)"
+								:cell="grid.ensureCellAt({[dim0.name]: categ_dim0.value})">
+							</pricinggrids-gridcell>
+						</td>
+					</tr>
+				</tbody>
+			</template>
+			<template v-else-if="dimensionCount==2">
+				{{void(
+					dim0 = grid.dimensions[0],
+					dim1 = grid.dimensions[1]
+				)}}
+				<thead>
+					<tr class="table-dark">
+						<th rowspan="2">{{ dim0.name }}</th>
+						<th :colspan="dim1.categories.length">
+							{{ dim1.name }}
+						</th>
+					</tr>
+					<tr>
+						<th v-for="(categ_dim1, categIdx_dim1) in dim1.categories" class="gridHead">
+							{{ categoryLabel(dim1, categ_dim1, categIdx_dim1) }}
+						</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr v-for="(categ_dim0, categIdx_dim0) in dim0.categories" >
+						<th class="gridHead">
+							{{ categoryLabel(dim0, categ_dim0, categIdx_dim0) }}
+						</th>
+						<td v-for="categ_dim1 in dim1.categories">
+							<pricinggrids-gridcell
+								@edit-grid-cell="(cell)=>editGridCell_start(cell)"
+								:cell="grid.ensureCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value})">
+							</pricinggrids-gridcell>
+						</td>
+					</tr>
+				</tbody>
+			</template>
+			<template v-else-if="dimensionCount==3">
+				{{void(
+					dim0 = grid.dimensions[0],
+					dim1 = grid.dimensions[1],
+					dim2 = grid.dimensions[2]
+				)}}
+				<thead>
+					<tr class="table-dark">
+						<th rowspan="4">{{ dim0.name }}</th>
+						<th :colspan="dim2.categories.length * dim1.categories.length">
+							{{ dim2.name }}
+						</th>
+					</tr>
+					<tr>
+						<th v-for="(categ_dim2, categIdx_dim2) in dim2.categories" :colspan="dim1.categories.length" class="gridHead">
+							{{ categoryLabel(dim2, categ_dim2, categIdx_dim2) }}
+						</th>
+					</tr>
+					<tr class="table-dark">
+						<th v-for="categ_dim2 in dim2.categories" :colspan="dim1.categories.length">
+							{{ dim1.name }}
+						</th>
+					</tr>
+					<tr>
+						<template v-for="categ_dim2 in dim2.categories">
+						<th v-for="(categ_dim1, categIdx_dim1) in dim1.categories" class="gridHead">
+							{{ categoryLabel(dim1, categ_dim1, categIdx_dim1) }}
+						</th>
+						</template>
+					</tr>
+				</thead>
+				<tbody>
+					<tr v-for="(categ_dim0, categIdx_dim0) in dim0.categories" >
+						<th class="gridHead">{{ categoryLabel(dim0, categ_dim0, categIdx_dim0) }}</th>
+						<template v-for="categ_dim2 in dim2.categories">
+						<td v-for="categ_dim1 in dim1.categories">
+							<pricinggrids-gridcell
+								@edit-grid-cell="(cell)=>editGridCell_start(cell)"
+								:cell="grid.ensureCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value, [dim2.name]: categ_dim2.value})">
+							</pricinggrids-gridcell>
+						</td>
+						</template>
+					</tr>
+				</tbody>
+			</template>
+			<template v-else>
+				<tbody><tr><td>
+					Dimensions &gt; 3 non support&eacute; !
+				</td></tr></tbody>
+			</template>
+		</table>
+
+
+		<!-- Modal dialog template for Cell customizer -->
+		<div class="modal"  id="grid-cell-customizer" tabindex="-1">
+			<div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+				<form class="modal-content needs-validation">
+					<div class="modal-header">
+						<h5 class="modal-title">Cellule de grille</h5>
+						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					</div>
+					<div class="modal-body" style="min-height: 50vh">
+						<ul class="nav nav-pills">
+							<li class="nav-item" v-for="[choice,choiceLabel] in [
+								['FixedPrice','Prix fixe'],
+								['PerVolumePrice', 'Prix /vol.'],
+								['DelegatedPrice', 'Prix reporté']
+							]">
+								<a href="#" class="nav-link"
+								  :class="{active: ui_state.editingPolicyChoice == choice}"
+								  @click.prevent="ui_state.editingPolicyChoice = choice; editGridCell_clear($event)">
+									{{choiceLabel}}
+								</a>
+							</li>
+							<li class="nav-item dropdown">
+								<a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button"
+								  :class="{active: ui_state.editingPolicyChoice == 'clipboardPolicy'}"
+								  @click.prevent="ui_state.editingPolicyChoice = 'clipboardPolicy'">
+									<i class="bi bi-clipboard" aria-label="Clipboard"></i>
+								</a>
+								<ul class="dropdown-menu">
+									<li><a href="#" class="dropdown-item" @click.prevent="editGridCell_pasteAndSave">Coller & Valider</a></li>
+									<li><a href="#" class="dropdown-item" @click.prevent="editGridCell_paste">Coller</a></li>
+									<li><hr class="dropdown-divider"></li>
+									<li><a href="#" class="dropdown-item" @click.prevent="editGridCell_copy">Copier</a></li>
+									<li><a href="#" class="dropdown-item" @click.prevent="editGridCell_emptyClipboard">Vider</a></li>
+								</ul>
+							</li>
+						</ul>
+						<div class="mt-3 px-2">
+							{{ void(currCopy = ui_state.editingPolicyCopies[ui_state.editingPolicyChoice] )}}
+							<template v-if="ui_state.editingPolicyChoice == 'clipboardPolicy'">
+								<div v-if="currCopy" class="alert alert-info">
+									<i class="bi bi-clipboard-check fs-2"></i>
+									<pricinggrids-policy :policy="currCopy" editMode="no"/>
+								</div>
+								<div v-else class="alert alert-warning">
+									<i class="bi bi-clipboard-x fs-2"></i>
+									(Presse-papier vide)
+								</div>
+							</template>
+							<template v-else>
+								<pricinggrids-policy v-if="currCopy" :policy="currCopy" editMode="full" :ui_state="ui_state" />
+								<div v-else class="text-bg-danger">
+									UNKNOWN "editingPolicyChoice" : {{ ui_state.editingPolicyChoice }}
+									<!-- meaning not listed in nav > nav-item -->
+								</div>
+							</template>
+						</div>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-secondary" @click="editGridCell_clear" data-bs-dismiss="modal">Abandonner</button>
+						<button type="button" class="btn btn-primary" @click="editGridCell_end">Valider</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</script>
+
+	<script type="text/x-template" id="PricingGrids_Policy-template">
+		<template v-if="policy.type == 'FixedPrice'">
+			<template v-if="editMode=='full'">
+				<div class="input-group has-validation">
+					<span class="input-group-text">de</span>
+					<money-input class="form-control" min="0" v-model="policy.price" required />
+					<span class="input-group-text">€</span>
+					<div class="invalid-feedback">
+						Prix en euros
+					</div>
+				</div>
+			</template>
+			<template v-else-if="editMode=='quick'">
+				<money-input v-model="policy.price" />
+			</template>
+			<template v-else>
+				Prix fixe de {{ policy.price }} €
+			</template>
+		</template>
+
+		<template v-else-if="policy.type == 'PerVolumePrice'">
+			<template v-if="editMode=='full'">
+				<div class="input-group has-validation">
+					<span class="input-group-text">Prix au</span>
+					<select class="form-select" v-model="policy.attribute" required>
+						<option disabled value="">Coordonnée brute</option>
+						<option v-for="k in numericRawCoords" :value="k">
+							{{ k }}
+						</option>
+					</select>
+					<div class="invalid-feedback">
+						Sélectionnez un attribute de volume.
+					</div>
+				</div>
+				<div class="input-group has-validation mt-1">
+					<span class="input-group-text">arrondi au</span>
+					<input class="form-control" type="number" step="1" min="1" v-model.number="policy.rounding" required>
+					<span class="input-group-text">supérieur</span>
+					<div class="invalid-feedback">
+						Taille du "paquet" auquel appliquer le prix unitaire (ex. 1, 10, 50, 100)
+					</div>
+				</div>
+				<div class="input-group has-validation mt-3">
+					<span class="input-group-text">de</span>
+					<money-input class="form-control" min="0" v-model="policy.price" required />
+					<span class="input-group-text">€</span>
+					<span class="input-group-text">par unité</span>
+					<div class="invalid-feedback">
+						Prix en euros pour 1 unité (indépendant de l'arrondi)
+					</div>
+				</div>
+			</template>
+			<template v-else-if="editMode=='quick'">
+				<money-input v-model="policy.price" />*{{policy.attribute}}
+				<div class="secondary">
+					(arrondi à {{ policy.rounding }})
+				</div>
+			</template>
+			<template v-else>
+				Prix au "{{ policy.attribute }}"<br>
+				(arrondi au {{ policy.rounding }} supérieur)<br>
+				de {{ policy.price }}€ par unité
+			</template>
+		</template>
+
+		<template v-else-if="policy.type == 'DelegatedPrice'">
+			<template v-if="editMode=='full'">
+				<div class="input-group has-validation">
+					<span class="input-group-text">Se reporter à la grille</span>
+					<select class="form-select" v-model="policy.delegated_gridName" required>
+						<option disabled value="">Choisissez une grille</option>
+						<option v-for="k in ui_state.system.grids.map(g=>g.name)" :value="k">
+							{{ k }}
+						</option>
+						<!-- TODO filter out current ? or support self reference with coordinate change ?... -->
+					</select>
+					<div class="invalid-feedback">
+						Sélectionnez la grille à suivre.
+					</div>
+				</div>
+				<div class="input-group has-validation mt-3">
+					<span class="input-group-text">Frais supplémentaire : </span>
+					<money-input class="form-control" v-model="policy.delegated_additiveAmount" />
+					<span class="input-group-text">€</span>
+					<i class="input-group-text">(optionnel)</i>
+					<div class="invalid-feedback">
+						Frais à ajouter en €, après avoir appliqué la griller à suivre.
+					</div>
+				</div>
+			</template>
+			<template v-else-if="editMode=='quick'">
+				voir grille "{{ policy.delegated_gridName }}"<br>
+				{{ policy.delegated_additiveAmount ? "+ ajout "+policy.delegated_additiveAmount+"€" : ""}}
+				<!-- quick mode is no edit for now... may change -->
+			</template>
+			<template v-else>
+				voir grille "{{ policy.delegated_gridName }}"<br>
+				{{ policy.delegated_additiveAmount ? "+ ajout "+policy.delegated_additiveAmount+"€" : ""}}
+				<!-- TODO ajout mention "type de frais" ? genre "Livraison directe" -->
+				<!-- TODO ou mieux : ajout d'une composition additive/multiplicative générale -->
+			</template>
+		</template>
+		<template v-else><!-- UNKNOWN POLICY TYPE -->
+			<template v-if="editMode=='full'">
+				<div class="alert alert-danger d-flex align-items-center" role="alert">
+					<i class="bi bi-exclamation-triangle-fill fs-1"></i>
+					<div>
+						ERREUR - Type de prix inconnu : {{ policy.type }}
+					</div>
+				</div>
+			</template>
+			<template v-else-if="editMode=='quick'">
+				<span class="badge bg-danger">UNKNOWN</span>
+					{{ policy.type }}
+			</template>
+			<template v-else>
+				{{ policy }}
+			</template>
+		</template>
+	</script>
+
 	<script type="text/x-template" id="PricingTest-Form-template">
-		<form id="" class="" @submit.prevent="">
+		<form id="" class="" @submit.prevent=""><!-- TODO make me look better -->
 			<div class="mb-3">
 				<label class="form-label" for="inputPoids">Poids</label>
 				<input type="number" step="0.1" min="0" lang="en-US"
@@ -236,7 +497,7 @@
 			</div>
 			<div class="mb-3">
 				<label class="form-label" for="inputCountry">Pays</label>
-				<select class="form-control" id="inputCountry" v-model="ui_state.testPricedObj.pays">
+				<select class="form-select" id="inputCountry" v-model="ui_state.testPricedObj.pays">
 					<option value="">(Inconnu)</option>
 					<option value="France">France</option>
 					<option value="Belgique">Belgique</option>
@@ -245,7 +506,7 @@
 			</div>
 			<div class="mb-3">
 				<label class="form-label" for="inputTransporteurHN">Transporteur HN</label>
-				<select class="form-control" id="inputTransporteurHN" v-model="ui_state.testPricedObj.transporteurHN">
+				<select class="form-select" id="inputTransporteurHN" v-model="ui_state.testPricedObj.transporteurHN">
 					<option disabled value="">Choisissez un transport</option>
 					<option value="Schenker std">Schenker std</option>
 					<option value="Schenker premium">Schenker premium</option>
@@ -270,6 +531,24 @@
 
 		const numericRawCoords =  typicalRawCoords.filter(([k,v]) => typeof v == "number").map(([k,v]) => k);
 		const stringRawCoords =  typicalRawCoords.filter(([k,v]) =>typeof v == "string").map(([k,v]) => k);
+		const DEFAULT_POLICIES = {
+			"FixedPrice": {
+				type: "FixedPrice",
+				price: null
+			},
+			"PerVolumePrice": {
+				type: "PerVolumePrice",
+				attribute: null,
+				rounding: 10,
+				price: null
+			},
+			"DelegatedPrice": {
+				type: "DelegatedPrice",
+				delegated_gridName: "",
+				delegated_additiveAmount: null
+			},
+		};
+
 
 		/* shared state for the page */
 		//const gridBuilderApp_UI = Vue.reactive( ui_state); TODO need explicit call ?!
@@ -277,33 +556,19 @@
 		const gridBuilderApp = Vue.createApp({
 			data() {
 				return {
-					numericRawCoords,
-					stringRawCoords,
-
 					ui_state: { // TODO utiliser un bus global ?...
 						//start TODO XXXXXXXXXXXXXXXXXXX funky defaults
 						system: theSystem,
 						currentGrid: theSystem.grids[0], //ensure it exists ?
 
-						// TODO encore plus Q&D que d'hab', for demo
 						editingPolicyCell: null,
-						editingPolicyCopy0: null,
-						editingPolicyChoice: "copy", //or a real policy type
-						editingPolicyCopy1: {
-							type: "FixedPrice",
-							price: 0
+						editingPolicyChoice: "clipboardPolicy", //or a real policy type
+						editingPolicyCopies:{
+							"clipboardPolicy" : null,
+							... DEFAULT_POLICIES
 						},
-						editingPolicyCopy2: {
-							type: "PerVolumePrice",
-							attribute: "poids",
-							rounding: 10,
-							price: 0
-						},
-						editingPolicyCopy3: {
-							type: "DelegatedPrice",
-							delegated_gridName: "",
-							delegated_additiveAmount: 0
-						},
+
+
 						//end TODO XXXXXXXXXXXXXXXXXXX
 
 						editingDimName: "",
@@ -335,41 +600,6 @@
 				}
 			},
 			methods: {
-				editGridCell_start(cell){
-					this.ui_state.editingPolicyCell = cell;
-
-					this.ui_state.editingPolicyCopy0 = JSON.parse(JSON.stringify(cell?.policy));
-					switch(cell?.policy?.type){
-						case "FixedPrice": {
-							this.ui_state.editingPolicyChoice = "FixedPrice";
-							this.ui_state.editingPolicyCopy1 = JSON.parse(JSON.stringify(cell.policy));
-						} break;
-						case "PerVolumePrice": {
-							this.ui_state.editingPolicyChoice = "PerVolumePrice";
-							this.ui_state.editingPolicyCopy2 = JSON.parse(JSON.stringify(cell.policy));
-						} break;
-						case "DelegatedPrice": {
-							this.ui_state.editingPolicyChoice = "DelegatedPrice";
-							this.ui_state.editingPolicyCopy3 = JSON.parse(JSON.stringify(cell.policy));
-						} break;
-						default:
-					}
-				},
-				editGridCell_end(){
-					if (!this.ui_state.editingPolicyCell) return;
-					switch(this.ui_state.editingPolicyChoice){
-						case "FixedPrice": {
-							this.ui_state.editingPolicyCell.policy = JSON.parse(JSON.stringify(this.ui_state.editingPolicyCopy1));
-						} break;
-						case "PerVolumePrice": {
-							this.ui_state.editingPolicyCell.policy = JSON.parse(JSON.stringify(this.ui_state.editingPolicyCopy2));
-						} break;
-						case "DelegatedPrice": {
-							this.ui_state.editingPolicyCell.policy = JSON.parse(JSON.stringify(this.ui_state.editingPolicyCopy3));
-						} break;
-						default:
-					}
-				}
 				// TODO UI state management (loading, etc.)
 
 
@@ -401,10 +631,10 @@
 				<ul class="nav nav-tabs">
 					<li v-for="grid in ui_state.system.grids"
 						class="nav-item">
-						<a href="#" class="nav-link" :class="{active: ui_state.currentGrid.name == grid.name}" @click="selectGrid(grid.name)">{{grid.name}}</a>
+						<a href="#" class="nav-link" :class="{active: ui_state.currentGrid.name == grid.name}" @click.prevent="selectGrid(grid.name)">{{grid.name}}</a>
 					</li>
 					<li class="nav-item">
-						<a href="#" class="nav-link bi bi-plus-lg" @click="newGrid"></a>
+						<a href="#" class="nav-link bi bi-plus-lg" @click.prevent="newGrid"></a>
 					</li>
 				</ul>`
 		};
@@ -497,6 +727,7 @@
 					} else {
 						name_field.setCustomValidity("");
 					}
+
 					// 1.b) validate other attribs
 					if (!form.checkValidity()) {
 						event.preventDefault();
@@ -562,7 +793,7 @@
 							<div class="input-group mb-3">
 								<input id="dim-name" class="form-control" placeholder="Nom interne" v-model.trim="ui_state.editingDimCopy.name" required>
 								<span class="input-group-text">par seuil de</span>
-								<select class="form-control" v-model="ui_state.editingDimCopy.raw_name" required>
+								<select class="form-select" v-model="ui_state.editingDimCopy.raw_name" required>
 									<option disabled value="">Coordonnée brute</option>
 									<option v-for="k in numericRawCoords" :value="k">
 										{{ k }}
@@ -601,6 +832,14 @@
 								}
 							}
 
+							const oldCategoryNames = this.dimension.categories.map(c => c.value);
+							{
+								const lostCategoryNames = oldCategoryNames.filter(n => !categoryNames.includes(n));
+								if (lostCategoryNames.length > 0){
+									categoryAlerts.push(`Les catégories suivantes ont disparu, les cellules correspondantes seront perdues : ${lostCategoryNames}.`);
+								}
+							}
+
 							// intra-category dupes
 							for (const cat of categories){
 								const dupes =  Array.from(new Set(cat.enum.filter((item, i) => cat.enum.indexOf(item) !== i)));
@@ -634,7 +873,7 @@
 							<div class="input-group mb-3">
 								<input id="dim-name" class="form-control" placeholder="Nom interne" v-model.trim="ui_state.editingDimCopy.name" required>
 								<span class="input-group-text">par seuil de</span>
-								<select class="form-control" v-model="ui_state.editingDimCopy.raw_name" required>
+								<select class="form-select" v-model="ui_state.editingDimCopy.raw_name" required>
 									<option disabled value="">Coordonnée brute</option>
 									<option v-for="k in stringRawCoords" :value="k">
 										{{ k }}
@@ -653,9 +892,12 @@
 									<splitting-input class="form-control" v-model="cat.enum"></splitting-input>
 								</div>
 								<button type="button" @click="addCategory" class="btn btn-outline-secondary bi bi-plus-lg"></button>
-								<ul v-if="categoryAlerts.length>0" class="alert alert-warning fade show" role="alert">
-									<li v-for="ca in categoryAlerts">{{ ca }}</li>
-								</ul>
+								<div v-if="categoryAlerts.length>0" class="alert alert-warning fade show mt-1" role="alert">
+									<i class="bi bi-exclamation-triangle fs-3"></i>
+									<ul>
+										<li v-for="ca in categoryAlerts">{{ ca }}</li>
+									</ul>
+								</div>
 							</div>
 						</div>
 						<div v-else>
@@ -683,7 +925,7 @@
 									<button type="button" class="btn btn-outline-primary mb-1" @click="editDimension_end">Save</button>
 								</template>
 								<template v-else>
-									<button type="button" class="btn btn-secondary mb-1 bi bi-pencil-square" @click="editDimension_start($event, dim.name)"></button>
+									<button type="button" class="btn btn-secondary mb-1 bi bi-pencil" @click="editDimension_start($event, dim.name)"></button>
 									<button type="button" class="btn btn-secondary mb-1 bi bi-caret-up-fill" @click="moveDimension(dimIdx,-1)" :disabled="!isMovable(dimIdx,-1)"></button>
 									<button type="button" class="btn btn-secondary mb-1 bi bi-caret-down-fill" @click="moveDimension(dimIdx,+1)" :disabled="!isMovable(dimIdx,+1)"></button>
 								</template>
@@ -721,53 +963,130 @@
 				<div class="gridCell">
 					<a class="position-absolute top-0 end-0" data-bs-toggle="modal" data-bs-target="#grid-cell-customizer"
 					  @click="$emit('editGridCell', cell)">
-						<i class="bi bi-three-dots-vertical"></i>
+						<i class="bi bi-pencil-square"></i>
 					</a>
 					<template v-if="cell">
 						<template v-if="cell.policy">
-							<template v-if="cell.policy.type=='FixedPrice'">
-								<input type="number" v-model.number="cell.policy.price">
-							</template>
-							<template v-else-if="cell.policy.type=='PerVolumePrice'">
-								<input type="number" v-model.number="cell.policy.price">*{{cell.policy.attribute}}
-								<div class="secondary">
-									(arrondi à <input type="number" step="1" min="1" v-model.number="cell.policy.rounding">)
-								</div>
-							</template>
-							<template v-else-if="cell.policy.type=='DelegatedPrice'">
-								voir grille {{ cell.policy.delegated_gridName }}
-								{{ cell.policy.delegated_additiveAmount??0==0
-								  ? "+ ajout "+ cell.policy.delegated_additiveAmount + "€"
-								  : "" }}
-							</template>
-							<template v-else>
-								<span class="badge bg-danger">UNKNOWN</span>
-								 {{ cell.policy.type }}
-							</template>
+							<pricinggrids-policyQuick :policy="cell.policy" />
 						</template>
 						<template v-else>
-							<span class="badge bg-danger">NO POLICY</span>
+							<span class="badge bg-warning">EMPTY</span>
 						</template>
 					</template>
 					<template v-else>
-						<span class="badge bg-danger">NO CELL</span>
+						<span class="badge bg-danger">NO CELL</span><!-- error case -->
 					</template>
 				</div>
 				`
 		};
 
-		var PricingGrids_Grid = {
+		var PricingGrids_Policy = {
 			props: {
-				grid: Object
-				//TODO pass the full grid system : a policy can reference another grid !
+				policy: Object,
+				ui_state: Object,
+				editMode: String, // among "full", "quick", "no"
 			},
-			computed:{
-				dimensionCount(){
-					return this.grid.dimensions.length;
+			data(){
+				return {
+					numericRawCoords,
+					stringRawCoords
 				}
 			},
-			emits: ["editGridCell"],
+			template: '#PricingGrids_Policy-template' // template is shared !
+		};
+
+		/* a lighter version of PricingGrids_Policy, with less bindings */
+		var PricingGrids_PolicyQuick = {
+			props: {
+				policy: Object
+			},
+			data(){
+				return {
+					editMode: "quick"
+				}
+			},
+			template: '#PricingGrids_Policy-template' // template is shared !
+		};
+
+
+		var PricingGrids_Grid = {
+			props: {
+				ui_state: Object
+			},
+			computed:{
+				grid(){
+					return this.ui_state.currentGrid;
+				},
+				dimensionCount(){
+					return this.ui_state.currentGrid.dimensions.length;
+				}
+			},
 			methods:{
+				editGridCell_clear(event){
+					let form = event.target.closest("form.needs-validation")
+					form.classList.remove('was-validated');
+				},
+
+				editGridCell_start(cell){
+					this.ui_state.editingPolicyCell = cell;
+
+					if (cell && cell.policy){
+						// Normal cells
+						this.ui_state.editingPolicyChoice = cell.policy.type;
+						if (this.ui_state.editingPolicyChoice == "clipboardPolicy") throw new Error("'clipboardPolicy' is not a standard Cell Policy !");
+
+						this.ui_state.editingPolicyCopies[cell.policy.type] = JSON.parse(JSON.stringify(cell.policy))
+					} else {
+						// Empty Cells and Policies
+						this.ui_state.editingPolicyChoice = "clipboardPolicy";
+					}
+				},
+
+				editGridCell_end(event){
+					if (!this.ui_state.editingPolicyCell) return new Error("Saving cannot occur in a missing Cell.");
+					if (!this.ui_state.editingPolicyChoice) throw new Error("Saving cannot occur without a editingPolicyChoice ?!");
+
+					let form = event.target.closest("form.needs-validation");
+					if (!form.checkValidity()) {
+						event.preventDefault();
+						event.stopPropagation();
+						form.classList.add('was-validated')
+						return;
+					}
+
+					let srcPolicy = this.ui_state.editingPolicyCopies[this.ui_state.editingPolicyChoice]
+					this.ui_state.editingPolicyCell.policy = JSON.parse(JSON.stringify(srcPolicy));
+
+					const modal = document.getElementById("grid-cell-customizer");
+					const bsModal = bootstrap.Modal.getOrCreateInstance(modal);
+					bsModal.hide();
+				},
+
+				editGridCell_emptyClipboard(){
+					this.ui_state.editingPolicyCopies['clipboardPolicy'] = null;
+				},
+				editGridCell_copy(){
+					let cell = this.ui_state.editingPolicyCell;
+					if (cell && cell.policy) {
+						this.ui_state.editingPolicyCopies["clipboardPolicy"] = JSON.parse(JSON.stringify(cell.policy));
+						this.ui_state.editingPolicyChoice = "clipboardPolicy";
+					} //else just ignore
+				},
+				editGridCell_paste(){
+					let srcPolicy = this.ui_state.editingPolicyCopies["clipboardPolicy"];
+					if (srcPolicy && srcPolicy.type){
+						let dstPolicy = this.ui_state.editingPolicyCopies[srcPolicy.type];
+						Object.assign(dstPolicy, srcPolicy);
+						this.ui_state.editingPolicyChoice = srcPolicy.type;
+					} // else just ignore
+				},
+
+				editGridCell_pasteAndSave(event){
+					this.editGridCell_paste();
+					this.editGridCell_end(event);
+				},
+
+				/* (parameterized computed) */
 				categoryLabel(dimension, category, categoryIndex){
 					let label;
 					switch (dimension.type) {
@@ -794,129 +1113,8 @@
 					return label ?? category.value;
 				}
 			},
-			emits: ["editGridCell"] /* bubble up*/,
-			template: `
-				<table class="table table-bordered">
-					<template v-if="dimensionCount==0">
-						<thead>
-							<tr>
-								<th>Toutes livraisons</th>
-							</tr>
-						</thead>
-						<tbody>
-							<tr>
-								<td>
-									<pricinggrids-gridcell
-									  @edit-grid-cell="(cell)=>$emit('editGridCell', cell)"
-									  :cell="grid.gridCellAt({})">
-									</pricinggrids-gridcell>
-								</td>
-							</tr>
-						</tbody>
-					</template>
-					<template v-else-if="dimensionCount==1">
-						{{void(
-							dim0 = this.grid.dimensions[0]
-						)}}
-						<thead>
-							<tr>
-								<th>{{ dim0.name }}</th>
-								<th>Prix</th>
-							</tr>
-						</thead>
-						<tbody>
-							<tr v-for="(categ_dim0, categIdx_dim0) in dim0.categories">
-								<th>{{ categoryLabel(dim0, categ_dim0, categIdx_dim0) }}</th>
-								<td>
-									<pricinggrids-gridcell
-									  @edit-grid-cell="(cell)=>$emit('editGridCell', cell)"
-									  :cell="grid.gridCellAt({[dim0.name]: categ_dim0.value})">
-									</pricinggrids-gridcell>
-								</td>
-							</tr>
-						</tbody>
-					</template>
-					<template v-else-if="dimensionCount==2">
-						{{void(
-							dim0 = this.grid.dimensions[0],
-							dim1 = this.grid.dimensions[1]
-						)}}
-						<thead>
-							<tr>
-								<th rowspan="2">{{ dim0.name }}</th>
-								<th :colspan="dim1.categories.length">
-									{{ dim1.name }}
-								</th>
-							</tr>
-							<tr>
-								<th v-for="(categ_dim1, categIdx_dim1) in dim1.categories">
-									{{ categoryLabel(dim1, categ_dim1, categIdx_dim1) }}
-								</th>
-							</tr>
-						</thead>
-						<tbody>
-							<tr v-for="(categ_dim0, categIdx_dim0) in dim0.categories" >
-								<th>{{ categoryLabel(dim0, categ_dim0, categIdx_dim0) }}</th>
-								<td v-for="categ_dim1 in dim1.categories">
-									<pricinggrids-gridcell
-									  @edit-grid-cell="(cell)=>$emit('editGridCell', cell)"
-									  :cell="grid.gridCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value})">
-									</pricinggrids-gridcell>
-								</td>
-							</tr>
-						</tbody>
-					</template>
-					<template v-else-if="dimensionCount==3">
-						{{void(
-							dim0 = grid.dimensions[0],
-							dim1 = grid.dimensions[1],
-							dim2 = grid.dimensions[2]
-						)}}
-						<thead>
-							<tr>
-								<th rowspan="4">{{ dim0.name }}</th>
-								<th :colspan="dim2.categories.length * dim1.categories.length">
-									{{ dim2.name }}
-								</th>
-							</tr>
-							<tr>
-								<th v-for="(categ_dim2, categIdx_dim2) in dim2.categories" :colspan="dim1.categories.length">
-									{{ categoryLabel(dim2, categ_dim2, categIdx_dim2) }}
-								</th>
-							</tr>
-							<tr>
-								<th v-for="categ_dim2 in dim2.categories" :colspan="dim1.categories.length">
-									{{ dim1.name }}
-								</th>
-							</tr>
-							<tr>
-								<template v-for="categ_dim2 in dim2.categories">
-								<th v-for="(categ_dim1, categIdx_dim1) in dim1.categories">
-									{{ categoryLabel(dim1, categ_dim1, categIdx_dim1) }}
-								</th>
-								</template>
-							</tr>
-						</thead>
-						<tbody>
-							<tr v-for="(categ_dim0, categIdx_dim0) in dim0.categories" >
-								<th>{{ categoryLabel(dim0, categ_dim0, categIdx_dim0) }}</th>
-								<template v-for="categ_dim2 in dim2.categories">
-								<td v-for="categ_dim1 in dim1.categories">
-									<pricinggrids-gridcell
-									  @edit-grid-cell="(cell)=>$emit('editGridCell', cell)"
-									  :cell="grid.gridCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value, [dim2.name]: categ_dim2.value})">
-									</pricinggrids-gridcell>
-								</td>
-								</template>
-							</tr>
-						</tbody>
-					</template>
-					<template v-else>
-						<tbody><tr><td>
-							Dimensions &gt; 3 non support&eacute; !
-						</td></tr></tbody>
-					</template>
-				</table>` // Note : une solution générale est possible, mais un peu illisible... et moins souple sur le rendu.
+
+			template: '#PricingGrids_Grid-template'
 		};
 
 
@@ -929,10 +1127,46 @@
 			template: '#PricingTest-Form-template'
 		};
 
+
+		/** Rounding to cents */
+		var MoneyInput = {
+			props: ['modelValue', 'modelModifiers', 'decimals'],
+			//	modelValue: optional Number ?,
+			//	modelModifiers: capture and ignore
+			// },
+			data(){
+				return {
+					decimalsInt: 1, // 2 is more typical, except here ;-)
+					rounding: 0
+				}
+			},
+			emits: ['update:modelValue'],
+			created(){
+				if (this.decimals)
+					this.decimalsInt = parseInt(this.decimals,10);
+				this.rounding = Math.pow(0.1, this.decimalsInt);
+			},
+			computed: {
+				value: {
+					get() {
+						return typeof this.modelValue == 'number' ?  this.modelValue.toFixed(this.decimalsInt) : "";
+					},
+					set(v) {
+						v = Number.parseFloat(v);
+						v = Number.isNaN(v) ? v = null : Math.floor(v / this.rounding) * this.rounding;
+						this.$forceUpdate(); // needed to "visually" truncate the field, when the value is not changed by adding 0.00001
+						this.$emit('update:modelValue', v);
+					}
+				}
+			},
+			template: `<input type="number" :step="rounding" v-model.lazy.number="value" />`
+		};
+
 		/** Splitting to array */
 		var SplittingInput = {
 			props: {
-				modelValue: Array
+				modelValue: Array,
+				modelModifiers: { default: () => ({}) } //capture and ignore this.modelModifiers
 			},
 			emits: ['update:modelValue'],
 			computed: {
@@ -951,13 +1185,17 @@
 		};
 
 
-
+		gridBuilderApp.component("money-input", MoneyInput);
 		gridBuilderApp.component("splitting-input", SplittingInput);
 
 		gridBuilderApp.component("pricinggrids-tabs", PricingGrids_Tabs);
 
 		gridBuilderApp.component("pricinggrids-grid", PricingGrids_Grid);
 		gridBuilderApp.component("pricinggrids-gridcell", PricingGrids_GridCell);
+
+		gridBuilderApp.component("pricinggrids-policy", PricingGrids_Policy);
+		gridBuilderApp.component("pricinggrids-policyQuick", PricingGrids_PolicyQuick);
+
 
 		gridBuilderApp.component("pricinggrids-dim-list", PricingGrids_DimensionList);
 

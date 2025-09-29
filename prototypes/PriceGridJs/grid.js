@@ -75,7 +75,7 @@ class PricingGrid {
 	*/
 	apply(pricedObject){
 		let gridCell = this._findGridCellFor(pricedObject);
-		if (gridCell == null){
+		if (gridCell == null || gridCell.policy == null){
 			return undefined;//throw new Error("No cell defined");
 		} else {
 			let policy = gridCell.policy;
@@ -90,7 +90,7 @@ class PricingGrid {
 					amount = roundedVolume * policy.price;
 				} break;
 				case "DelegatedPrice": {
-					amount = null;
+					amount = null; /* will have to be resolved at PricingSystem level */
 				} break;
 				default : {
 					throw new Error("Unsupported type of Pricing Policy : " + policy.type);
@@ -104,32 +104,41 @@ class PricingGrid {
 		let rawCoordinates = pricedObject.getPPGRawCoordinates();
 		let gridCoordinates = this._toGridCoordinates(rawCoordinates);
 
-		return this.gridCellAt(gridCoordinates);
+		return this.getCellAt(gridCoordinates);
 	}
 
-	gridCellAt(gridCoordinates){
+	getCellAt(gridCoordinates){
 		// collect all applicable grid cells...
-		let applicablePolicies = [];
+		let applicableCells = [];
 		for (const cell of this.gridCells){
 			if (this._matchCoords(gridCoordinates, cell.coords)){
-				applicablePolicies.push(cell);
+				applicableCells.push(cell);
 			}
 		}
 
-		switch(applicablePolicies.length){
+		switch(applicableCells.length){
 			case 0: {
-				console.log("No policy found");
+				console.log("No cell found");
 				return null;
 			}
 			case 1: {
-				return applicablePolicies.pop();
+				return applicableCells.pop();
 			}
 			default: {
-				console.warn(applicablePolicies);
+				console.warn(applicableCells);
 
-				throw new Error("Overlapping policy definition !");
+				throw new Error("Overlapping cell definition !");
 			}
 		}
+	}
+
+	ensureCellAt(gridCoordinates){
+		let cell = this.getCellAt(gridCoordinates);
+		if (!cell){
+			cell = {coords: gridCoordinates, policy: null};
+			this.gridCells.push(cell);
+		}
+		return cell;
 	}
 
 	//translate raw coordinates to grid coordinates (= apply category definitions)
@@ -228,7 +237,7 @@ class PricingGrid {
 			let coordsPlus = {[removedDimension.name]: removedDimension.categories[0].value, ...coords};
 
 			let policy = null;
-			let oldCell = this.gridCellAt(coordsPlus);
+			let oldCell = this.getCellAt(coordsPlus);
 			if (oldCell) policy = oldCell.policy;
 
 			let newCell = {coords, policy};
@@ -277,19 +286,10 @@ class PricingGrid {
 
 	updateCellsFromDimensions() {
 		let newGridCells = [];
-		for (const c of PricingGrid.getAllAvailableCoords(this.dimensions)){
-			let cell = this.gridCellAt(c);
-			let newPolicy;
-			if (cell && cell.policy)
-				newPolicy = JSON.parse(JSON.stringify(cell.policy));
-			else {
-				newPolicy = {
-					type: "FixedPrice",
-					price: 0
-				}; // TODO proper default
-			}
-			let newCell = {coords:c, policy:newPolicy};
-			newGridCells.push(newCell);
+		for (const coords of PricingGrid.getAllAvailableCoords(this.dimensions)){
+			let cell = this.getCellAt(coords);
+			let policy = (cell && cell.policy) ? JSON.parse(JSON.stringify(cell.policy)) : null;
+			newGridCells.push({coords, policy});
 		}
 
 		this.gridCells = newGridCells;
