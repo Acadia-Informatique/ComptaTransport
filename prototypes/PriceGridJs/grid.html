@@ -40,6 +40,7 @@
 				return {
 						poids : this.poids,
 						poidsEntier: Math.ceil(this.poids),
+						//poidsVolumique: Lxlxh / 5000 d'après la fiche export
 						pays: this.pays, // TODO lookup ISO 3166-1 alpha-2 or alpha-3 codes
 						departement,
 						transporteurHN: this.transporteurHN
@@ -50,6 +51,10 @@
 
 	<style>
 		/** Bootstrap global overrides */
+		body {
+			background-color: rgb(235, 255, 254);
+		}
+
 		.accordion {
 			--bs-accordion-btn-color: black;
 			--bs-accordion-btn-bg: rgb(32, 211, 194);
@@ -57,24 +62,60 @@
 			--bs-accordion-active-bg: rgb(0, 0, 172);
 		}
 
+		/* Custom styles for large devices (≥992px) */
+		@media only screen and (min-width: 992px) {
+			div.pricinggrid-pane {
+				overflow-y: auto !important;
+				height: 100vh !important;
+			}
+			div#gridViewport {
+				overflow-y: auto;
+				height: 85vh;
+			}
+		}
+
 
 		/** App specifics */
+		div.pricinggrid-pane {
+			scroll-behavior: smooth;
+		}
+		div#gridViewport {
+			border: 3px inset grey;
+			overflow-x: auto;
+		}
 		table.gridTable {
 			--bs-border-color: rgb(80, 80, 80);
 			--bs-border-width: 2px;
 		}
+		table.gridTable thead {
+		  	position: sticky;
+			top: 0; /* Don't forget this, required for the stickiness */
+			box-shadow: 0px 10px 16px 0px rgba(0, 0, 0, 0.4);
+			z-index:3;
+		}
+
 		table.gridTable th.gridHead {
 			--bs-table-bg: rgb(246, 255, 164);
+
+			position: sticky;
+			left: 0; /* Don't forget this, required for the stickiness */
+			/* box-shadow: 10px 0px 16px 0px rgba(0, 0, 0, 0.4); not showing ?... */
+			z-index:2;
 		}
 
 		.gridCell, .gridHead {
 			position: relative; /* for absolute children*/
 		}
-		.gridCell input[type=number] {
+
+		.gridCell input.money-input {
 			width:4.5em;
-			border:lightgrey 1px dotted;
+			border:1px dotted lightgrey;
 			padding: 0.1em 0.2em;
-			text-align:right
+			text-align:right;
+		}
+		.gridCell input.money-input:invalid {
+			border:1px solid red ;
+			background-color:pink ;
 		}
 		.gridCell .secondary {
 			font-size: 80%;
@@ -104,8 +145,8 @@
 
 <body>
 	<div id="pricinggrids-builder">
-		<div class="container-fluid mt-2 mb-3"><div class="row">
-			<div class="accordion shadow col-12 col-lg-3 order-lg-last" id="tool-pane">
+		<div class="container-fluid"><div class="row">
+			<div class="accordion shadow col-12 col-lg-5 col-xl-3 order-lg-last pt-2" id="tool-pane">
 				<div class="accordion-item">
 					<h2 class="accordion-header">
 						<button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
@@ -131,11 +172,14 @@
 					</div>
 				</div>
 			</div>
-			<div class="col-12 col-lg-9">
+			<div class="pricinggrid-pane col-12 col-lg-7 col-xl-9 pt-2">
 				<pricinggrids-tabs :ui_state="ui_state"></pricinggrids-tabs>
-				<div class="container-fluid overflow-auto">
+
+				<div id="gridViewport" class="mb-3">
 					<pricinggrids-grid :ui_state="ui_state"></pricinggrids-grid>
 				</div>
+
+				<h3 id="dimension-list"><a href="#dimension-list">Légende</a></h3>
 				<pricinggrids-dim-list :ui_state="ui_state"></pricinggrids-dim-list>
 			</div>
 		</div></div>
@@ -373,10 +417,10 @@
 				</div>
 			</template>
 			<template v-else-if="editMode=='quick'">
-				<money-input v-model="policy.price" />
+				<money-input v-model="policy.price" required/>
 			</template>
 			<template v-else>
-				Prix fixe de {{ policy.price }} €
+				Prix fixe de {{ policy.price }}€
 			</template>
 		</template>
 
@@ -413,7 +457,7 @@
 				</div>
 			</template>
 			<template v-else-if="editMode=='quick'">
-				<money-input v-model="policy.price" />*{{policy.attribute}}
+				<money-input v-model="policy.price" required />*{{policy.attribute}}
 				<div class="secondary">
 					(arrondi à {{ policy.rounding }})
 				</div>
@@ -472,7 +516,7 @@
 				</div>
 			</template>
 			<template v-else-if="editMode=='quick'">
-				<span class="badge bg-danger">UNKNOWN</span>
+				<span class="badge text-bg-danger">UNKNOWN</span>
 					{{ policy.type }}
 			</template>
 			<template v-else>
@@ -482,48 +526,144 @@
 	</script>
 
 	<script type="text/x-template" id="PricingTest-Form-template">
-		<form id="" class="" @submit.prevent=""><!-- TODO make me look better -->
-			<div class="mb-3">
-				<label class="form-label" for="inputPoids">Poids</label>
-				<input type="number" step="0.1" min="0" lang="en-US"
-				 class="form-control" id="inputPoids" placeholder="Poids (en kg)"
-				 v-model.number="ui_state.testPricedObj.poids">
+		<form>
+			<div class="row mb-3 mb-lg-1">
+				<div class="col-lg-4">
+					<label class="col-form-label" for="inputPoids">Poids</label>
+				</div>
+				<div class="col-lg-8">
+					<input class="form-control" id="inputPoids" placeholder="Poids (en kg)"
+					  type="number" step="0.1" min="0"
+					  v-model.number="ui_state.testPricedObj.poids">
+				</div>
 			</div>
-			<div class="mb-3">
-				<label class="form-label" for="inputPostCode">Code postal</label>
-				<input type="text" maxlength="5"
-				 class="form-control" id="inputPostCode" placeholder="Code postal"
-				 v-model.trim="ui_state.testPricedObj.codePostal">
+			<div class="row mb-3 mb-lg-1">
+				<div class="col-lg-4">
+					<label class="col-form-label" for="inputPostCode">Code postal</label>
+				</div>
+				<div class="col-lg-8">
+					<input class="form-control" id="inputPostCode" placeholder="Code postal"
+					  type="text" maxlength="5"
+					  v-model.trim="ui_state.testPricedObj.codePostal">
+				</div>
 			</div>
-			<div class="mb-3">
-				<label class="form-label" for="inputCountry">Pays</label>
-				<select class="form-select" id="inputCountry" v-model="ui_state.testPricedObj.pays">
-					<option value="">(Inconnu)</option>
-					<option value="France">France</option>
-					<option value="Belgique">Belgique</option>
-					<option value="Hongrie">Hongrie</option>
-				</select>
+			<div class="row mb-3 mb-lg-1">
+				<div class="col-lg-4">
+					<label class="col-form-label" for="inputCountry">Pays</label>
+				</div>
+				<div class="col-lg-8">
+					<input class="form-control" id="inputCountry"
+					  type="text" list="countryDatalist" autocomplete="on"
+					  v-model="ui_state.testPricedObj.pays">
+					<datalist id="countryDatalist">
+						<option value="Allemagne"></option>
+						<option value="Autriche"></option>
+						<option value="Belgique"></option>
+						<option value="Bulgarie"></option>
+						<option value="Croatie"></option>
+						<option value="Danemark"></option>
+						<option value="Espagne (hors îles)"></option>
+						<option value="Estonie"></option>
+						<option value="Finlande"></option>
+						<option value="France"></option>
+						<option value="Grèce (hors îles)"></option>
+						<option value="Hongrie"></option>
+						<option value="Irlande"></option>
+						<option value="Islande"></option>
+						<option value="Italie"></option>
+						<option value="Lettonie"></option>
+						<option value="Luxembourg"></option>
+						<option value="Norvège"></option>
+						<option value="Pays-Bas"></option>
+						<option value="Pologne"></option>
+						<option value="Portugal"></option>
+						<option value="Rép. Tchèque"></option>
+						<option value="Roumanie"></option>
+						<option value="Suisse"></option>
+						<option value="Suède"></option>
+						<option value="Slovaquie"></option>
+					</datalist>
+				</div>
 			</div>
-			<div class="mb-3">
-				<label class="form-label" for="inputTransporteurHN">Transporteur HN</label>
-				<select class="form-select" id="inputTransporteurHN" v-model="ui_state.testPricedObj.transporteurHN">
-					<option disabled value="">Choisissez un transport</option>
-					<option value="Schenker std">Schenker std</option>
-					<option value="Schenker premium">Schenker premium</option>
-					<option value="Geodis MES">Geodis MES</option>
-					<option value="Geodis ATX">Geodis ATX</option>
-				</select>
+			<div class="row mb-3 mb-lg-1">
+				<div class="col-lg-4">
+					<label class="col-form-label" for="inputTransporteurHN">Transporteur HN</label>
+				</div>
+				<div class="col-lg-8">
+					<input class="form-control" id="inputTransporteurHN"
+					  type="text" list="transporteurHNDatalist" autocomplete="on"
+					  v-model="ui_state.testPricedObj.transporteurHN">
+					<datalist id="transporteurHNDatalist">
+						<option value="Schenker Standard (MES)"></option>
+						<option value="Schenker Premium (MES)"></option>
+						<option value="MAZET"></option>
+						<option value="Geodis MES"></option>
+						<option value="Geodis ATX"></option>
+					</datalist>
+				</div>
 			</div>
 
+			<!-- PRICING TEST RESULT -->
+			<table class="table" style="font-size:0.8em">
+				<thead>
+					<tr>
+						<th scope="col">Grille @ Case</th>
+						<th scope="col">Tarif</th>
+						<th scope="col">Cumul</th>
+					</tr>
+				</thead>
+				<tbody>
+					<pricingtest-result :result="testResult"/>
+				</tbody>
+				<tfoot class="table-group-divider">
+					<tr>
+						<td colspan="3" class="fs-3">
+							Total:
+							<template v-if="!isNaN(testResult?.amount)">
+								{{testResult.amount.toFixed(2)}} €
+							</template>
+							<span v-else class="text-bg-danger">
+								&nbsp;???&nbsp;
+							</span>
+						</td>
+					</tr>
+				</tfoot>
+			</table>
 
 
-
-			{{ void(returnVal = ui_state.system.applyGrid(ui_state.currentGrid.name, ui_state.testPricedObj) )}}
-			<div> <!--class="text-truncate" -->{{ JSON.stringify(returnVal) }}</div>
-
-			<div class="fs-2">Amount : {{ returnVal?.amount }}</div>
 		</form>
 	</script>
+
+
+
+	<script type="text/x-template" id="PricingTest-Result-template">
+		<pricingtest-result v-if="result.nested" :result="result.nested" />
+		<tr>
+			<td>
+				{{ result.gridName}}<br>
+				<span v-if="result.gridCell?.coords" style="white-space:pre;">
+					{{ pretty_coords(result.gridCell.coords) }}
+				</span>
+			</td>
+			<td>
+				<template v-if="result.gridCell?.policy">
+					<pricinggrids-policy :policy="result.gridCell.policy" editMode="no"/>
+				</template>
+				<template v-else>
+					N/A
+				</template>
+			</td>
+			<td>
+				<template v-if="!isNaN(result.amount)">
+					{{result.amount.toFixed(2)}}
+				</template>
+				<span v-else class="text-bg-danger">
+					&nbsp;???&nbsp;
+				</span>
+			</td>
+		</tr>
+	</script>
+
 
 	<!-- ========== component logic ============== -->
 	<script type="module">
@@ -970,11 +1110,11 @@
 							<pricinggrids-policyQuick :policy="cell.policy" />
 						</template>
 						<template v-else>
-							<span class="badge bg-warning">EMPTY</span>
+							<span class="badge text-bg-warning">EMPTY</span>
 						</template>
 					</template>
 					<template v-else>
-						<span class="badge bg-danger">NO CELL</span><!-- error case -->
+						<span class="badge text-bg-danger">NO CELL</span><!-- error case -->
 					</template>
 				</div>
 				`
@@ -1124,8 +1264,37 @@
 			props: {
 				ui_state: Object
 			},
+			computed:{
+				testResult(){
+					const gridName = this.ui_state.currentGrid.name;
+					const testPricedObj = this.ui_state.testPricedObj;
+					return this.ui_state.system.applyGrid(gridName, testPricedObj);
+				}
+			},
 			template: '#PricingTest-Form-template'
 		};
+
+		/**
+		 * Table rows based on PricingSystem.apply()'s result.
+		 * It is *recursive* because of the nested results.
+		 */
+		var PricingTest_Result = {
+			props: {
+				result: Object
+			},
+			methods:{
+				/* render a pretty print JSON coords, to be displayed in a PRE element */
+				pretty_coords(coords){
+					// btw, if you want "pretty labels" on that, you will need to make the grids interpret their own dimensions...
+					let str = JSON.stringify(coords, null, 1);
+					str = str.substring(2, str.length-2); // removes the braces and line breaks
+					return str;
+				}
+			},
+			template: '#PricingTest-Result-template'
+		};
+
+
 
 
 		/** Rounding to cents */
@@ -1144,7 +1313,7 @@
 			created(){
 				if (this.decimals)
 					this.decimalsInt = parseInt(this.decimals,10);
-				this.rounding = Math.pow(0.1, this.decimalsInt);
+				this.rounding = Math.pow(10, this.decimalsInt);
 			},
 			computed: {
 				value: {
@@ -1153,13 +1322,13 @@
 					},
 					set(v) {
 						v = Number.parseFloat(v);
-						v = Number.isNaN(v) ? v = null : Math.floor(v / this.rounding) * this.rounding;
-						this.$forceUpdate(); // needed to "visually" truncate the field, when the value is not changed by adding 0.00001
+						v = Number.isNaN(v) ? v = null : Math.floor(v * this.rounding) / this.rounding;
+						this.$forceUpdate(); // needed to "visually" truncate the field, when the value is *not* changed by adding 0.00001
 						this.$emit('update:modelValue', v);
 					}
 				}
 			},
-			template: `<input type="number" :step="rounding" v-model.lazy.number="value" />`
+			template: `<input type="number" :step="1/rounding" v-model.lazy.number="value" class="money-input"/>`
 		};
 
 		/** Splitting to array */
@@ -1201,6 +1370,7 @@
 
 
 		gridBuilderApp.component("pricingtest-form", PricingTest_Form);
+		gridBuilderApp.component("pricingtest-result", PricingTest_Result);
 
 		gridBuilderApp.mount('#pricinggrids-builder');
 	</script>

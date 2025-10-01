@@ -46,11 +46,11 @@ class PricingSystem {
 			if (policy?.type == "DelegatedPrice"){
 				let nestedReturnVal = this.applyGrid(policy.delegated_gridName, pricedObject);
 				return {
+					gridName,
 					gridCell:returnVal.gridCell,
 					amount: nestedReturnVal.amount + policy.delegated_additiveAmount,
-					nested: nestedReturnVal
+					nested: nestedReturnVal //<- chaining extension to grid.apply()'s return
 				};
-
 			} else {
 				return returnVal;
 			}
@@ -76,7 +76,7 @@ class PricingGrid {
 	apply(pricedObject){
 		let gridCell = this._findGridCellFor(pricedObject);
 		if (gridCell == null || gridCell.policy == null){
-			return undefined;//throw new Error("No cell defined");
+			return {gridName:this.name, gridCell, amount:NaN}; //throw new Error("No cell defined");
 		} else {
 			let policy = gridCell.policy;
 			let amount = null;
@@ -96,7 +96,7 @@ class PricingGrid {
 					throw new Error("Unsupported type of Pricing Policy : " + policy.type);
 				}
 			}
-			return {gridCell, amount};// TODO define a proper interface for this critical value
+			return {gridName:this.name, gridCell, amount};// <- important structure !
 		}
 	}
 
