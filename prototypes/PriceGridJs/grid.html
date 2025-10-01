@@ -1367,7 +1367,7 @@
 					},
 					set(v) {
 						v = Number.parseFloat(v);
-						v = Number.isNaN(v) ? v = null : Math.floor(v * this.rounding) / this.rounding;
+						v = Number.isNaN(v) ? v = null : Math.round(v * this.rounding) / this.rounding; // shouldn't it be Math.floor ?...maybe not for float decimals :-(
 						this.$forceUpdate(); // needed to "visually" truncate the field, when the value is *not* changed by adding 0.00001
 						this.$emit('update:modelValue', v);
 					}
