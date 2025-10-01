@@ -18,12 +18,30 @@ class AbstractPricedObject {
 	}
 }
 
-
-/*
-class PricingPolicy {
-
-}
-*/
+/**
+ * Typical policies, usable as calculation test cases or to model.
+ */
+const POLICY_PROTOTYPES = [
+	{
+		type: "FixedPrice",
+		price: 11.9
+	},
+	{
+		type: "PerVolumePrice",
+		attribute: "weight",
+		rounding: 10,
+		price: 4.4,
+		offset : {
+			attribute: 0,
+			price: 0
+		}
+	},
+	{
+		type: "DelegatedPrice",
+		delegated_gridName: "B2B",
+		delegated_additiveAmount: 3
+	},
+];
 
 // TODO serialize / hydration for all GridStystem participants
 
@@ -85,9 +103,14 @@ class PricingGrid {
 					amount = policy.price;
 				} break;
 				case "PerVolumePrice": {
-					let volume = pricedObject[policy.attribute];
-					let roundedVolume = policy.rounding * Math.ceil(volume / policy.rounding);
-					amount = roundedVolume * policy.price;
+					let offset = policy.offset ?? {attribute: 0, price: 0};
+					let volume = pricedObject[policy.attribute] - offset.attribute;
+					if (volume >= 0) {
+						let roundedVolume = policy.rounding * Math.ceil(volume / policy.rounding);
+						amount = roundedVolume * policy.price + offset.price;
+					} else {// better not support negative offsetting...
+						amount = NaN;
+					}
 				} break;
 				case "DelegatedPrice": {
 					amount = null; /* will have to be resolved at PricingSystem level */
