@@ -5,6 +5,7 @@
 		- label : text on the button (if empty, the button will not be displayed)
 		- class (optional) : CSS class name(s) for the button
 		- handler (optional) : callback function called for this choice (if not set, makes a default close button (X) to appear)
+		- autofocus (optional) : makes the button get focus on showing
 
 	(Note: hence an "empty" object may be used to make the (X) button appear. Besides, when no choice is set, it appears anyway)
 */
@@ -72,13 +73,18 @@ window.confirm_dialog = function (txt, ...choiceObjs) {
 		}
 
 		// apply handler
-		newButton.addEventListener('click', () => {
-			if (obj.handler) obj.handler();
+		newButton.addEventListener('click', (e) => {
+			let handlerRes = undefined;
+			if (obj.handler) handlerRes = obj.handler();
 
-			// hide the dialog anyway, using Bootstrap 5 API
-			const bsModal = bootstrap.Modal.getOrCreateInstance(modal);
-			bsModal.hide();
+			if (handlerRes !== false){ // veto closing
+				const bsModal = bootstrap.Modal.getOrCreateInstance(modal);
+				bsModal.hide();
+			}
 		});
+
+		// apply autofocus
+		if (obj.autofocus) newButton.autofocus = true;
 
 		buttons.appendChild(newButton);
 		newButton.style.display = '';
@@ -89,6 +95,7 @@ window.confirm_dialog = function (txt, ...choiceObjs) {
 	// Show dialog using Bootstrap 5 API
 	const bsModal = bootstrap.Modal.getOrCreateInstance(modal);
 	bsModal.show();
+	modal.querySelector("*[autofocus]")?.focus(); // additional help for autofocus
 };
 
 /* A Bootstrap-based replacement for window.alert(), based on confirm_dialog().
@@ -97,8 +104,8 @@ window.confirm_dialog = function (txt, ...choiceObjs) {
 */
 window.alert_dialog = function (txt1, txt2) {
 	if (txt2) {
-		window.confirm_dialog(txt1, txt2, {label: "OK", class: "btn-primary"});
+		window.confirm_dialog(txt1, txt2, {label: "OK", class: "btn-primary", autofocus:true});
 	} else {
-		window.confirm_dialog(txt1, {label: "OK", class: "btn-primary"});
+		window.confirm_dialog(txt1, {label: "OK", class: "btn-primary", autofocus:true});
 	}
 };

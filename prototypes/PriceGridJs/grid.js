@@ -4,21 +4,6 @@
 
 
 /**
- * AbstractPricedObject is a sample base class for Object to be priced.
- * Duck-typing really requires a proper getPPGRawCoordinates() method.
- */
-class AbstractPricedObject {
-
-	/**
-	 * Returns a relevant Pricing Policy Grid raw coordinates object.
-	 * @returns an Object where attributes are the coordinates to be fed in PricingGrids.
-	 */
-	getPPGRawCoordinates(){
-		throw new Error("Method getPPGRawCoordinates() must be implemented to return an 'coordinates' Object");
-	}
-}
-
-/**
  * Typical policies, usable as calculation test cases or to model.
  */
 const POLICY_PROTOTYPES = [
@@ -51,10 +36,13 @@ class PricingSystem {
 		this.grids = [];
 	}
 
-	findGridByName(name) {
-		return this.grids.find(g => g.name == name);
-	}
-
+	/**
+	 * Recursively propagates grid.apply() to the system, starting with specified grid.
+	 * @param {*} gridName
+	 * @param {*} pricedObject
+	 * @see PricingGrid.apply()
+	 * @returns same as PricingGrid.apply(), plus "gridName" and optional "nested" (chaining)
+	 */
 	applyGrid(gridName, pricedObject){
 		let grid = this.findGridByName(gridName);
 		if (grid) {
@@ -70,12 +58,71 @@ class PricingSystem {
 					nested: nestedReturnVal //<- chaining extension to grid.apply()'s return
 				};
 			} else {
-				return returnVal;
+				return {
+					gridName,
+					...returnVal
+				}
 			}
 
 		} else {
 			throw new Error(`Grid "${gridName}" not found in system "${this.name}".`);
 		}
+	}
+
+	//---- Grid CRUD
+	findGridByName(name) {
+		return this.grids.find(g => g.name == name);
+	}
+
+	/**
+	 * Create new GRid in system.
+	 * @param {*} name - must be non empty and unique (arg is NOT checked)
+	 * @returns created grid
+	 */
+	addNewGrid(name){
+		let newGrid = new PricingGrid(name);
+		newGrid.updateCellsFromDimensions();
+		this.grids.push(newGrid);
+	}
+
+	/**
+	 * Deletes a grid by name, if it exists AND is free of internal references.
+	 *
+	 * @param {*} name
+	 * @returns the removed grid
+	 * @throw Error when internal reference exist to target (eg. by a DelegatedPrice)
+	 */
+	removeGrid(name){
+		for (const grid of this.grids){
+			for (const cell of grid.gridCells){
+				if (cell?.policy?.delegated_gridName == name){
+					throw new Error(`Grid "${name}" cannot be removed, for it is referenced by cell ${JSON.stringify(cell.coords)} of grid "${grid.name}".`);
+				}
+			}
+		}
+
+		let removedGridIdx = this.grids.findIndex(g => g.name == name);
+		if (removedGridIdx >=0){
+			return this.grids.splice(removedGridIdx, 1)[0]; // supposedly no dupes
+		} else {
+			return null;
+		}
+	}
+
+	/**
+	 * Rename a grid and updates all internal references.
+	 * @param oldName
+	 * @param newName
+	 */
+	renameGrid(oldName, newName){
+		for (const grid of this.grids){
+			for (const cell of grid.gridCells){
+				if (cell?.policy?.delegated_gridName == oldName){
+					cell.policy.delegated_gridName = newName;
+				}
+			}
+		}
+		this.findGridByName(oldName).name = newName;
 	}
 }
 
@@ -86,19 +133,19 @@ class PricingGrid {
 		this.gridCells = [];
 	}
 
-
 	/**
-	 * Returns policy and computed amount
-	 * TODO assess usability (maybe keep policy and application separated)
-	*/
+	 * Run the pricing engine, to return the computed amount (and how it finds it)
+	 * @param {*} pricedObject - expected to provide a getPPGRawCoordinates() method, returning a raw 'coordinates' Object"
+	 * @returns returns {gridCell, amount}. If something goes wrong, "gridCell" can be null or empty, and "amount" may be NaN.
+	 */
 	apply(pricedObject){
 		let gridCell = this._findGridCellFor(pricedObject);
 		if (gridCell == null || gridCell.policy == null){
-			return {gridName:this.name, gridCell, amount:NaN}; //throw new Error("No cell defined");
+			return {gridCell, amount:NaN}; //or throw ?..
 		} else {
 			let policy = gridCell.policy;
 			let amount = null;
-			switch(policy.type){
+			switch(policy.type){ // try with POLYMORPHISM ;-)
 				case "FixedPrice": {
 					amount = policy.price;
 				} break;
@@ -113,13 +160,13 @@ class PricingGrid {
 					}
 				} break;
 				case "DelegatedPrice": {
-					amount = null; /* will have to be resolved at PricingSystem level */
+					amount = null; /* = will have to be resolved at PricingSystem level */
 				} break;
 				default : {
 					throw new Error("Unsupported type of Pricing Policy : " + policy.type);
 				}
 			}
-			return {gridName:this.name, gridCell, amount};// <- important structure !
+			return {gridCell, amount};// <- important structure !
 		}
 	}
 
@@ -210,6 +257,13 @@ class PricingGrid {
 		return isMatching;
 	}
 
+
+	//---- Dimension CRUD
+
+	findDimensionByName(name){
+		return this.dimensions.find(d => d.name == name)
+	}
+
 	/**
 	 * append a new default dimension to the grid.
 	 * @param type among "ThresholdCategory", "EnumCategory", etc.
@@ -217,8 +271,8 @@ class PricingGrid {
 	 */
 	addNewDimension(type){
 		// find a non-used name
-		let name = "dim";
-		while (this.dimensions.find( dim => dim.name == name)){ name += "*"; }
+		let name = "x";
+		while (this.findDimensionByName(name)){ name += "x"; }
 
 		// TODO move defaulting for each type somewhere else
 		let defaultDimension;
@@ -278,8 +332,8 @@ class PricingGrid {
 	 * @param newName
 	 */
 	renameDimension(oldName, newName){
-		let oldNamedDim = this.dimensions.find( dim => dim.name == oldName);
-		let newNamedDim = this.dimensions.find( dim => dim.name == newName);
+		let oldNamedDim = this.findDimensionByName(oldName);
+		let newNamedDim = this.findDimensionByName(newName);
 		if (!oldNamedDim) throw new Error("Cannot rename dimension, name not found : " + oldName);
 		if (newNamedDim) throw new Error("Cannot rename dimension, new name already used : " + newName);
 
@@ -593,9 +647,8 @@ pricingGrid_acadia_b2c.gridCells =
 ;
 
 
-var uneCommande = new class extends AbstractPricedObject {
+var uneCommande = new class {
 	constructor(poids, codePostal){
-		super();
 		this.poids = poids;
 		this.codePostal = codePostal;
 	}
