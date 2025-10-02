@@ -8,9 +8,29 @@
 		- autofocus (optional) : makes the button get focus on showing
 
 	(Note: hence an "empty" object may be used to make the (X) button appear. Besides, when no choice is set, it appears anyway)
+
+
+	The current version *requires* that target HTML contains specific markups:
+
+	<div class="modal" id="modal-confirm-dialog" data-bs-backdrop="static" tabindex="-1">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title"></h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<div class="msg"></div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" id="button-template" class="btn col mx-2"></button>
+				</div>
+			</div>
+		</div>
+	</div>
 */
 
-window.confirm_dialog = function (txt, ...choiceObjs) {
+export function confirm_dialog(txt, ...choiceObjs) {
 	const modal = document.getElementById("modal-confirm-dialog");
 
 	// 1) Texts
@@ -96,16 +116,16 @@ window.confirm_dialog = function (txt, ...choiceObjs) {
 	const bsModal = bootstrap.Modal.getOrCreateInstance(modal);
 	bsModal.show();
 	modal.querySelector("*[autofocus]")?.focus(); // additional help for autofocus
-};
+}
 
 /* A Bootstrap-based replacement for window.alert(), based on confirm_dialog().
 	usage :
 		alert_dialog ([title,] message);
 */
-window.alert_dialog = function (txt1, txt2) {
+export function alert_dialog(txt1, txt2) {
 	if (txt2) {
-		window.confirm_dialog(txt1, txt2, {label: "OK", class: "btn-primary", autofocus:true});
+		confirm_dialog(txt1, txt2, {label: "OK", class: "btn-primary", autofocus:true});
 	} else {
-		window.confirm_dialog(txt1, {label: "OK", class: "btn-primary", autofocus:true});
+		confirm_dialog(txt1, {label: "OK", class: "btn-primary", autofocus:true});
 	}
 };
