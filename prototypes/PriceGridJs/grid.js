@@ -215,7 +215,7 @@ class PricingGrid {
 
 		switch(applicableCells.length){
 			case 0: {
-				console.log("No cell found");
+				console.debug("No cell found");
 				return null;
 			}
 			case 1: {
@@ -223,7 +223,6 @@ class PricingGrid {
 			}
 			default: {
 				console.warn(applicableCells);
-
 				throw new Error("Overlapping cell definition !");
 			}
 		}

@@ -168,11 +168,34 @@
 					</h2>
 					<div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#tool-pane">
 						<div class="accordion-body">
-							<h4>Stockage interne</h4>
-							<div class="d-flex justify-content-evenly">
-								<button class="btn btn-primary" @click="localstoreGrids">Sauver</button>
-								<button class="btn btn-primary" @click="localreadGrids">Charger</button>
-								<button class="btn btn-danger" @click="localclearGrids">Effacer</button>
+
+
+							<div class="input-group">
+								<div class="col-4">
+									<label class="col-form-label" for="inputSysName">Système</label>
+								</div>
+								<div class="col-8">
+									<input class="form-control" id="inputSysName" placeholder="Nom du système"
+										v-model.trim="ui_state.system.name">
+								</div>
+								<div class="form-text">
+									Nom du système de grilles (ex. par compagnie : Acadia, Chronopost, UPS, etc.)
+								</div>
+							</div>
+							<hr>
+
+
+							<div class="d-flex">
+								<button class="btn btn-primary mb-2" @click="localStorage_saveSystem">Sauver système "{{ui_state.system.name}}"</button>
+							</div>
+
+							<div v-for="(name, idx) of localStorage_listSystems" class="d-flex align-items-baseline mb-1">
+								<button class="btn btn-warning bi" :class="idx==0?'bi-bookmark-heart':'bi-bookmark'"
+								  @click="localStorage_loadSystem(name)">
+									Charger système "{{name}}"
+								</button>
+
+								<button class="btn btn-danger bi bi-bookmark-x" @click="localStorage_delSystem(name)"></button>
 							</div>
 
 						</div>
@@ -818,7 +841,6 @@
 						editingDimName: "",
 						editingDimCopy: null,
 
-
 						testPricedObj: new CommandeALivrer("FCxxxxxx", 10 /*kg*/, "93420"),
 
 						confirmCancelDim: function(callback){
@@ -840,24 +862,103 @@
 							}
 
 						}
-
-					}
+					},
+					localStorage_listSystems:[],
 				}
 			},
+			mounted(){
+				console.info(`LocalStorage read for "list-systems"`);
+				let list = localStorage.getItem("list-systems");
+				list = list ? JSON.parse(list) : [];
+				this.localStorage_listSystems.push(...list); //WATCHER BUG : not triggering (which is taken advantage of here)
+
+				//autoload of 1st one
+				if (this.localStorage_listSystems.length>0) {
+					console.info(`Autoload of 1st system in "list-systems"`);
+					this.localStorage_loadSystem(this.localStorage_listSystems[0], false);
+				}
+
+				//autosave of current
+				window.addEventListener('beforeunload',()=>{
+					console.info(`Emergency autosave of current`);
+					this.localStorage_saveSystem(false);
+				});
+			},
+			watch:{
+				'localStorage_listSystems'(newValue){
+					console.info(`LocalStorage written for "list-systems"`);
+					localStorage.setItem("list-systems", JSON.stringify(newValue));
+				},
+				'ui_state.system.name'(newValue){
+					document.title = `Prototype - Tarifs de port "${newValue}"`;
+				},
+
+			},
 			methods: {
-				localstoreGrids(){
-					let data = JSON.stringify(this.ui_state.system);
-					localStorage.setItem("myCat", data);
+				localStorage_saveSystem(useAlert = true){
+					let name = this.ui_state.system.name;
+					let alreadyExist = this.localStorage_listSystems.includes(name);
+
+					let handler = ()=>{
+						let data = JSON.stringify(this.ui_state.system);
+						localStorage.setItem(`system.${name}`, data);
+
+						//update list : save to 1st position
+						if (alreadyExist){
+							const index = this.localStorage_listSystems.indexOf(name);
+							if (index > -1) this.localStorage_listSystems.splice(index, 1);
+						}
+						this.localStorage_listSystems.unshift(name);
+						this.localStorage_listSystems = this.localStorage_listSystems.slice(); //WATCHER BUG : force trigger
+					};
+
+					if (useAlert && alreadyExist) {
+						confirm_dialog("Stockage local",`Écraser  sauvegarde "${name}" ?`,{
+							label:'Continuer', class: 'btn-primary', autofocus:true,
+							handler
+						}, {
+							label:'Abandonner', class: 'btn-secondary',
+						});
+					} else {
+						handler();
+					}
 				},
-				localreadGrids(){
-					let data = localStorage.getItem("myCat");
-					this.ui_state.system = PricingSystem.fromJSON(data);
-					this.ui_state.currentGrid = this.ui_state.system.grids[0];
+				localStorage_loadSystem(name, useAlert = true){
+					let handler = ()=>{
+						let data = localStorage.getItem(`system.${name}`);
+						if (data) {
+							this.ui_state.system = PricingSystem.fromJSON(data);
+							this.ui_state.currentGrid = this.ui_state.system.grids[0];
+						} else {
+							throw new Error("Could not retrieve Pricing system from localStorage", name);
+						}
+					};
+
+					if (useAlert) {
+						confirm_dialog("Stockage local",`Attention, en ouvrant cette sauvegarde "${name}", vous allez remplacer toutes les grilles courantes par la sauvegarde.`,{
+							label:'Continuer', class: 'btn-primary', autofocus:true,
+							handler
+						}, {
+							label:'Abandonner', class: 'btn-secondary',
+						});
+					} else {
+						handler();
+					}
 				},
-				localclearGrids(){
-					localStorage.removeItem("myCat");
-					// OR
-					localStorage.clear();
+				localStorage_delSystem(name){ // option for localStorage.clear(); ?
+					confirm_dialog("Stockage local",`Supprimer cette sauvegarde "${name}" ?`,{
+						label:'Continuer', class: 'btn-primary', autofocus:true,
+						handler : ()=>{
+							localStorage.removeItem(`system.${name}`);
+
+							//update list
+							const index = this.localStorage_listSystems.indexOf(name);
+							if (index > -1) this.localStorage_listSystems.splice(index, 1);
+							this.localStorage_listSystems = this.localStorage_listSystems.slice(); //WATCHER BUG : force trigger
+						}
+					}, {
+						label:'Abandonner', class: 'btn-secondary',
+					});
 				},
 
 			}
