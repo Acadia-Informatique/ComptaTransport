@@ -24,6 +24,10 @@
 	<script type="text/javascript">
 		"use strict";
 
+		// my Q&D data obj clone polyfill, used on VueJS reactive objects
+		window.deepClone = function(v){return JSON.parse(JSON.stringify(v));};
+
+
 		class CommandeALivrer {
 			constructor(numero, poids, codePostal){
 				this.numero = numero;
@@ -164,7 +168,13 @@
 					</h2>
 					<div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#tool-pane">
 						<div class="accordion-body">
-							TODO add some menus
+							<h4>Stockage interne</h4>
+							<div class="d-flex justify-content-evenly">
+								<button class="btn btn-primary" @click="localstoreGrids">Sauver</button>
+								<button class="btn btn-primary" @click="localreadGrids">Charger</button>
+								<button class="btn btn-danger" @click="localclearGrids">Effacer</button>
+							</div>
+
 						</div>
 					</div>
 				</div>
@@ -563,10 +573,9 @@
 					<span class="input-group-text">Se reporter à la grille</span>
 					<select class="form-select" v-model="policy.delegated_gridName" required>
 						<option disabled value="">Choisissez une grille</option>
-						<option v-for="k in ui_state.system.grids.map(g=>g.name)" :value="k">
+						<option v-for="k in ui_state.system.grids.map(g=>g.name).filter(n=>n!=ui_state.currentGrid.name)" :value="k">
 							{{ k }}
 						</option>
-						<!-- TODO filter out current ? or support self reference with coordinate change ?... -->
 					</select>
 					<div class="invalid-feedback">
 						Sélectionnez la grille à suivre.
@@ -831,14 +840,27 @@
 							}
 
 						}
+
 					}
 				}
 			},
 			methods: {
-				// TODO UI state management (loading, etc.)
+				localstoreGrids(){
+					let data = JSON.stringify(this.ui_state.system);
+					localStorage.setItem("myCat", data);
+				},
+				localreadGrids(){
+					let data = localStorage.getItem("myCat");
+					this.ui_state.system = PricingSystem.fromJSON(data);
+					this.ui_state.currentGrid = this.ui_state.system.grids[0];
+				},
+				localclearGrids(){
+					localStorage.removeItem("myCat");
+					// OR
+					localStorage.clear();
+				},
 
-
-			},
+			}
 		});
 
 
@@ -1040,7 +1062,7 @@
 						let editingDim = this.ui_state.currentGrid.findDimensionByName(name);
 						if (!editingDim) throw new Error(`Dimension "${name}" cannot be found for editing.`);
 
-						this.ui_state.editingDimCopy = JSON.parse(JSON.stringify(editingDim));
+						this.ui_state.editingDimCopy = deepClone(editingDim);
 						this.ui_state.editingDimName = name;
 					});
 				},
@@ -1400,7 +1422,7 @@
 						this.ui_state.editingPolicyChoice = cell.policy.type;
 						if (this.ui_state.editingPolicyChoice == "clipboardPolicy") throw new Error("'clipboardPolicy' is not a standard Cell Policy !");
 
-						this.ui_state.editingPolicyCopies[cell.policy.type] = JSON.parse(JSON.stringify(cell.policy))
+						this.ui_state.editingPolicyCopies[cell.policy.type] = deepClone(cell.policy)
 					} else {
 						// Empty Cells and Policies
 						this.ui_state.editingPolicyChoice = "clipboardPolicy";
@@ -1420,7 +1442,7 @@
 					}
 
 					let srcPolicy = this.ui_state.editingPolicyCopies[this.ui_state.editingPolicyChoice]
-					this.ui_state.editingPolicyCell.policy = JSON.parse(JSON.stringify(srcPolicy));
+					this.ui_state.editingPolicyCell.policy = deepClone(srcPolicy);
 
 					const modal = document.getElementById("grid-cell-customizer");
 					const bsModal = bootstrap.Modal.getOrCreateInstance(modal);
@@ -1433,7 +1455,7 @@
 				editGridCell_copy(){
 					let cell = this.ui_state.editingPolicyCell;
 					if (cell && cell.policy) {
-						this.ui_state.editingPolicyCopies["clipboardPolicy"] = JSON.parse(JSON.stringify(cell.policy));
+						this.ui_state.editingPolicyCopies["clipboardPolicy"] = deepClone(cell.policy);
 						this.ui_state.editingPolicyChoice = "clipboardPolicy";
 					} //else just ignore
 				},

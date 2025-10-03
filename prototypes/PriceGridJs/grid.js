@@ -2,7 +2,6 @@
 
 //TODO Proper JS module
 
-
 /**
  * Typical policies, usable as calculation test cases or to model.
  */
@@ -28,13 +27,30 @@ const POLICY_PROTOTYPES = [
 	},
 ];
 
-// TODO serialize / hydration for all GridStystem participants
+
 
 class PricingSystem {
 	constructor(name) {
 		this.name = name;
 		this.grids = [];
 	}
+
+	/**
+	 * Hydration.
+	 * @param {*} v - JSON string or its parsed object
+	 */
+	static fromJSON(v) {
+		if (typeof v == "string") v = JSON.parse(v);
+		let obj = new PricingSystem(v.name);
+
+		for (const gridv of v.grids){
+			let newGrid = PricingGrid.fromJSON(gridv);
+			obj.grids.push(newGrid);
+		}
+
+		return obj;
+	}
+
 
 	/**
 	 * Recursively propagates grid.apply() to the system, starting with specified grid.
@@ -131,6 +147,17 @@ class PricingGrid {
 		this.name = name;
 		this.dimensions = [];
 		this.gridCells = [];
+	}
+
+	/**
+	 * Hydration.
+	 * @param {*} v - JSON string or its parsed object
+	 */
+	static fromJSON(v) {
+		if (typeof v == "string") v = JSON.parse(v);
+		let obj = new PricingGrid(v.name);
+		Object.assign(obj, v);
+		return obj;
 	}
 
 	/**
@@ -365,7 +392,7 @@ class PricingGrid {
 		let newGridCells = [];
 		for (const coords of PricingGrid.getAllAvailableCoords(this.dimensions)){
 			let cell = this.getCellAt(coords);
-			let policy = (cell && cell.policy) ? JSON.parse(JSON.stringify(cell.policy)) : null;
+			let policy = cell?.policy ?? null;
 			newGridCells.push({coords, policy});
 		}
 
