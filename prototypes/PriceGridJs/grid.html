@@ -122,6 +122,14 @@
 			font-size: 80%;
 		}
 
+
+		.hiddenFileImpExp {
+			display: inline-block;
+			width:1px;
+			overflow: hidden;
+			visibility: hidden;
+		}
+
 		/** List animations */
 		.list-move, /* apply transition to moving elements */
 		.list-enter-active,
@@ -168,8 +176,6 @@
 					</h2>
 					<div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#tool-pane">
 						<div class="accordion-body">
-
-
 							<div class="input-group">
 								<div class="col-4">
 									<label class="col-form-label" for="inputSysName">Système</label>
@@ -184,7 +190,6 @@
 							</div>
 							<hr>
 
-
 							<div class="d-flex">
 								<button class="btn btn-primary mb-2" @click="localStorage_saveSystem">Sauver système "{{ui_state.system.name}}"</button>
 							</div>
@@ -198,6 +203,26 @@
 								<button class="btn btn-danger bi bi-bookmark-x" @click="localStorage_delSystem(name)"></button>
 							</div>
 
+						</div>
+					</div>
+				</div>
+				<div class="accordion-item">
+					<h2 class="accordion-header">
+						<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+							Export / Import
+						</button>
+					</h2>
+					<div id="collapseThree" class="accordion-collapse collapse" data-bs-parent="#tool-pane">
+						<div class="accordion-body">
+							<button class="btn btn-outline-primary" @click="downloadSystemByLink">Exporter système de grilles</button>
+							<a class="hiddenFileImpExp" ref="downloadSystemLink">Download link</a>
+							<div class="form-text">
+								Vous trouverez les fichiers exportés dans les "Téléchargements" de votre navigateur,
+								nommés par ex. {{ downloadSystemByLink_filename() }}.
+							</div>
+
+							<button class="btn btn-outline-primary" @click="$refs.uploadSystemInput.click()">Importer</button>
+							<input class="hiddenFileImpExp" type="file" @change="uploadSystem" ref="uploadSystemInput" accept=".grille">
 						</div>
 					</div>
 				</div>
@@ -892,7 +917,6 @@
 				'ui_state.system.name'(newValue){
 					document.title = `Prototype - Tarifs de port "${newValue}"`;
 				},
-
 			},
 			methods: {
 				localStorage_saveSystem(useAlert = true){
@@ -961,7 +985,49 @@
 					});
 				},
 
+				downloadSystemByLink(){
+					console.info("Generating a lengthy download link from PricingSystem...");
+					let data = JSON.stringify(this.ui_state.system);
+					const linkData = new Blob([data], { type: 'application/json' });
+					const linkHref =  URL.createObjectURL(linkData);
+
+					let el = this.$refs.downloadSystemLink;
+					el.href = linkHref;
+					el.download = this.downloadSystemByLink_filename();
+					el.click();
+				},
+				downloadSystemByLink_filename(){
+					return "tarifs_" + encodeURIComponent(this.ui_state.system.name) + ".grille";
+				},
+				uploadSystem(event){
+					let inputFld = event.target;
+					let file = (inputFld?.files && inputFld.files.length > 0) ?  inputFld.files[0] : null;
+					if (!file) return; // silently
+					// if (file.type && file.type != 'application/json') {
+					// 	alert_dialog("Import de Grille", "Import impossible, format de fichier attendu : JSON");
+					// 	return;
+					// }
+					const fileReader = new FileReader();
+					fileReader.onload = ()=>{
+						try {
+							this.ui_state.system = PricingSystem.fromJSON(fileReader.result);
+							this.ui_state.currentGrid = this.ui_state.system.grids[0];
+						}catch(err){
+							alert_dialog("Import de Grille", "Erreur d'import: "+ err);
+						}
+					};
+					fileReader.onerror = (event)=>{
+						alert_dialog("Import de Grille", "Erreur de lecture du fichier: " + event.target.error);
+					};
+					fileReader.readAsText(file);
+				}
+
+			},
+			computed:{
+
 			}
+
+
 		});
 
 
@@ -1064,7 +1130,7 @@
 								let grid = this.ui_state.system.removeGrid(gridName);
 								if (grid){
 									console.info(`Deleted Grille "${gridName}".`);
-									this.ui_state.currentGrid = this.ui_state.system.grids[0];//default to 1st available
+									this.ui_state.currentGrid = this.ui_state.system.grids[0];//fallback to 1st available
 								} else {
 									console.error(`Unexpected problem while deleting Grille "${gridName}".`);
 								}
