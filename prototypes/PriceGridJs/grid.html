@@ -125,7 +125,15 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 		.gridCell .secondary {
 			font-size: 80%;
 		}
-
+		.gridCell .quick-extra-info {
+			position: absolute;
+			bottom:0; right:0;
+			color:rgba(119, 71, 9, 0.3);
+			font-size: 1.5em;
+			font-weight:bolder;
+			transform: rotate(10deg);
+			pointer-events: none;
+		}
 
 		.hiddenFileImpExp {
 			display: inline-block;
@@ -531,6 +539,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 	</script>
 
 	<script type="text/x-template" id="PricingGrids_Policy-template">
+		<!-- TODO factorize "extra-info" across all policy types ? keep in all forms ?... -->
 		<template v-if="policy.type == 'FixedPrice'">
 			<template v-if="editMode=='full'">
 				<div class="input-group has-validation">
@@ -541,12 +550,24 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 						Prix en euros
 					</div>
 				</div>
+				<hr>
+				<div class="input-group">
+					<span class="input-group-text">Transporteur</span>
+					<input type="text" class="form-control" v-model.trim="policy.extra_info">
+				</div>
 			</template>
 			<template v-else-if="editMode=='quick'">
 				<money-input v-model="policy.price" required/>
+				<div class="quick-extra-info" v-if="policy.extra_info">
+					{{ policy.extra_info }}
+				</div>
 			</template>
 			<template v-else>
 				Prix fixe de {{ policy.price }}€
+				<div v-if="policy.extra_info">
+					<hr>
+					Transporteur: {{policy.extra_info}}
+				</div>
 			</template>
 		</template>
 
@@ -596,8 +617,13 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 						Prix et unités de départ doivent être positifs.
 					</div>
 				</div>
-				<div  v-if="policy.offset" class="form-text">
+				<div v-if="policy.offset" class="form-text">
 					Attention à bien positionner le nombre d'unités à la valeur de départ de la catégorie correspondante, pour rester cohérent. Ex.: mettre "30" pour une catégorie de poids "30+ kg".
+				</div>
+				<hr>
+				<div class="input-group">
+					<span class="input-group-text">Transporteur</span>
+					<input type="text" class="form-control" v-model.trim="policy.extra_info">
 				</div>
 			</template>
 			<template v-else-if="editMode=='quick'">
@@ -608,6 +634,9 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 				<div class="secondary">
 					(arrondi à {{ policy.rounding }})
 				</div>
+				<div class="quick-extra-info" v-if="policy.extra_info">
+					{{ policy.extra_info }}
+				</div>
 			</template>
 			<template v-else>
 				Prix au "{{ policy.attribute }}"<br>
@@ -616,6 +645,10 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 				<template v-if="policy.offset">
 					(à partir de {{ policy.offset.attribute }} pour {{ policy.offset.price }}€)
 				</template>
+				<div v-if="policy.extra_info">
+					<hr>
+					Transporteur: {{policy.extra_info}}
+				</div>
 			</template>
 		</template>
 
@@ -642,17 +675,29 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 						Frais à ajouter en €, après avoir appliqué la griller à suivre.
 					</div>
 				</div>
+				<hr>
+				<div class="input-group">
+					<span class="input-group-text">Transporteur</span>
+					<input type="text" class="form-control" v-model.trim="policy.extra_info">
+				</div>
 			</template>
 			<template v-else-if="editMode=='quick'">
 				voir grille "{{ policy.delegated_gridName }}"<br>
 				{{ policy.delegated_additiveAmount ? "+ ajout "+policy.delegated_additiveAmount+"€" : ""}}
 				<!-- quick mode is no edit for now... may change -->
+				<div class="quick-extra-info" v-if="policy.extra_info">
+					{{ policy.extra_info }}
+				</div>
 			</template>
 			<template v-else>
 				voir grille "{{ policy.delegated_gridName }}"<br>
 				{{ policy.delegated_additiveAmount ? "+ ajout "+policy.delegated_additiveAmount+"€" : ""}}
 				<!-- TODO ajout mention "type de frais" ? genre "Livraison directe" -->
 				<!-- TODO ou mieux : ajout d'une composition additive/multiplicative générale -->
+				<div v-if="policy.extra_info">
+					<hr>
+					Transporteur: {{policy.extra_info}}
+				</div>
 			</template>
 		</template>
 		<template v-else><!-- UNKNOWN POLICY TYPE -->
@@ -774,6 +819,9 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 							<span v-else class="text-bg-danger">
 								&nbsp;???&nbsp;
 							</span>
+							<div class="fs-4" v-if="testResult.extra_info">
+								{{ testResult.extra_info }}
+							</div>
 						</td>
 					</tr>
 				</tfoot>

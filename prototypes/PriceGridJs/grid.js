@@ -71,6 +71,7 @@ class PricingSystem {
 					gridName,
 					gridCell:returnVal.gridCell,
 					amount: nestedReturnVal.amount + policy.delegated_additiveAmount,
+					extra_info: returnVal.extra_info ? returnVal.extra_info : nestedReturnVal.extra_info, //meaning : non-cascading, 1st available info is kept and deeper ones are discarded
 					nested: nestedReturnVal //<- chaining extension to grid.apply()'s return
 				};
 			} else {
@@ -165,7 +166,7 @@ class PricingGrid {
 	/**
 	 * Run the pricing engine, to return the computed amount (and how it finds it)
 	 * @param {*} pricedObject - expected to provide a getPPGRawCoordinates() method, returning a raw 'coordinates' Object"
-	 * @returns returns {gridCell, amount}. If something goes wrong, "gridCell" can be null or empty, and "amount" may be NaN.
+	 * @returns returns {gridCell, amount, extra_info}. If something goes wrong, "gridCell" can be null or empty, and "amount" may be NaN.
 	 */
 	apply(pricedObject){
 		let gridCell = this._findGridCellFor(pricedObject);
@@ -174,6 +175,7 @@ class PricingGrid {
 		} else {
 			let policy = gridCell.policy;
 			let amount = null;
+			let extra_info = policy.extra_info;
 			switch(policy.type){ // try with POLYMORPHISM ;-)
 				case "FixedPrice": {
 					amount = policy.price;
@@ -195,7 +197,7 @@ class PricingGrid {
 					throw new Error("Unsupported type of Pricing Policy : " + policy.type);
 				}
 			}
-			return {gridCell, amount};// <- important structure !
+			return {gridCell, amount, extra_info};// <- important structure !
 		}
 	}
 
