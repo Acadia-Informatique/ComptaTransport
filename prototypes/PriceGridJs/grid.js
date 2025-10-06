@@ -143,7 +143,9 @@ class PricingSystem {
 }
 
 class PricingGrid {
+	static #keySeq = 0;
 	constructor(name){
+		this.$$key = PricingGrid.#keySeq++; //for VueJS animation only, meaningless value
 		this.name = name;
 		this.dimensions = [];
 		this.gridCells = [];
