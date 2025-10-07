@@ -33,11 +33,14 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 
 
 		class CommandeALivrer {
-			constructor(numero, poids, codePostal){
-				this.numero = numero;
+			constructor( poids, codePostal){
 				this.poids = poids;
 				this.pays = "France";
 				this.codePostal = codePostal;
+				this.size_length = null;
+				this.size_width = null;
+				this.size_height = null;
+				this.size_parcel_count = null;
 				this.transporteurHN = "";
 			}
 			getPPGRawCoordinates(){
@@ -45,9 +48,15 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 				return {
 						poids : this.poids,
 						poidsEntier: Math.ceil(this.poids),
-						//poidsVolumique: Lxlxh / 5000 d'après la fiche export
+						poidsVolumique: Math.max(this.poids,
+						  (this.size_length * this.size_width * this.size_height) / 5000 // poids volumique d'après la fiche export
+						),
 						pays: this.pays, // TODO lookup ISO 3166-1 alpha-2 or alpha-3 codes
 						departement,
+						tailleHN :
+							((this.size_length + 2*this.size_width + 2*this.size_height) > 300)
+							|| (this.size_parcel_count > 10) ? "Oui" : "Non",
+						nb_colis : this.size_parcel_count,
 						transporteurHN: this.transporteurHN
 				};
 			}
@@ -127,10 +136,11 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 		}
 		.gridCell .quick-extra-info {
 			position: absolute;
-			bottom:0; right:0;
+			top:10px; left:5px;
 			color:rgba(119, 71, 9, 0.3);
 			font-size: 1.5em;
 			font-weight:bolder;
+			line-height:1em;
 			transform: rotate(10deg);
 			pointer-events: none;
 		}
@@ -235,6 +245,8 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 
 							<button class="btn btn-outline-primary" @click="$refs.uploadSystemInput.click()">Importer</button>
 							<input class="hiddenFileImpExp" type="file" @change="uploadSystem" ref="uploadSystemInput" accept=".grille">
+
+							<br><A href="./tarifs_ACA_202509.grille" download="tarifs_ACA_202509.grille">Exemple de fichier à importer</A>
 						</div>
 					</div>
 				</div>
@@ -780,6 +792,22 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 				</div>
 			</div>
 			<div class="row mb-3 mb-lg-1">
+				<div class="input-group">
+					<span class="input-group-text">L</span>
+					<input type="text" class="form-control" v-model.number="ui_state.testPricedObj.size_length" placeholder="(cm)"/>
+					<span class="input-group-text">l</span>
+					<input type="text" class="form-control" v-model.number="ui_state.testPricedObj.size_width" placeholder="(cm)"/>
+					<span class="input-group-text">h</span>
+					<input type="text" class="form-control" v-model.number="ui_state.testPricedObj.size_height" placeholder="(cm)"/>
+				</div>
+			</div>
+			<div class="row mb-3 mb-lg-1">
+				<div class="input-group">
+					<span class="input-group-text">Colis</span>
+					<input type="number" class="form-control" step="1" min="0" v-model="ui_state.testPricedObj.size_parcel_count"/>
+				</div>
+			</div>
+			<div class="row mb-3 mb-lg-1">
 				<div class="col-lg-4">
 					<label class="col-form-label" for="inputTransporteurHN">Transporteur HN</label>
 				</div>
@@ -867,7 +895,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 		import {confirm_dialog, alert_dialog} from "./ConfirmDialog.js";
 
 
-		let typicalRawCoords = Object.entries(new CommandeALivrer("", 0, "01000").getPPGRawCoordinates()); //arguably typical ?...
+		let typicalRawCoords = Object.entries(new CommandeALivrer(0, "01000").getPPGRawCoordinates()); //arguably typical ?...
 
 		const numericRawCoords =  typicalRawCoords.filter(([k,v]) => typeof v == "number").map(([k,v]) => k);
 		const stringRawCoords =  typicalRawCoords.filter(([k,v]) =>typeof v == "string").map(([k,v]) => k);
@@ -893,6 +921,9 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 			},
 		};
 
+		const DEFAULT_PRICINGSYSTEM = new PricingSystem("Compagnie_1");
+		DEFAULT_PRICINGSYSTEM.grids.push(new PricingGrid("Grille_1"));
+
 
 		/* shared state for the page */
 		//const gridBuilderApp_UI = Vue.reactive( ui_state); TODO need explicit call ?!
@@ -901,9 +932,8 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 			data() {
 				return {
 					ui_state: { // TODO utiliser un bus global ?...
-						//start TODO XXXXXXXXXXXXXXXXXXX funky defaults
-						system: theSystem,
-						currentGrid: theSystem.grids[0], //ensure it exists ?
+						system: DEFAULT_PRICINGSYSTEM,
+						currentGrid: DEFAULT_PRICINGSYSTEM.grids[0],
 
 						editingPolicyCell: null,
 						editingPolicyChoice: "clipboardPolicy", //or a real policy type
@@ -918,7 +948,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 						editingDimName: "",
 						editingDimCopy: null,
 
-						testPricedObj: new CommandeALivrer("FCxxxxxx", 10 /*kg*/, "93420"),
+						testPricedObj: new CommandeALivrer(1 /*kg*/, "77600"),
 
 						confirmCancelDim: function(callback){
 							let continueFunc = ()=>{
@@ -1146,7 +1176,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 
 					if (this.new_gridName != this.old_gridName
 					  && this.ui_state.system.findGridByName(this.new_gridName)){
-						name_field.setCustomValidity("Duplicate names");
+						name_field.setCustomValidity("Noms en doublon");
 					} else {
 						name_field.setCustomValidity("");
 					}
@@ -1296,7 +1326,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 
 					if (newName != oldName
 					  &&  this.ui_state.currentGrid.findDimensionByName(newName)){
-						name_field.setCustomValidity("Duplicate names");
+						name_field.setCustomValidity("Noms en doublon");
 					} else {
 						name_field.setCustomValidity("");
 					}
@@ -1462,7 +1492,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 						`<div v-if="isEditing">
 							<div class="input-group mb-3">
 								<input id="dim-name" class="form-control" placeholder="Nom interne" v-model.trim="ui_state.editingDimCopy.name" required>
-								<span class="input-group-text">par seuil de</span>
+								<span class="input-group-text">sur liste de</span>
 								<select class="form-select" v-model="ui_state.editingDimCopy.raw_name" required>
 									<option disabled value="">Coordonnée brute</option>
 									<option v-for="k in stringRawCoords" :value="k">
@@ -1492,7 +1522,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 							</div>
 						</div>
 						<div v-else>
-							"{{ dimension.name }}" : par seuil de "{{ dimension.raw_name }}"
+							"{{ dimension.name }}" : sur liste de "{{ dimension.raw_name }}"
 							<ul>
 								<li v-for="cat in dimension.categories">
 									<strong>{{ cat.value }}</strong> : <em>{{ cat.enum.join(", ") }}</em>
@@ -1692,7 +1722,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 					this.editGridCell_end(event);
 				},
 
-				/* (parameterized computed) */
+				/* "Pretty" category labels (parameterized computed) TODO to be extended */
 				categoryLabel(dimension, category, categoryIndex){
 					let label;
 					switch (dimension.type) {
@@ -1701,7 +1731,8 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 							 ? dimension.categories[categoryIndex+1]
 							 : null;
 							 switch (dimension.raw_name){
-								case "poids" : {
+								case "poids" :
+								case "poidsVolumique": {
 									label = nextCategory
 									 ? `${category.value} - ${nextCategory.value} kg`
 									 : `${category.value}+ kg`;
@@ -1739,6 +1770,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 			},
 			computed:{
 				testResult(){
+					if (!this.ui_state.currentGrid) return;
 					const gridName = this.ui_state.currentGrid.name;
 					const testPricedObj = this.ui_state.testPricedObj;
 					return this.ui_state.system.applyGrid(gridName, testPricedObj);

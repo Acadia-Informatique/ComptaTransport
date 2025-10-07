@@ -158,6 +158,7 @@ class PricingGrid {
 	 */
 	static fromJSON(v) {
 		if (typeof v == "string") v = JSON.parse(v);
+		delete(v.$$key);
 		let obj = new PricingGrid(v.name);
 		Object.assign(obj, v);
 		return obj;
@@ -406,292 +407,161 @@ class PricingGrid {
 
 //===============================
 
+function test(){
+	const theSystem = new PricingSystem("ACADIA");
 
+	let pricingGrid_acadia_b2b = new PricingGrid("ACA-BTB");
+	theSystem.grids.push(pricingGrid_acadia_b2b);
 
-const theSystem = new PricingSystem("ACADIA");
+	pricingGrid_acadia_b2b.dimensions =
+		[
+			{
+				name: "wcat",
+				raw_name : "poids",
+				type: "ThresholdCategory",
+				categories : [
+					{value: 0}, {value: 10}, {value: 100}
+				]
+			},
+			{
+				name: "zone",
+				raw_name: "departement",
+				type: "EnumCategory",
+				categories : [
+					{value: "Zone 01", enum:["75","77","78","91","92","93","94","95","02","08","10","14","18","27","28","36","37","41","45","51","58","59","60","61","62","72","76","80","89"]},
+					{value: "Corse",   enum:["20"]},
+				]
+			},
+		]
+	;
 
-let pricingGrid_acadia_b2b = new PricingGrid("ACA-BTB");
-theSystem.grids.push(pricingGrid_acadia_b2b);
-
-pricingGrid_acadia_b2b.dimensions =
-	[
-		{
-			name: "wcat",
-			raw_name : "poids",
-			type: "ThresholdCategory",
-			categories : [
-				{value: 0},
-				{value: 5},
-				{value: 7},
-				{value: 9},
-				{value: 12},
-				{value: 15},
-				{value: 20},
-				{value: 25},
-				{value: 30},
-				{value: 40},
-				{value: 45},
-				{value: 50},
-				{value: 55},
-				{value: 60},
-				{value: 70},
-				{value: 80},
-				{value: 90},
-				{value: 100}
-			]
-		},
-		{
-			name: "zone",
-			raw_name: "departement",
-			type: "EnumCategory",
-			categories : [
-				{value: "Zone 01", enum:["75","77","78","91","92","93","94","95","02","08","10","14","18","27","28","36","37","41","45","51","58","59","60","61","62","72","76","80","89"]},
-				{value: "Zone 02", enum:["01","03","07","15","21","23","24","26","29","35","39","42","43","44","47","48","49","50","52","53","54","55","63","69","70","71","86","87","88"]},
-				{value: "Zone 03", enum:["16","17","19","22","25","33","38","56","57","67","68","73","74","79","85","90"]},
-				{value: "Zone 04", enum:["06","09","11","12","13","30","31","32","34","40","46","64","66","81","82","84"]},
-				{value: "Zone 05", enum:["04","05","65","83","98"]},
-				{value: "Corse",   enum:["20"]},
-			]
-		},
-	]
-;
-
-pricingGrid_acadia_b2b.gridCells =
-	[
-		{
-			coords: {wcat:0, zone:"Zone 01"},
-			policy: {
-				type: "FixedPrice",
-				price: 9.9
+	pricingGrid_acadia_b2b.gridCells =
+		[
+			{
+				coords: {wcat:0, zone:"Zone 01"},
+				policy: {
+					type: "FixedPrice",
+					price: 9.9
+				}
+			},
+			{
+				coords: {wcat:0, zone:"Corse"},
+				policy: {
+					type: "FixedPrice",
+					price: 9.9 + 35
+				}
+			},
+			{
+				coords: {wcat:10, zone:"Zone 01"},
+				policy: {
+					type: "FixedPrice",
+					price: 10.9
+				}
+			},
+			{
+				coords: {wcat:10, zone:"Corse"},
+				policy: {
+					type: "FixedPrice",
+					price: 10.9 + 35
+				}
+			},
+			{
+				coords: {wcat:100, zone:"Zone 01"},
+				policy: {
+					type: "PerVolumePrice",
+					attribute: "poids",
+					rounding: 10,
+					price: 3.6
+				}
+			},
+			{
+				coords: {wcat:100, zone:"Corse"},
+				policy: {
+					type: "PerVolumePrice",
+					attribute: "poids",
+					rounding: 10,
+					price: 5
+				}
 			}
-		},
-		{
-			coords: {wcat:0, zone:"Corse"},
-			policy: {
-				type: "FixedPrice",
-				price: 9.9 + 35
+
+		]
+	;
+
+
+
+	let pricingGrid_acadia_b2c = new PricingGrid("ACA-BTC");
+	theSystem.grids.push(pricingGrid_acadia_b2c);
+
+
+	pricingGrid_acadia_b2c.dimensions =
+		[
+			{
+				name: "wcat",
+				raw_name : "poidsEntier",
+				type: "ThresholdCategory",
+				categories : [
+					{value: 0},
+					{value: 5},
+					{value: 50},
+					{value: 100},
+				]
 			}
-		},
-		{
-			coords: {wcat:5, zone:"Zone 01"},
-			policy: {
-				type: "FixedPrice",
-				price: 10.9
+		]
+	;
+
+	pricingGrid_acadia_b2c.gridCells =
+		[
+			{
+				coords: {wcat:0},
+				policy: {
+					type: "FixedPrice",
+					price: 13.9
+				}
+			},
+			{
+				coords: {wcat:5},
+				policy: {
+					type: "FixedPrice",
+					price: 15.9
+				}
+			},
+			{
+				coords: {wcat:50},
+				policy: {
+					type: "DelegatedPrice",
+					delegated_gridName: "ACA-BTB",
+					delegated_additiveAmount: 10
+				}
+			},
+			{
+				coords: {wcat:100},
+				policy: {
+					type: "DelegatedPrice",
+					delegated_gridName: "ACA-BTB",
+					delegated_additiveAmount: 20
+				}
 			}
-		},
-		{
-			coords: {wcat:5, zone:"Corse"},
-			policy: {
-				type: "FixedPrice",
-				price: 10.9 + 35
-			}
-		},
 
-		{coords: {wcat:7, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 11.9}},
-		{coords: {wcat:7, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 11.9 + 35}},
-
-		{coords: {wcat:9, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 13.9}},
-		{coords: {wcat:9, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 13.9 + 35}},
-
-		{coords: {wcat:12, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 14.9}},
-		{coords: {wcat:12, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 14.9 + 35}},
-
-		{coords: {wcat:15, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 18.9}},
-		{coords: {wcat:15, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 18.9 + 35}},
-
-		{coords: {wcat:20, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 23.9}},
-		{coords: {wcat:20, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 23.9 + 35}},
-
-		{coords: {wcat:25, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 27.9}},
-		{coords: {wcat:25, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 27.9 + 35}},
-
-		{coords: {wcat:30, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 29.9}},
-		{coords: {wcat:30, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 29.9 + 35}},
-
-		{coords: {wcat:40, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 34.9}},
-		{coords: {wcat:40, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 34.9 + 35}},
-
-		{coords: {wcat:45, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 36.9}},
-		{coords: {wcat:45, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 36.9 + 35}},
-
-		{coords: {wcat:50, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 40.9}},
-		{coords: {wcat:50, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 40.9 + 35}},
-
-		{coords: {wcat:55, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 42.9}},
-		{coords: {wcat:55, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 42.9 + 35}},
-
-		{coords: {wcat:60, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 44.9}},
-		{coords: {wcat:60, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 44.9 + 35}},
-
-		{coords: {wcat:70, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 46.9}},
-		{coords: {wcat:70, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 46.9 + 35}},
-
-		{coords: {wcat:80, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 49.9}},
-		{coords: {wcat:80, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 49.9 + 35}},
-
-		{coords: {wcat:90, zone:"Zone 01"}, policy: {type: "FixedPrice",
-				price: 54.9}},
-		{coords: {wcat:90, zone:"Corse"}, policy: {type: "FixedPrice",
-				price: 54.9 + 35}},
+		]
+	;
 
 
-
-
-
-		{
-			coords: {wcat:100, zone:"Zone 01"},
-			policy: {
-				type: "PerVolumePrice",
-				attribute: "poids",
-				rounding: 10,
-				price: 3.6
-			}
-		},
-		{
-			coords: {wcat:100, zone:"Corse"},
-			policy: {
-				type: "PerVolumePrice",
-				attribute: "poids",
-				rounding: 10,
-				price: 5
-			}
+	var uneCommande = new class {
+		constructor(poids, codePostal){
+			this.poids = poids;
+			this.codePostal = codePostal;
 		}
 
-	]
-;
-
-
-
-let pricingGrid_acadia_b2c = new PricingGrid("ACA-BTC");
-theSystem.grids.push(pricingGrid_acadia_b2c);
-
-
-pricingGrid_acadia_b2c.dimensions =
-	[
-		{
-			name: "wcat",
-			raw_name : "poidsEntier",
-			type: "ThresholdCategory",
-			categories : [
-				{value: 0},
-				{value: 5},
-				{value: 8},
-				{value: 11},
-				{value: 15},
-				{value: 20},
-				{value: 25},
-				{value: 30},
-				{value: 40},
-				{value: 45},
-				{value: 50},
-				{value: 100},
-			]
+		getPPGRawCoordinates(){
+			let departement = this.codePostal.substring(0,2);
+			return {
+				poids : this.poids,
+				poidsEntier: Math.ceil(this.poids),
+				departement,
+			};
 		}
-	]
-;
+	}(45 /*kg*/, "93420");
 
-pricingGrid_acadia_b2c.gridCells =
-	[
-		{
-			coords: {wcat:0},
-			policy: {
-				type: "FixedPrice",
-				price: 13.9
-			}
-		},
-		{
-			coords: {wcat:5},
-			policy: {
-				type: "FixedPrice",
-				price: 15.9
-			}
-		},
-		{
-			coords: {wcat:8},
-			policy: {
-				type: "FixedPrice",
-				price: 18.9
-			}
-		},
-		{
-			coords: {wcat:11},
-			policy: {
-				type: "FixedPrice",
-				price: 20.9
-			}
-		},
-
-		{coords: {wcat:15}, policy: {type: "FixedPrice", price: 23.9}},
-		{coords: {wcat:20}, policy: {type: "FixedPrice", price: 26.9}},
-		{coords: {wcat:25}, policy: {type: "FixedPrice", price: 30.9}},
-		{coords: {wcat:30}, policy: {type: "FixedPrice", price: 32.9}},
-		{coords: {wcat:40}, policy: {type: "FixedPrice", price: 37.9}},
-		{coords: {wcat:45}, policy: {type: "FixedPrice", price: 39.9}},
-
-		{
-			coords: {wcat:50},
-			policy: {
-				type: "DelegatedPrice",
-				delegated_gridName: "ACA-BTB",
-				delegated_additiveAmount: 10
-			}
-		},
-		{
-			coords: {wcat:100},
-			policy: {
-				type: "DelegatedPrice",
-				delegated_gridName: "ACA-BTB",
-				delegated_additiveAmount: 20
-			}
-		}
-
-	]
-;
-
-
-var uneCommande = new class {
-	constructor(poids, codePostal){
-		this.poids = poids;
-		this.codePostal = codePostal;
-	}
-
-	getPPGRawCoordinates(){
-		let departement = this.codePostal.substring(0,2);
-		return {
-			poids : this.poids,
-			poidsEntier: Math.ceil(this.poids),
-			departement,
-		};
-	}
-}(45 /*kg*/, "93420");
-
-let xxx = theSystem.applyGrid("ACA-BTB", uneCommande);
-console.log(xxx);
+	let xxx = theSystem.applyGrid("ACA-BTB", uneCommande);
+	console.log(xxx);
+}
