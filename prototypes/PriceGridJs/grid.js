@@ -250,10 +250,14 @@ class PricingGrid {
 			let categoryValue = null;
 			switch(dimension.type){
 				case "ThresholdCategory": {
+					let comparison = dimension.comparison ?? "eqSup"; // retro-compatibility
 					for (const category of dimension.categories){
-						if (rawValue >= category.value){
+						if ((comparison == "eqSup" && rawValue >= category.value)
+						  || (comparison == "strictSup" && rawValue > category.value)){
 							categoryValue = category.value;
 							// keep last fitting category
+						} else {
+							break; // Warning : quick break possible only when categories are ascendingly sorted !
 						}
 					}
 
@@ -312,7 +316,7 @@ class PricingGrid {
 				defaultDimension = {type, name, raw_name:"", categories:[{value: "All", enum: []}] };
 				break;
 			case "ThresholdCategory":
-				defaultDimension = {type, name, raw_name:"", categories:[{value: 0}] };
+				defaultDimension = {type, name, raw_name:"", categories:[{value: 0}], comparison:"eqSup" };
 				break;
 			default:
 				throw new Error("Unsupported type of Dimension : " + type);

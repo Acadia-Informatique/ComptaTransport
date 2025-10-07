@@ -1422,13 +1422,23 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 									Nom interne unique et non-vide (et court de préférence)
 								</span>
 							</div>
-
-							<label class="form-label" for="dim-categoryThresholdList">Liste des seuils</label>
+							<div class="row">
+								<div class="col-3">
+									<label class="form-label" for="dim-categoryThresholdList">Liste des seuils</label>
+								</div>
+								<div class="col-3">
+									<select class="form-select mb-1" v-model="ui_state.editingDimCopy.comparison">
+										<option value="eqSup">&gt;=</option>
+										<option value="strictSup">&gt</option>
+									</select>
+								</div>
+							</div>
 							<input class="form-control" id="dim-categoryThresholdList" v-model.lazy="categoryThresholdList">
 						</div>
 						<div v-else>
 							"{{ dimension.name }}" : par seuil de "{{ dimension.raw_name }}"
 							({{ dimension.categories.map(c=>c.value).join(", ") }})
+							 , {{ (dimension.comparison ?? "eqSup")=="eqSup" ? "égal ou supérieur" : "strictement supérieur" }}
 						</div>`
 				},
 				EnumCategoryDimension:{
@@ -1733,9 +1743,15 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 							 switch (dimension.raw_name){
 								case "poids" :
 								case "poidsVolumique": {
-									label = nextCategory
-									 ? `${category.value} - ${nextCategory.value} kg`
-									 : `${category.value}+ kg`;
+									if ((dimension.comparison ?? "eqSup") == "eqSup"){
+										label = nextCategory
+										? `${category.value} - ${nextCategory.value} kg`
+										: `${category.value}+ kg`;
+									} else {// == "strictSup"
+										label = nextCategory
+										? `jusqu'à ${nextCategory.value} kg`
+										: `au-delà de ${category.value} kg`;
+									}
 								} break;
 								case "poidsEntier": {
 									label = nextCategory
