@@ -40,8 +40,10 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 				this.size_length = null;
 				this.size_width = null;
 				this.size_height = null;
-				this.size_parcel_count = null;
-				this.transporteurHN = "";
+				this.size_parcel_count = 1;
+				this.transporteur100 = "";
+				this.market = "BTB";
+				this.isIntegration = false;
 			}
 			getPPGRawCoordinates(){
 				let departement = (this.pays=="France" && this.codePostal &&  this.codePostal.length==5) ? this.codePostal.substring(0,2) : "00";
@@ -56,8 +58,10 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 						tailleHN :
 							((this.size_length + 2*this.size_width + 2*this.size_height) > 300)
 							|| (this.size_parcel_count > 10) ? "Oui" : "Non",
-						nb_colis : this.size_parcel_count,
-						transporteurHN: this.transporteurHN
+						nbColis : this.size_parcel_count ?? 1,
+						transporteur100: this.transporteur100,
+						market: this.market,
+						integration: this.isIntegration ? "Oui" : "Non"
 				};
 			}
 		}
@@ -733,6 +737,11 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 
 	<script type="text/x-template" id="PricingTest-Form-template">
 		<form>
+			<div class="d-flex justify-content-evenly">
+				<div><input type="radio" v-model="ui_state.testPricedObj.market" value="BTB"> BTB</div>
+				<div><input type="radio" v-model="ui_state.testPricedObj.market" value="BTC"> BTC</div>
+				<div><input type="checkbox" v-model="ui_state.testPricedObj.isIntegration" value="true"> Integration</div>
+			</div>
 			<div class="row mb-3 mb-lg-1">
 				<div class="col-lg-4">
 					<label class="col-form-label" for="inputPoids">Poids</label>
@@ -809,13 +818,13 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 			</div>
 			<div class="row mb-3 mb-lg-1">
 				<div class="col-lg-4">
-					<label class="col-form-label" for="inputTransporteurHN">Transporteur HN</label>
+					<label class="col-form-label" for="inputtransporteur100">Transporteur 100+</label>
 				</div>
 				<div class="col-lg-8">
-					<input class="form-control" id="inputTransporteurHN"
-					  type="text" list="transporteurHNDatalist" autocomplete="on"
-					  v-model="ui_state.testPricedObj.transporteurHN">
-					<datalist id="transporteurHNDatalist">
+					<input class="form-control" id="inputtransporteur100"
+					  type="text" list="transporteur100Datalist" autocomplete="on"
+					  v-model="ui_state.testPricedObj.transporteur100">
+					<datalist id="transporteur100Datalist">
 						<option value="Schenker Standard (MES)"></option>
 						<option value="Schenker Premium (MES)"></option>
 						<option value="MAZET"></option>
@@ -1549,8 +1558,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 								return this.ui_state.editingDimCopy.categories.map(c => c.value).join(" ; ");
 							},
 							set(value) {
-								let asCleanStr = value.replaceAll(/[^\d.]+/g, ";");
-								let asTokens = asCleanStr.split(";");
+								let asTokens = value.split(";").map(v => v.trim());
 								let asUniqueTokens = [ ...new Set(asTokens)];
 								let categoryValues = asUniqueTokens.sort((a, b) => a - b);
 
@@ -1801,6 +1809,18 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 									 ? `${category.value} - ${nextCategory.value - 1} kg`
 									 : `${category.value}+ kg`;
 								} break;
+								default: {
+									if ((dimension.comparison ?? "eqSup") == "eqSup"){
+										label = nextCategory
+										? `[${category.value} - ${nextCategory.value}[`
+										: `[${category.value}, +∞[`;
+									} else {// == "strictSup"
+										label = nextCategory
+										? `jusqu'à ${nextCategory.value}`
+										: `au-delà de ${category.value}`;
+									}
+								}
+
 							 }
 
 						case "EnumCategory":
