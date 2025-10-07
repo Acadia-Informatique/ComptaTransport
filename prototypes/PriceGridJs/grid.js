@@ -270,6 +270,9 @@ class PricingGrid {
 						}
 					}
 				} break;
+				case "DirectCategory": {
+					categoryValue = rawValue; // check if among dimension.categories ?... maybe when we support wildcard.
+				} break;
 				default: {
 				} break;
 			}
@@ -317,6 +320,9 @@ class PricingGrid {
 				break;
 			case "ThresholdCategory":
 				defaultDimension = {type, name, raw_name:"", categories:[{value: 0}], comparison:"eqSup" };
+				break;
+			case "DirectCategory":
+				defaultDimension = {type, name, raw_name:"", categories:[{value: "All"}] };
 				break;
 			default:
 				throw new Error("Unsupported type of Dimension : " + type);

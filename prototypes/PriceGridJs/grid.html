@@ -1268,7 +1268,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 			},
 			data(){
 				return {
-					newDimType:"ThresholdCategory"
+					newDimType:"ThresholdCategory" // default, because more common
 				}
 			},
 			methods: {
@@ -1541,6 +1541,48 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 						</div>`
 				},
 
+				DirectCategoryDimension:{
+					extends: _AbstractDimension,
+					computed:{
+						categoryList: {
+							get() {
+								return this.ui_state.editingDimCopy.categories.map(c => c.value).join(" ; ");
+							},
+							set(value) {
+								let asCleanStr = value.replaceAll(/[^\d.]+/g, ";");
+								let asTokens = asCleanStr.split(";");
+								let asUniqueTokens = [ ...new Set(asTokens)];
+								let categoryValues = asUniqueTokens.sort((a, b) => a - b);
+
+								let newCategories = categoryValues.map( v => ({value:v}) );
+								this.ui_state.editingDimCopy.categories = newCategories;
+							}
+						}
+					},
+					template:
+						`<div v-if="isEditing">
+							<div class="input-group mb-3">
+								<input id="dim-name" class="form-control" placeholder="Nom interne" v-model.trim="ui_state.editingDimCopy.name" required>
+								<span class="input-group-text">par valeur directe de </span>
+								<select class="form-select" v-model="ui_state.editingDimCopy.raw_name" required>
+									<option disabled value="">Coordonnée brute</option>
+									<option v-for="k in stringRawCoords" :value="k">
+										{{ k }}
+									</option>
+								</select>
+								<span class="invalid-feedback">
+									Nom interne unique et non-vide (et court de préférence)
+								</span>
+							</div>
+
+							<label class="form-label" for="dim-categoryList">Liste des valeurs</label>
+							<input class="form-control" id="dim-categoryList" v-model.lazy="categoryList">
+						</div>
+						<div v-else>
+							"{{ dimension.name }}" : par valeur de "{{ dimension.raw_name }}"
+							({{ dimension.categories.map(c=>c.value).join(", ") }})
+						</div>`
+				},
 
 			},
 
@@ -1578,6 +1620,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 								<option disabled value="">Type de dimension</option>
 								<option value="ThresholdCategory">Par seuil</option>
 								<option value="EnumCategory">Par énumération</option>
+								<option value="DirectCategory">Directe</option>
 							</select>
 						</div>
 					</li>
@@ -1761,6 +1804,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 							 }
 
 						case "EnumCategory":
+						case "DirectCategory":
 						default:
 					}
 					return label ?? category.value;
