@@ -1854,6 +1854,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 					const gridName = this.ui_state.currentGrid.name;
 					const testPricedObj = this.ui_state.testPricedObj;
 					return this.ui_state.system.applyGrid(gridName, testPricedObj);
+					//return {amount:-1, extra_info:""} //TODO prévoir débrayage pour les références circulaires, au niveau GRID.JS
 				}
 			},
 			template: '#PricingTest-Form-template'
