@@ -114,5 +114,9 @@ Parfois les analyses seront complétées par des démos interactives, qui permet
 
 Nous tâcherons de les rendre disponibles ici :
 - [Modèle général de Grille tarifaire](https://acadia-informatique.github.io/ComptaTransport/prototypes/PriceGridJs/grid.html)
+	Un lien de téléchargement d'une grille exemple est fournie dans le panneau droit du prototype (section Export/Import). Mais nous vous proposerons ici des grilles plus complètes (mais un peu expérimentales) au fur et à fur, toujours à titre d'exemple :
+	- export [Grille frais de port ACADIA 2025](https://acadia-informatique.github.io/ComptaTransport/prototypes/PriceGridJs/tarifs_ACADIA-alt.grille)
+ 	- export [Grille tarifaire Geodis 2023](https://acadia-informatique.github.io/ComptaTransport/prototypes/PriceGridJs/tarifs_Geodis_2023.grille)
+
 
 
