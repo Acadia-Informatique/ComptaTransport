@@ -2,5 +2,24 @@
 <persistence version="3.0" xmlns="https://jakarta.ee/xml/ns/persistence" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence https://jakarta.ee/xml/ns/persistence/persistence_3_0.xsd">
 	<persistence-unit name="ComptaTransportPU">
 		<jta-data-source>ComptaTransport-db</jta-data-source>
+
+
+		<class>com.acadiainfo.comptatransport.domain.Carrier</class>
+		<properties>	
+			<!-- Enable SQL trace :
+			setting compile time
+				<property name="eclipselink.logging.level" value="FINE"/>
+			is equivalent to runtime
+				asadmin create-jvm-options -Declipselink.logging.level=FINE
+				(which writes into config/domain.xml)
+			
+			Both are disabled at ANY change of logging.properties (by admin console or file editing)... which is weird
+			-->
+		
+			<!-- Two more properties mentioned on the web, but don't seem to be needed in Glassfish 7 for sql trace... 
+			<property name="eclipselink.logging.level.sql" value="FINE"/>
+			<property name="eclipselink.logging.parameters" value="true"/>
+			-->
+		</properties>			
 	</persistence-unit>
 </persistence>

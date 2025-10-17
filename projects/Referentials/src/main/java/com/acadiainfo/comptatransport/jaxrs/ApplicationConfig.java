@@ -1,4 +1,4 @@
-package com.acadiainfo.jaxrs;
+package com.acadiainfo.comptatransport.jaxrs;
 
 import jakarta.ws.rs.ApplicationPath;
 import jakarta.ws.rs.core.Application;
