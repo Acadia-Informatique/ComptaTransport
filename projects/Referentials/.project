@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
 	<name>Referentials</name>
-	<comment></comment>
+	<comment>remplacez moi par un POM, misère</comment>
 	<projects>
 	</projects>
 	<buildSpec>
@@ -27,5 +27,6 @@
 		<nature>org.eclipse.wst.common.project.facet.core.nature</nature>
 		<nature>org.eclipse.jdt.core.javanature</nature>
 		<nature>org.eclipse.wst.jsdt.core.jsNature</nature>
+
 	</natures>
 </projectDescription>

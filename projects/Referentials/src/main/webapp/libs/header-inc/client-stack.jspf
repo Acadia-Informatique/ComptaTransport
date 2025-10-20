@@ -1,0 +1,59 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+
+
+
+<c:url value="/libs" var="libsUrl" />
+<c:url value="/webjars" var="webJarsUrl" />
+<link href="${webJarsUrl}/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet">
+<link href="${webJarsUrl}/bootstrap-icons/1.13.1/font/bootstrap-icons.min.css" rel="stylesheet">
+
+<script src="${webJarsUrl}/popperjs__core/2.11.8/dist/umd/popper.min.js"></script>
+<script src="${webJarsUrl}/bootstrap/5.3.8/js/bootstrap.min.js"></script>
+<script src="${webJarsUrl}/vue/3.5.22/dist/vue.global.js"></script>
+
+<% /* ---------- Some utils ------------ */ %>
+<script type="text/javascript">
+"use strict";
+	// my Q&D data obj clone polyfill, used on VueJS reactive objects
+	window.deepClone = function(v){return JSON.parse(JSON.stringify(v));};
+</script>
+
+<% /* ---------- REST API CLient ------------ */ %>
+<script src="${webJarsUrl}/axios/1.12.2/dist/axios.min.js"></script>
+<% /* TODO add axios retry on the stack ?... */ %>
+<script type="text/javascript">
+"use strict";
+	/* pre-configured for this web-app's own API */
+	const axios_backend = axios.create({
+		baseURL: "<c:url value="/api" />",
+		timeout: 1000,
+
+		// promote failfast behaviour
+		responseType: 'json', // supposed to be default, but silentJSONParsing : false needed that ?!...
+		transitional: {
+			silentJSONParsing: false, // default to true in current Axios version (1.12.x)
+			clarifyTimeoutError: true,
+		},
+
+
+		//headers: {'Authorization': 'xxxx'}, TODO
+
+		// Jax-RS doesn't require those PHP monkeying
+		paramsSerializer: {
+			indexes: null // array indexes format (null - no brackets, false (default) - empty brackets, true - brackets with indexes)
+		},
+	});
+
+	function showAxiosErrorDialog(error){
+		//console.error(error);
+
+		let best_message = error?.response?.data; // serverside
+		if (!best_message) best_message = error.message;
+
+		alert_dialog(`Erreur appel API - \${error?.config?.method} - code: \${error.status}`,
+			`Info. technique : \${error.code} : \${best_message}`
+		);
+	}
+</script>
+
+

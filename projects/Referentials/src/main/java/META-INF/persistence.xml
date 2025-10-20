@@ -2,9 +2,12 @@
 <persistence version="3.0" xmlns="https://jakarta.ee/xml/ns/persistence" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence https://jakarta.ee/xml/ns/persistence/persistence_3_0.xsd">
 	<persistence-unit name="ComptaTransportPU">
 		<jta-data-source>ComptaTransport-db</jta-data-source>
-
-
-		<class>com.acadiainfo.comptatransport.domain.Carrier</class>
+		
+		
+		<!-- general L2 cache disabled for DEV, if needed
+		<shared-cache-mode>ENABLE_SELECTIVE</shared-cache-mode>
+		 -->
+		
 		<properties>	
 			<!-- Enable SQL trace :
 			setting compile time

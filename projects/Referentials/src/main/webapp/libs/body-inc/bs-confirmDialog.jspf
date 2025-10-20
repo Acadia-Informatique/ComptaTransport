@@ -1,0 +1,141 @@
+<%
+/* A Bootstrap-based replacement for window.confirm() and alert(), with customization options.
+
+- confirm_dialog
+    usage :
+		confirm_dialog ([title,] message [,choice1, choice2, etc.]);
+	where each "choice" object gives a button, according to its attributes :
+		- label : text on the button (if empty, the button will not be displayed)
+		- class (optional) : CSS class name(s) for the button
+		- handler (optional) : callback function called for this choice (if not set, makes a default close button (X) to appear)
+		- autofocus (optional) : makes the button get focus on showing
+
+	(Note: hence an "empty" object may be used to make the (X) button appear. Besides, when no choice is set, it appears anyway)
+
+    Note on this JSPF integration : too bad you cannot import from local inline modules.
+    The functions could have been exported instead of being declared globally on "window".
+
+- alert_dialog
+	usage :
+		alert_dialog ([title,] message);
+*/
+%>
+<!-- start: bs-ConfirmDialog -->
+<script type="text/javascript" >
+
+function confirm_dialog(txt, ...choiceObjs) {
+	const modal = document.getElementById("modal-confirm-dialog");
+
+	// 1) Texts
+	//- title (optional)
+	let title;
+	if (choiceObjs && choiceObjs.length > 0 && typeof choiceObjs[0] == 'string') {
+		title = txt;
+		txt = choiceObjs.shift();
+	} else {
+		title = "";
+	}
+	const modalTitle = modal.querySelector(".modal-title");
+	modalTitle.textContent = title;
+
+	//- main text (required)
+	const modalMsg = modal.querySelector(".msg");
+	modalMsg.textContent = txt; //note : main text is a mandatory arg
+
+	// 2) default close button (X)
+	const buttonClose = modal.querySelector(".btn-close");
+	if (choiceObjs && choiceObjs.length > 0) {
+		buttonClose.style.display = 'none';
+	} else {
+		buttonClose.style.display = '';
+	}
+	 // ... is expected to be activated with a handler-less choice
+
+	// 3) Custom buttons
+	const buttons = modal.querySelector(".modal-footer");
+
+	// - prepare button template
+	const origBtnTemplate = buttons.querySelector("#button-template");
+	origBtnTemplate.style.display = 'none'; // hide original in-place, if not already done
+	let buttonTemplate = origBtnTemplate.cloneNode(true);
+	buttonTemplate.removeAttribute('id');
+	buttonTemplate.style.display = '';
+
+	// - remove old buttons (except template)
+	Array.from(buttons.children).forEach(child => {
+		if (child !== origBtnTemplate) {
+			buttons.removeChild(child);
+		}
+	});
+
+	let showClose = false;
+	choiceObjs.forEach((obj) => {
+		if (!obj.handler) showClose = true; // at least one handler-less choice, so show (X) button
+		if (!obj.label) return; // no label, no button :-)
+
+		let newButton = buttonTemplate.cloneNode(true);
+
+		//apply label
+		newButton.textContent = obj.label;
+
+		// apply CSS class(es)
+		if (obj.class) {
+			obj.class.split(" ").forEach(cls => {
+				if (cls) newButton.classList.add(cls);
+			});
+		}
+
+		// apply handler
+		newButton.addEventListener('click', (e) => {
+			let handlerRes = undefined;
+			if (obj.handler) handlerRes = obj.handler();
+
+			if (handlerRes !== false){ // veto closing
+				const bsModal = bootstrap.Modal.getOrCreateInstance(modal);
+				bsModal.hide();
+			}
+		});
+
+		// apply autofocus
+		if (obj.autofocus) newButton.autofocus = true;
+
+		buttons.appendChild(newButton);
+		newButton.style.display = '';
+	});
+	// Show close button if any choice has no handler
+	buttonClose.style.display = showClose ? '' : 'none';
+
+	// Show dialog using Bootstrap 5 API
+	const bsModal = bootstrap.Modal.getOrCreateInstance(modal);
+	bsModal.show();
+	modal.querySelector("*[autofocus]")?.focus(); // additional help for autofocus
+}
+
+
+function alert_dialog(txt1, txt2) {
+	if (txt2) {
+		confirm_dialog(txt1, txt2, {label: "OK", class: "btn-primary", autofocus:true});
+	} else {
+		confirm_dialog(txt1, {label: "OK", class: "btn-primary", autofocus:true});
+	}
+};
+</script>
+
+<!-- Bootstrap Modal dialog for generic ConfirmDialog -->
+<div class="modal" id="modal-confirm-dialog" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="msg"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="button-template" class="btn col mx-2"></button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- end: bs-ConfirmDialog -->

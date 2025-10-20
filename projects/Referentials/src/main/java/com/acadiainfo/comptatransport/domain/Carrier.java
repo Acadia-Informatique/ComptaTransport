@@ -1,5 +1,8 @@
 package com.acadiainfo.comptatransport.domain;
 
+import java.util.Set;
+import java.util.TreeSet;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -9,10 +12,8 @@ import jakarta.persistence.Version;
 
 
 @Entity
-//@jakarta.enterprise.inject.Model
 @Table(schema = "ComptaTransport", name = "CARRIER")
-
-@NamedQuery(name = "CARRIER.findAll", query = "SELECT c FROM Carrier c ORDER BY c.name")
+@NamedQuery(name = "findAll", query = "SELECT c FROM Carrier c ORDER BY c.name")
 public class Carrier {
 
 	/** X3 name **/
@@ -40,10 +41,11 @@ public class Carrier {
 	private String description;
 
 	/**
-	 * Indicates a "zero-fee" carrier (usually a virtual shipping mode).
+	 * Tags can be used for technical filtering (e.g. "zero-fee") or for expressing customer preferences.
 	 */
-	@Column(name = "zero_charge", nullable = false)
-	private boolean isZeroCharge;
+	@Column(name = "tags")
+	private Set<String> tags = new TreeSet<String>();
+
 
 	/**
 	 * When not null, this message is displayed at "Contrôle quotidien" whenever
@@ -56,5 +58,61 @@ public class Carrier {
 	@Version
 	@Column(name = "_v_lock")
 	private long version;
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getShortName() {
+		return shortName;
+	}
+
+	public void setShortName(String shortName) {
+		this.shortName = shortName;
+	}
+
+	public String getLabel() {
+		return label;
+	}
+
+	public void setLabel(String label) {
+		this.label = label;
+	}
+
+	public String getGroupName() {
+		return groupName;
+	}
+
+	public void setGroupName(String groupName) {
+		this.groupName = groupName;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
+	}
+
+	public Set<String> getTags() {
+		return tags;
+	}
+
+	public void setTags(Set<String> tags) {
+		this.tags = tags;
+	}
+
+	public String getWarningMessage() {
+		return warningMessage;
+	}
+
+	public void setWarningMessage(String warningMessage) {
+		this.warningMessage = warningMessage;
+	}
 	
 }
