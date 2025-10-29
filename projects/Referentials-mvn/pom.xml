@@ -90,11 +90,6 @@
 	</build>
 	
 	<dependencies>
-		<dependency>
-			<groupId>jakarta.data</groupId>
-			<artifactId>jakarta.data-api</artifactId>
-			<version>1.0.1</version>
-		</dependency>
 
 		<!-- client stack as WebJars (core: VueJS + Bootstrap)-->
 		<dependency>

@@ -6,7 +6,7 @@
 	<meta charset="UTF-8">
 	<title>(ComptaTransport)</title>
 	
-	<%@ include file="/libs/client-stack.jspf" %>
+	<%@ include file="/WEB-INF/includes/header-inc/client-stack.jspf" %>
 	
 </head>
 <body>

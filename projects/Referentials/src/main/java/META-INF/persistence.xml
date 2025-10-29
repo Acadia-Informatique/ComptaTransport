@@ -4,9 +4,8 @@
 		<jta-data-source>ComptaTransport-db</jta-data-source>
 		
 		
-		<!-- general L2 cache disabled for DEV, if needed
+		<!-- general L2 cache disabled for DEV, if needed -->
 		<shared-cache-mode>ENABLE_SELECTIVE</shared-cache-mode>
-		 -->
 		
 		<properties>	
 			<!-- Enable SQL trace :

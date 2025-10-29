@@ -5,8 +5,10 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.OPTIONS;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Context;
@@ -42,8 +44,31 @@ public class TestEJB {
 	@Path("/qs")
 	public String testQueryString(@QueryParam("name") String name, @Context UriInfo uriInfo) {
 		// TODO use uriInfo.getPathParameters() and list of @QueryParam annotated args
+		// to list all unsupported params
 
 		return "My name is " + name;
+	}
+
+	@OPTIONS
+	@Path("/tracking/{order}")
+	@Produces(value = MediaType.APPLICATION_JSON)
+	public Response pseudoTrackingOpt(@PathParam("order") String orderRef) {
+		return Response.status(200).header("Access-Control-Allow-Origin", "*")
+				.header("Access-Control-Allow-Credentials", "true")
+				.header("Access-Control-Allow-Headers", "origin, content-type, accept, authorization")
+				.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD").build();
+	}
+	@GET
+	@Path("/tracking/{order}")
+	@Produces(value = MediaType.APPLICATION_JSON)
+	public Response pseudoTracking(@PathParam("order") String orderRef) {
+		String pseudoRes = String.format("CP%s%05d", orderRef, System.currentTimeMillis() % 9999);
+		String responsePayload = "{\"ref\":\"" + orderRef + "\",\"tracking\":\"" + pseudoRes + "\"}";
+		return Response.status(200).header("Access-Control-Allow-Origin", "*")
+				.header("Access-Control-Allow-Credentials", "true")
+				.header("Access-Control-Allow-Headers", "origin, content-type, accept, authorization")
+				.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD").entity(responsePayload)
+				.build();
 	}
 
 	@POST

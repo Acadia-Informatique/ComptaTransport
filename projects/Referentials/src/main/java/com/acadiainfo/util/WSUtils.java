@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.util.stream.Stream;
 
 import jakarta.ws.rs.core.*;
-import jakarta.ws.rs.core.Response.ResponseBuilder;
-import jakarta.ws.rs.core.Response.Status;
 
 public class WSUtils {
 
@@ -44,9 +42,4 @@ public class WSUtils {
 		return stream;
 	}
 
-	public static ResponseBuilder responseWithErrorMsg(Status status, String msg) {
-		return Response.status(status).entity(msg).type(MediaType.TEXT_PLAIN_TYPE.withCharset("UTF-8"))
-				.language(java.util.Locale.ENGLISH) // so sorry ;-)
-		;
-	}
 }

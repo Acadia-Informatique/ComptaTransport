@@ -4,6 +4,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.NamedQuery;
@@ -14,7 +15,7 @@ import jakarta.persistence.Version;
 @Entity
 @Table(schema = "ComptaTransport", name = "CARRIER")
 @NamedQuery(name = "findAll", query = "SELECT c FROM Carrier c ORDER BY c.name")
-public class Carrier {
+public class Carrier implements Auditable, VersionLockable {
 
 	/** X3 name **/
 	@Id
@@ -55,9 +56,16 @@ public class Carrier {
 	@Column(name = "warning_msg", nullable = true)
 	private String warningMessage;
 	
+	/*
+	 * JPA Optimistic lock
+	 */
 	@Version
 	@Column(name = "_v_lock")
-	private long version;
+	private long _v_lock;
+	
+
+	@Embedded
+	private AuditingInfo auditingInfo;
 
 	public String getName() {
 		return name;
@@ -114,5 +122,19 @@ public class Carrier {
 	public void setWarningMessage(String warningMessage) {
 		this.warningMessage = warningMessage;
 	}
-	
+
+	@Override
+	public long get_v_lock() {
+		return _v_lock;
+	}
+
+	@Override
+	public void set_v_lock(long _v_lock) {
+		this._v_lock = _v_lock;
+	}
+
+	@Override
+	public AuditingInfo getAuditingInfo() {
+		return auditingInfo;
+	}
 }

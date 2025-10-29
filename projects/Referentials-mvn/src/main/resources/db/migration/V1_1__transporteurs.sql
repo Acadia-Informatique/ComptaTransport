@@ -1,18 +1,23 @@
-CREATE TABLE ComptaTransport.CARRIER (
-	name varchar(32) NOT NULL COMMENT 'de X3',
-	short_name varchar(16) NULL COMMENT 'de X3 (Pas très sûr de l''utilité...)',
-	label varchar(64) NOT NULL COMMENT 'inspiré de X3',
-	description varchar(256) NULL COMMENT 'libre, pour doc.',
-	group_name varchar(32) NULL COMMENT 'Pour le contrôle, tiré de la feuille Excel', 	
-	tags varchar(256) NULL COMMENT 'qualification tech ou pour les préférences client',
-	warning_msg varchar(64) NULL COMMENT 'Pour le contrôle',
-	_v_lock BIGINT UNSIGNED DEFAULT 0 NOT NULL COMMENT '(technical: JPA @Version)',
-	CONSTRAINT CARRIER_PK PRIMARY KEY (name)
+-- ComptaTransport.CARRIER definition
+
+CREATE TABLE `CARRIER` (
+  `name` varchar(32) NOT NULL COMMENT 'de X3',
+  `short_name` varchar(16) DEFAULT NULL COMMENT 'de X3 (Pas très sûr de l''utilité...)',
+  `label` varchar(64) NOT NULL COMMENT 'inspiré de X3',
+  `description` varchar(256) DEFAULT NULL COMMENT 'libre, pour doc.',
+  `group_name` varchar(32) DEFAULT NULL COMMENT 'Pour le contrôle, tiré de la feuille Excel',
+  `tags` varchar(256) DEFAULT NULL COMMENT 'qualification tech ou pour les préférences client',
+  `warning_msg` varchar(64) DEFAULT NULL COMMENT 'Pour le contrôle',
+  `_v_lock` bigint unsigned NOT NULL DEFAULT '0' COMMENT '(technical: JPA @Version)',
+  `_date_created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '(audit)',
+  `_date_modified` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '(audit)',
+  PRIMARY KEY (`name`)
 )
 ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_0900_ai_ci
 COMMENT='Liste les transporteurs tels que définis dans l''ERP Sage X3, et en les complétant avec la vision Compta.';
+
 
 
 BEGIN;

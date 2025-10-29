@@ -1,0 +1,437 @@
+<%@ page language="java" pageEncoding="UTF-8"%>
+<%--
+VueJS + Axios simple data admin grid.
+
+Components :
+- EntityDataGrid
+
+Dependencies :
+- header-inc/client-stack.jspf
+--%>
+<script type="text/javascript">
+	// VueJS component (options API)
+	var EntityDataGrid = {
+		props: {
+			resourceName: { // user-friendly and collective name for the resource being edited
+				type: String,
+				required: true, //default: "YourResource"
+			},
+			resourceUri: {
+				type: String,
+				required: true, //default: "/yourAPI/yourResourceBase"
+			},
+			identifier: {
+				type: String,
+				required: false,
+				default: "id"
+			},
+			config : {
+				type: Object,
+				required: false,
+				default: {
+					defaultNewEntity: {"id":0},
+					columns: [
+						{ //------------------  Column config example
+							name: "id", // required
+							type: Number, // default is String
+							label: "Identifier",
+							//width: string as CSS, or number as percentage, default is not set.
+							editable: false, // "editable" is a shorthand for "insertable" and "updatable", overriding them
+							sortable: true,  // default is true
+							mandatory: false, // default is false
+							format: {pattern:/\d+/, errorMsg:"Must be an integer"} // if length *strictly* over 0, that will set a limit to it
+							//renderer : built-in (textarea) or "custom-vue-component", default is plain div 
+							//editor:    built-in (textarea) or "custom-vue-component", default is simple input
+
+						}
+					],
+					inferColumns: true, // default is true
+					confirmDelete: true, // default is false
+				}
+			}
+		},
+		data(){
+			return {
+				columnList: [],
+				entityList: [],
+				editingEntity: null,
+				editingValidation: new Map(),
+				_technical_key_seq: 0, // sequence counter, used to uniquely identify rows in grid
+			};
+		},
+
+		methods:{
+			refreshFullGrid(){
+				axios_backend.get(this.resourceUri)
+				.then(response => {
+					this.columnList = this._buildColumnList(response.data);
+					this.entityList = this._buildRowList(response.data);
+				})
+				.catch(error => {
+					showAxiosErrorDialog(error);
+				})
+				.finally(() => {
+					this.clearEditingRow();
+				});
+			},
+			refreshGridRow(entity) {
+				let id = entity[this.identifier];
+
+				axios_backend.get(this.resourceUri + "/" + id)
+				.then(response=>{
+					let idx = this.entityList.findIndex(e => (e[this.identifier] == id));
+					if (idx >=0) {
+						let refreshedEntity = response.data; // heavily relying on failfast behaviour !
+						let removedEntity = this.entityList[idx];
+						refreshedEntity["#key"] = removedEntity["#key"];
+						this.entityList.splice(idx, 1, refreshedEntity);
+					}
+					// more accurate than
+					//for (pty in refreshedEntity) {
+					//	entity[pty] = refreshedEntity[pty];
+					//} because of potentially missing properties
+				})
+				.catch(function (error) {
+					showAxiosErrorDialog(error);
+				});
+			},
+			orderData(propertyName, direction){
+				this.entityList.sort((a,b) => {
+					// isNew() should always be unique and on 1st row, whatever the direction
+					if (this.isNew(a)) return -1;
+					if (this.isNew(b)) return +1;
+
+					// sort by direct comparison of values
+					const aVal = a[propertyName] ?? "";
+					const bVal = b[propertyName] ?? "";
+					if (aVal > bVal)
+						return direction;
+					else if (aVal < bVal)
+						return -direction;
+					else
+						return 0; // to keep it stable
+				});
+			},
+
+			deleteEntity(entity) {
+				let handler = () => {
+					let id = entity[this.identifier];
+					let entityUri =  this.resourceUri + "/" + encodeURIComponent(id);
+
+					axios_backend.delete(entityUri)
+					.then(()=>{
+						let idx = this.entityList.findIndex(e => (e[this.identifier] == id));
+						if (idx >=0) {
+							this.entityList.splice(idx, 1);
+						}
+						//this.refreshFullGrid() more up-to-date, but loses current sort/scroll pos
+					})
+					.catch(error => {
+						showAxiosErrorDialog(error);
+					})
+					.finally(() => {
+						this.clearEditingRow();
+					});
+				};
+
+				if (this.config.confirmDelete) {
+					confirm_dialog(this.resourceName,"Supprimer définitivement la ligne ?",{
+						label:'Continuer', class: 'btn-danger', /* autofocus:true,  no reason to make it easy ;-) */
+						handler
+					}, {
+						label:'Abandonner', class: 'btn-secondary',
+					});
+				} else {
+					handler();
+				}
+			},
+			createEntity(){
+				let newEntity = deepClone(this.config.defaultNewEntity);
+				newEntity["#key"] = -1; // so isNew(newEntity) becomes true
+				this.startEditingRow(newEntity);
+				this.entityList.unshift(newEntity);
+
+				this.$nextTick(() => {
+					this.$refs.scrollAnchor[0].scrollIntoView({block:"center"});
+					// note: ref="scrollAnchor" sits in a loop, hence the [0]...
+				});
+			},
+			isNew(entity){
+				return entity['#key'] == -1;
+			},
+			isEditingRow(entity){
+				if (this.isNew(entity))
+					return this.isNew(this.editingEntity);
+				else
+					return entity["#key"] == (this.editingEntity ? this.editingEntity["#key"] : null);
+			},
+			startEditingRow(entity){
+				this.clearEditingRow();
+				this.editingEntity = deepClone(entity);
+			},
+			stopEditingRow(){
+				let payload = this._buildPayload(this.editingEntity);
+
+				this.validateAllField(payload);
+				if (this.editingValidation.size > 0) {
+					alert_dialog(this.resourceName,"La saisie n'est pas valide.");
+					return; // abort the save
+				}
+
+				if (this.isNew(this.editingEntity)) {
+					axios_backend.post(this.resourceUri, payload)
+					.then(()=>{
+						this.clearEditingRow();
+						this.refreshFullGrid(); // TODO recapture id and refresh that row ? scroll to it ? keep it at 1st row  ?
+					})
+					.catch(function (error) {
+						showAxiosErrorDialog(error);
+					});
+				} else {
+					axios_backend.put(this.resourceUri + "/" + encodeURIComponent(this.editingEntity[this.identifier]), payload)
+					.then(()=>{
+						let changedEntity = this.entityList.find(e => this.isEditingRow(e));
+						this.clearEditingRow();
+						this.refreshGridRow(changedEntity);
+					})
+					.catch(function (error) {
+						showAxiosErrorDialog(error);
+					});
+				}
+			},
+			clearEditingRow(){
+				if (this.editingEntity && this.isNew(this.editingEntity)){
+					// this.entityList.shift(); may be enough, if only we could be *sure* to never move it ;-)
+					let idx = this.entityList.findIndex(e => this.isNew(e));
+					if (idx >=0) {
+						this.entityList.splice(idx, 1);
+					} //... at least there should be only 1
+				}
+				this.editingEntity = null;
+				this.editingValidation.clear();
+			},
+
+			_buildPayload(entityObj) {
+				let payloadObj = deepClone(entityObj);
+
+				//clear all technical markers
+				delete payloadObj["#key"];
+				console.debug("Payload built", payloadObj);
+				return payloadObj;
+			},
+
+			/* Use config and provided data to build a column list */
+			_buildColumnList(rows){
+				class Column {
+					constructor(columnConfig){
+						if (!columnConfig.name) console.error("columnConfig.name must be provided");
+						this.name = columnConfig.name;
+
+						this.label = columnConfig.label ?? columnConfig.name;
+
+						this.type = columnConfig.type ?? String; // not used yet, TODO find something to do with that, maybe range constraints for numbers...
+
+						this.visible = true;
+						if (typeof columnConfig.visible != 'undefined') {
+							this.visible = columnConfig.visible;
+						}
+
+						this.widthCSS = null;
+						if (typeof columnConfig.width === "number")
+							this.widthCSS = columnConfig.width + "%";
+						else if (typeof columnConfig.width === "string")
+							this.widthCSS = columnConfig.width;
+
+						this.insertable = this.updatable = true;
+						this.insertable = (typeof columnConfig.insertable != 'undefined') ? columnConfig.insertable : true;
+						this.updatable = (typeof columnConfig.updatable != 'undefined') ? columnConfig.updatable : true;
+						if (typeof columnConfig.editable != 'undefined') { // shorthand + override
+							this.insertable = this.updatable = columnConfig.editable;
+						}
+
+						this.sortable = true;
+						if (typeof columnConfig.sortable != 'undefined') {
+							this.sortable = columnConfig.sortable;
+						}
+
+						this.mandatory = false;
+						if (typeof columnConfig.mandatory != 'undefined') {
+							this.mandatory = columnConfig.mandatory;
+						}
+
+						this.format = null;
+						if (columnConfig?.format?.pattern) {
+							this.format = columnConfig.format;
+							if (!(this.format?.errorMsg)) {
+								this.format.errorMsg = "Wrong format (must match "+ this.format.pattern +"))";
+							}
+						}
+
+						this.renderer = columnConfig.renderer;
+						this.editor = columnConfig.editor;
+					}
+				}
+				let columnDefList = []; // return val
+
+				//1st, use the config
+				if (this.config.columns)
+				for (let columnConf of this.config.columns) {
+					columnDefList.push(new Column(columnConf));
+				}
+
+				//2nd, if requested, add auto-inferred columns (properties of 1st row)
+				if ((this.config.inferColumns ?? true)
+				  && rows instanceof Array && rows.length > 0)
+				for (const pty in rows[0]) {
+					if (columnDefList.some(c => c.name==pty)) continue;
+					columnDefList.push(new Column({name: pty}));
+				}
+
+				return columnDefList;
+			},
+			/* Inject technical key */
+			_buildRowList(rows){
+				this._technical_key_seq = 0; // reset counter
+				for (let row of rows){
+					row["#key"] = this._technical_key_seq ++;
+				}
+				return rows;
+			},
+			/* helps with column styling */
+			columnClassObj(column) {
+				return {
+					'identifier-col': column.name==this.identifier,
+					'mandatory-col' : column.mandatory
+				};
+			},
+			validateField(entity, column){
+				let validation = [];
+				if (column.mandatory) {
+					if (typeof entity[column.name] == 'undefined'
+					 || entity[column.name] === null
+					 || entity[column.name] === "") {
+						validation.push("Champ obligatoire");
+					}
+				}
+				if (column.format) {
+					if (!column.format.pattern.test(entity[column.name])){
+						validation.push(column.format.errorMsg);
+					}
+				}
+
+				if (validation.length)
+					this.editingValidation.set(column.name, validation);
+				else
+					this.editingValidation.delete(column.name);
+			},
+			validateAllField(entity){
+				this.editingValidation.clear();
+				for (let column of this.columnList){
+					this.validateField(entity, column)
+				}
+			}
+		},
+
+		mounted(){
+			this.refreshFullGrid();
+		},
+
+		template: '#entityDataList-template'
+	};
+</script>
+
+<script type="text/x-template" id="entityDataList-template">
+	<table class="table table-bordered table-hover table-sm gridTable" style="table-layout: fixed">
+		<caption>{{ resourceName }}</caption>
+		<colgroup>
+			<col style="width:55px"/><%-- class="btns-first" --%>
+			<template v-for="column in columnList.filter(c=>c.visible)">
+				<col v-if="column.widthCSS" :style="'width:' + column.widthCSS" />
+				<col v-else />
+			</template>
+			<col style="width:55px" /><%-- class="btns-last" --%>
+		</colgroup>
+		<thead>
+			<tr>
+				<th class="btns-first">
+					<button type="button" class="btn bi bi-plus-lg btn-primary" @click="createEntity(entity)"></button>
+				</th>
+				<th v-for="column in columnList.filter(c=>c.visible)" :class="columnClassObj(column)">
+					{{ column.label }}
+					<div v-if="column.sortable" class="sort-buttons">
+						<a class="bi bi-caret-down-fill" @click="orderData(column.name, +1)"></a>
+						<a class="bi bi-caret-up-fill" @click="orderData(column.name, -1)"></a>
+					</div>
+				</th>
+				<th class="btns-last">
+					<button type="button" class="btn bi bi-arrow-clockwise btn-primary" @click="refreshFullGrid()"></button>
+				</th>
+			</tr>
+		</thead>
+		<tbody>
+			<TransitionGroup name="list">
+			<tr v-for="entity in entityList" :key="entity['#key']">
+				<td class="btns-first">
+					<template v-if="isEditingRow(entity)" >
+						<button type="button" class="btn bi bi-check-lg btn-success" @click="stopEditingRow()"></button>
+						<button type="button" class="btn bi bi-escape btn-secondary" @click="clearEditingRow()" ref="scrollAnchor"></button>
+					</template>
+					<template v-else >
+						<button type="button" class="btn bi bi-pencil" @click="startEditingRow(entity)"></button>
+					</template>
+				</td>
+				<td v-for="column in columnList.filter(c=>c.visible)" :class="columnClassObj(column)">
+					<template v-if="isEditingRow(entity)" >
+
+						<template v-if="(isNew(entity) && column.insertable) || (!isNew(entity) && column.updatable)">
+							<textarea v-if="column.editor == 'textarea'"
+							  style="width:100%"
+							  v-model="editingEntity[column.name]" @input="validateField(editingEntity,column)">
+							</textarea>
+							<component v-else-if="column.editor" :is="column.editor"
+							  v-model="editingEntity[column.name]" @change="validateField(editingEntity,column)">
+							</component>
+							<input v-else
+							  style="width:100%"
+							  v-model="editingEntity[column.name]" @input="validateField(editingEntity,column)">
+						</template>
+						<template v-else>
+							<span v-if="column.renderer == 'textarea'">
+								{{ editingEntity[column.name] }}
+							</span>
+							<component v-else-if="column.renderer" :is="column.renderer"
+							  v-model="editingEntity[column.name]">
+							</component>
+							<input v-else disabled
+							  style="width:100%"
+							  :value="editingEntity[column.name]">
+						</template>
+
+						<div v-if="editingValidation.has(column.name)" class="validation">
+							<ul>
+								<li v-for="msg in editingValidation.get(column.name)">{{msg}}</li>
+							</ul>
+						</div>
+					</template>
+					<template v-else >
+						<span v-if="column.renderer == 'textarea'">
+							{{ entity[column.name] }}
+						</span>
+						<component v-else-if="column.renderer" :is="column.renderer" v-model="entity[column.name]"></component>
+						<div v-else class="text-truncate">{{ entity[column.name] }}	</div>
+					</template>
+				</td>
+				<td class="btns-last">
+					<template v-if="isEditingRow(entity)" >
+						<button v-if="isNew(entity)" type="button" class="btn bi bi-trash3 btn-secondary" disabled></button>
+						<button v-else               type="button" class="btn bi bi-trash3 btn-danger" @click="deleteEntity(entity)"></button>
+					</template>
+					<template v-else >
+						<button type="button" class="btn bi bi-arrow-clockwise" @click="refreshGridRow(entity)"></button>
+					</template>
+				</td>
+			</tr>
+			</TransitionGroup>
+		</tbody>
+	</table>
+</script>

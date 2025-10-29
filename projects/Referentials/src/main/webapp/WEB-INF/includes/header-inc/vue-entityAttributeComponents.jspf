@@ -1,0 +1,207 @@
+<%@ page language="java" pageEncoding="UTF-8"%>
+<%--
+VueJS components for rendering and editing some typical entity attributes.
+They are all v-model based.
+
+Since as cell editors and renderers they cannot be directly configured,
+you may need to compose them in custom components, or subclass them.
+
+Components :
+- MoneyInput
+- AuditingInfoRenderer (auditing info obj)
+- AuditingInfoRenderer_IconWithPopover (smaller variant)
+- TextTagsComponent ("text tags" tags as String[], editable)
+
+Dependencies :
+- header-inc/client-stack.jspf
+--%>
+
+<script type="text/javascript">
+	var MoneyInput = {
+		props: ['modelValue', 'modelModifiers', 'decimals'],
+		//	modelValue: optional Number ?,
+		//	modelModifiers: capture and ignore
+		// },
+		data(){
+			return {
+				decimalsInt: 2,
+				rounding: 0
+			}
+		},
+		emits: ['update:modelValue'],
+		created(){
+			if (this.decimals)
+				this.decimalsInt = parseInt(this.decimals,10);
+			this.rounding = Math.pow(10, this.decimalsInt);
+		},
+		computed: {
+			value: {
+				get() {
+					return typeof this.modelValue == 'number' ?  this.modelValue.toFixed(this.decimalsInt) : "";
+				},
+				set(v) {
+					v = Number.parseFloat(v);
+					v = Number.isNaN(v) ? v = null : Math.round(v * this.rounding) / this.rounding; // shouldn't it be Math.floor ?...maybe not for float decimals :-(
+					this.$forceUpdate(); // needed to "visually" truncate the field, when the value is *not* changed by adding 0.00001
+					this.$emit('update:modelValue', v);
+				}
+			}
+		},
+		template: `<input type="number" :step="1/rounding" v-model.lazy.number="value" class="money-input"/>`
+	};
+
+	var AuditingInfoRenderer = {
+		props: {
+			modelValue: {
+				type: Object, // AuditingInfo
+			},
+		},
+		methods: {
+			/* expected data format by JaxRS : "2025-10-30T10:24:43Z[UTC]" */
+			convertUTC2BrowserLocal(dtUTC){
+				if (dtUTC == null || dtUTC == "") return null;
+				if (/^(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})(\.\d+)?Z\[UTC\]$/.test(dtUTC)) {
+					dtUTC = dtUTC.slice(0, -("[UTC]".length)); //changed to a JS supported "simplified ISO8061"
+					return new Date(Date.parse(dtUTC)).toLocaleString();
+				} else {
+					return `((Illisible: \${dtUTC}))`;
+				}
+
+			}
+		},
+		computed: {
+			local_dateCreated(){return this.convertUTC2BrowserLocal(this.modelValue.dateCreated);},
+			local_dateModified(){return this.convertUTC2BrowserLocal(this.modelValue.dateModified);},
+		},
+		template:
+			`<div v-if="modelValue"><ul>
+				<li v-if="local_dateCreated">Créé le {{ local_dateCreated  }}</li>
+				<li v-if="local_dateModified">Modifié le {{ local_dateModified }}</li>
+			</ul></div>
+			<em v-else>(nouveau)</em>`// TODO mettre utilisateur (si nouveau, utilis. en cours) quand dispo
+	};
+
+	var AuditingInfoRenderer_IconWithPopover = {
+		extends: AuditingInfoRenderer,
+		methods:{
+			clickPopover(e){
+				var popover = bootstrap.Popover.getOrCreateInstance(e.target);
+				popover.toggle();
+			}
+		},
+		template: `
+			<button v-if="modelValue" type="button" class="btn bi bi-info-square"
+			  @click="clickPopover" data-bs-trigger="focus"
+			  title="Informations d'audit"
+			  data-bs-html="true" :data-bs-content=
+				"(local_dateCreated ? 'Créé le '+ local_dateCreated : '')
+				+(local_dateCreated && local_dateModified ? '<br>' : '')
+				+(local_dateModified ? 'Modifié le '+ local_dateModified : '')"></button>
+			<em v-else>(nouveau)</em>`// TODO mettre utilisateur (si nouveau, utilis. en cours) quand dispo
+	};
+
+	var TextTagsComponent = {
+		props: {
+			modelValue: {
+				type: Array, // of String
+				required: true
+			},
+			modelModifiers: { //capture and ignore this.modelModifiers
+				default: () => ({})
+			},
+
+			editable: {
+				type: Boolean,
+				default: false
+			},
+
+			selectables: {
+				type: Array, // of String
+				required: false,
+				default: []
+			}
+		},
+		emits: ['update:modelValue'],
+		data() {
+			return {
+				areSelectablesShown: false,
+			}
+		},
+		computed: {
+			textTagList: {
+				get() {return this.modelValue},
+				set(value) {this.$emit('update:modelValue', value)}
+			}
+		},
+		methods:{
+			showTagPalette(b){
+				this.isTagPaletteOpen = b;
+			},
+			addTextTag(textTag){
+				this.textTagList.push(textTag);
+
+				let deduplicated = new Set(this.textTagList);
+				deduplicated = Array.from(deduplicated).sort();
+				this.textTagList = deduplicated;
+			},
+			removeTextTag(textTag){
+				this.textTagList = this.textTagList.filter(t => t !== textTag);
+			},
+			tagStyleClass(textTag){
+				if (this.selectables.includes(textTag)){
+					return "bg-warning";
+				} else {
+					return "bg-info";
+				}
+			},
+			showSelectables(){
+				this.areSelectablesShown = true;
+			},
+			addOriginalTextTag(){
+				let originalTagElement = this.$refs.originalTagElement ; // = event.target for VueJS
+				//originalTagElement.blur(); not necessarily useful
+
+				let originalTagValue = originalTagElement.innerText.trim();
+				if (originalTagValue == ""){
+					originalTagElement.innerText = "???"; // as a viewing help
+					this.showSelectables(); // as another kind of help
+				} else { //if nothing added, maybe need help
+					this.addTextTag(originalTagValue);
+					originalTagElement.innerText = ""; // clearing
+				}
+			},
+
+		},
+		template: '#TextTags-Component-template'
+	};
+</script>
+
+
+<script type="text/x-template" id="TextTags-Component-template">
+	<div>
+		<div v-for="textTag in textTagList"
+		  class="badge rounded-pill me-1 mb-1"
+          :class="tagStyleClass(textTag)">
+			{{textTag}}
+			<i v-if="editable" class="bi bi-dash-circle-dotted" @click="removeTextTag(textTag)"></i>
+		</div>
+
+		<div v-if="editable" class="tag-palette">
+			<hr v-if="areSelectablesShown" />
+			<div class="badge rounded-pill bg-primary me-1 mb-1">
+				<span ref="originalTagElement" class="pe-2"
+				  contenteditable spellcheck="false" @keyup.enter="addOriginalTextTag"></span>
+				<i class="bi bi-plus-circle-dotted" @click="addOriginalTextTag"></i>
+			</div>
+			<template v-if="areSelectablesShown">
+				<div v-for="textTag in selectables"
+				  class="badge rounded-pill me-1 mb-1"
+				  :class="tagStyleClass(textTag)">
+					{{textTag}}
+					<i v-if="editable" class="bi bi-plus-circle-dotted" @click="addTextTag(textTag)"></i>
+				</div>
+			</template>
+		</div>
+	</div>
+</script>
+

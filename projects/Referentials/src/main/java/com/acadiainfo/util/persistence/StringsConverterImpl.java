@@ -16,8 +16,11 @@ class StringsConverterImpl {
 	final private static String[] EMPTY_ARRAY = new String[0];
 
 	protected String[] _doConvertToEntityAttribute(String dbData) {
-		String[] value = dbData != null ? dbData.split(SEPARATOR) : EMPTY_ARRAY;
-		return value;
+		if (dbData == null || dbData.equals("")) {
+			return EMPTY_ARRAY;
+		} else {
+			return dbData.split(SEPARATOR);
+		}
 	}
 
 	protected String _doConvertToDatabaseColumn(Iterable<? extends CharSequence> value) {

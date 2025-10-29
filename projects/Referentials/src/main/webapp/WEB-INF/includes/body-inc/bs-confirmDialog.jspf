@@ -1,3 +1,4 @@
+<%@ page language="java" pageEncoding="UTF-8"%>
 <%
 /* A Bootstrap-based replacement for window.confirm() and alert(), with customization options.
 
