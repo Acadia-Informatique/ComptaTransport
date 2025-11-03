@@ -149,9 +149,9 @@ Dependencies :
 			},
 			tagStyleClass(textTag){
 				if (this.selectables.includes(textTag)){
-					return "bg-warning";
+					return "text-bg-warning";
 				} else {
-					return "bg-info";
+					return "text-bg-info";
 				}
 			},
 			showSelectables(){
@@ -188,7 +188,7 @@ Dependencies :
 
 		<div v-if="editable" class="tag-palette">
 			<hr v-if="areSelectablesShown" />
-			<div class="badge rounded-pill bg-primary me-1 mb-1">
+			<div class="badge rounded-pill text-bg-primary me-1 mb-1">
 				<span ref="originalTagElement" class="pe-2"
 				  contenteditable spellcheck="false" @keyup.enter="addOriginalTextTag"></span>
 				<i class="bi bi-plus-circle-dotted" @click="addOriginalTextTag"></i>

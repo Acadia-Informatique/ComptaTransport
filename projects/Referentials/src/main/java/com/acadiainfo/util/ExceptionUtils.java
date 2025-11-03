@@ -16,7 +16,7 @@ public class ExceptionUtils {
 	/**
 	 * Unwrap a PersistenceException to a "human readable" version, database-originated exception.  
 	 * @param exc
-	 * @return a "root cause" if found, or the original exc arg
+	 * @return a "root cause" if found, or the original exc arg if unwrapping failed
 	 */
 	public static Throwable unwrapToSqlBasedException(PersistenceException exc) {
 		Throwable t = exc;
@@ -25,11 +25,7 @@ public class ExceptionUtils {
 			t = t.getCause();
 		}
 
-		if (isSqlBased(t)) {
-			return t;
-		} else {
-			return exc; // unwrapping failed, return original arg
-		}		
+		return (t != null) ? t : exc;
 	}
 
 	//
@@ -43,9 +39,13 @@ public class ExceptionUtils {
 	 * @return
 	 */
 	private static boolean isSqlBased(Throwable t) {
-		return (t instanceof java.sql.SQLException)
+		if (t == null) {
+			return false;
+		} else {
+			return t instanceof java.sql.SQLException
 				// || t.getClass().getName().startsWith("org.eclipse.persistence.exceptions.")
 				|| t.getClass().getName().startsWith("com.mysql.");
+		}
 	}
 
 	/**

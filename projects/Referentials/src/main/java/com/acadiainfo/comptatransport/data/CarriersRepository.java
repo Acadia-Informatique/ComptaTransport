@@ -1,5 +1,6 @@
-package com.acadiainfo.comptatransport.domain;
+package com.acadiainfo.comptatransport.data;
 
+import com.acadiainfo.comptatransport.domain.Carrier;
 import com.acadiainfo.util.persistence.CrudRepositoryImpl;
 
 import jakarta.persistence.EntityManager;

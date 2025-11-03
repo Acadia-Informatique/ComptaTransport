@@ -7,6 +7,8 @@ import java.util.stream.Stream;
 
 import com.acadiainfo.comptatransport.domain.VersionLockable;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Parameter;
+import jakarta.persistence.Query;
 
 /**
  * Crude CRUD implementation, which will NOT support entity subclasses.
@@ -50,8 +52,6 @@ public abstract class CrudRepositoryImpl<T, K> {
 		return em;
 	}
 
-
-
 	/**
 	 * Insert one entity.
 	 *
@@ -64,13 +64,13 @@ public abstract class CrudRepositoryImpl<T, K> {
 		if (t == null) {
 			throw new IllegalArgumentException(this.getEntityClass().getSimpleName() + " in argument can't be null");
 		}
-		try {
+		try {			
 			em.persist(t);
 			em.flush();
-			em.refresh(t); // for database generated fields
+			// em.refresh(t); // for database generated fields
 			return t;
 		} catch (jakarta.persistence.PersistenceException exc) {
-			throw com.acadiainfo.util.ExceptionUtils.sneakyThrow(explicitPersistenceException(t, exc));
+			throw explicitPersistenceException(t, exc);
 		}
 	}
 
@@ -81,7 +81,7 @@ public abstract class CrudRepositoryImpl<T, K> {
 	 * @param t "Data bag" entity to be updated, must have key, but won't get attached. 
 	 * @param ignoreNulls - defined for REST API Patch, see {@link CrudRepositoryImpl#patchEntity(Object, Object, boolean)}
 	 * @return the "JPA attached" version of arg.
-	 * @throws jakarta.persistence.OptimisticLockException for version conflicts
+	 * @throws some jakarta.persistence.PersistenceException and subclasses (for not existing, version conflicts, etc.)
 	 */
 	public T update(T t, boolean ignoreNulls) {
 		EntityManager em = this.getEntityManager();
@@ -101,10 +101,6 @@ public abstract class CrudRepositoryImpl<T, K> {
 
 				// em.clear();
 				em.refresh(t_in_base);
-				// em.merge(t_in_base);// for database generated fields... not working well
-
-				// it *is* unsafe, don't suppress the warning !
-				// I'm just trying to match the imposed interface here ;-)
 
 				return t_in_base;
 			} catch (IllegalAccessException | InvocationTargetException e) {
@@ -114,10 +110,10 @@ public abstract class CrudRepositoryImpl<T, K> {
 				throw new jakarta.persistence.OptimisticLockException(this.getEntityClass().getSimpleName()
 						+ " cannot be updated because it has changed since last read", exc);
 			} catch (jakarta.persistence.PersistenceException exc) {
-				throw com.acadiainfo.util.ExceptionUtils.sneakyThrow(explicitPersistenceException(t, exc));
+				throw explicitPersistenceException(t, exc);
 			}
 		} else {
-			throw new jakarta.persistence.OptimisticLockException(this.getEntityClass().getSimpleName()
+			throw new jakarta.persistence.EntityNotFoundException(this.getEntityClass().getSimpleName()
 					+ " may be deleted since last read, not found with key=" + key);
 		}
 	}
@@ -163,7 +159,7 @@ public abstract class CrudRepositoryImpl<T, K> {
 	public void deleteById(K key) {
 		if (key == null) {
 			throw new IllegalArgumentException(
-					"Error deleting " + this.getEntityClass().getSimpleName() + " from null key");
+			  "Error deleting " + this.getEntityClass().getSimpleName() + " from null key");
 		}
 
 		EntityManager em = this.getEntityManager();
@@ -173,43 +169,48 @@ public abstract class CrudRepositoryImpl<T, K> {
 			em.flush();
 		} else {
 			throw new jakarta.persistence.EntityNotFoundException(
-					this.getEntityClass().getSimpleName() + " not found with key = " + key);
+			  this.getEntityClass().getSimpleName() + " not found with key = " + key);
 		}
 	}
 
 	/**
 	 * Retrieve all entities in repository, which can use up a lot of resources for big ones. 
-	 * Important : Relies on the existence of a "findAll" NamedQuery defined at the Entity
-	 * @return found entiies 
+	 * Important : Relies on the existence of a "[Entity].findAll" NamedQuery, usually defined at the Entity
+	 * @return found entities 
 	 */
 	public Stream<T> findAll() {
-		return findWithNamedQuery("findAll");
-	}
-
-	/**
-	 * Use a {@link jakarta.persistence.NamedQuery} to retrieve entities from repository.
-	 * @param queryName - to be defined on the Entity class
-	 * @return found entiies
-	 */
-	public Stream<T> findWithNamedQuery(String queryName) {
 		EntityManager em = this.getEntityManager();
-
-		// all entities are expected to define this one
-		jakarta.persistence.Query query = em.createNamedQuery(queryName);
+		Query query = em.createNamedQuery(this.getEntityClass().getSimpleName() + ".findAll");
 
 		@SuppressWarnings("unchecked")
 		Stream<T> resultStream = query.getResultStream();
 		return resultStream;
 	}
 
+
 	/**
-	 * Get one existing id, or test its existence.
+	 * Get one existing by id, or test its existence.
 	 * @param key
 	 * @return found entity or null.
 	 */
 	public T findById(K key) {
+		if (key == null) {
+			throw new IllegalArgumentException("Entity cannot be found from a null key");
+		}
 		EntityManager em = this.getEntityManager();
 		return em.find(this.getEntityClass(), key);
+	}
+
+	/**
+	 * Short-hand for {@link #findById(Object)}.
+	 * @param entity
+	 * @return found entity or null.
+	 */
+	public T find(T entity) {
+		if (entity == null) {
+			throw new IllegalArgumentException("Entity to find cannot be null");
+		}
+		return this.findById(this.getEntityKey(entity));
 	}
 
 	/**
@@ -292,13 +293,16 @@ public abstract class CrudRepositoryImpl<T, K> {
 		}
 	}
 
-	/**
-	 * Look into a PersistenceException for a SQL-based cause.
+	/** 
+	 * Look into a PersistenceException for a SQL-based cause, as a safety net for insufficient checking.
+	 * The messages at repository level are meant for debugging, and are not properly localized. 
+	 * 
 	 * @param entity to which it happened. Can be null if it doesn't apply.
 	 * @param exc
 	 * @return a "human readable" version of the exc argument (may be another PersistenceException)
 	 */
-	protected Throwable explicitPersistenceException(T entity, jakarta.persistence.PersistenceException exc) {
+	protected jakarta.persistence.PersistenceException explicitPersistenceException(T entity,
+			jakarta.persistence.PersistenceException exc) {
 		// Lazy check for duplicate, since it is costly
 		// (and so unlikely, should only happen for non-generated PK)
 		Throwable cause = com.acadiainfo.util.ExceptionUtils.unwrapToSqlBasedException(exc);
@@ -311,16 +315,16 @@ public abstract class CrudRepositoryImpl<T, K> {
 							this.getEntityClass().getSimpleName() + " with same key already exists : " + key);
 				}
 			} else {
-				return new com.acadiainfo.util.DataIntegrityViolationException(
-						"Data integrity violated : " + cause.getMessage());
+				return new com.acadiainfo.util.DataIntegrityViolationException(cause);
 			}
-	 // } else if ... TODO add analysis for other common java.sql.* exceptions
+	 // } else if ... TODO add analysis for other common java.sql.* exceptions			
 		} else {
-			return cause;
+			// simplify the message and cause chain
+			return new jakarta.persistence.PersistenceException(cause.getMessage());
 		}
 
-		// if nothing applies, return original cause
-		return exc.getCause();
+		// if nothing applies, return original
+		return exc;
 	}
 
 	/**

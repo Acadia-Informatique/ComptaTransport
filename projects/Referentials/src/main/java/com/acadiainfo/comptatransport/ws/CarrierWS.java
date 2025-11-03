@@ -4,20 +4,26 @@ import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
+import com.acadiainfo.comptatransport.data.CarriersRepository;
 import com.acadiainfo.comptatransport.domain.Carrier;
-import com.acadiainfo.comptatransport.domain.CarriersRepository;
 import com.acadiainfo.util.WSUtils;
 
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.servlet.http.HttpServletRequest;
+
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
+import jakarta.ws.rs.core.Response.Status;
 
 @Stateless
 @Path("/carriers")
 public class CarrierWS {
 	private Logger logger = Logger.getLogger(getClass().getName());
+
+	@Context
+	private HttpServletRequest servReq;
 
 	@PersistenceContext(unitName = "ComptaTransportPU")
 	private EntityManager em;
@@ -26,13 +32,18 @@ public class CarrierWS {
 	@GET
 	@Path("/{name}")
 	@Produces(MediaType.APPLICATION_JSON)
-	public Carrier getOne(@PathParam("name") String name) {
-
-		Carrier carrier = CarriersRepository.getInstance(em).findById(name);
-		if (carrier == null) {
-			throw new jakarta.ws.rs.NotFoundException("Carrier not found with \"name\"=" + name);
+	public Response getOne_WS(@PathParam("name") String name) {
+		Carrier carrier = this.getOne(name);
+		if (carrier != null) {
+			return Response.ok().entity(carrier).build();
+		} else {
+			return WSUtils.response(Status.NOT_FOUND, servReq,
+			  "Transporteur non-trouvé avec ce nom (Carrier.name).");
 		}
-		return carrier;
+	}
+
+	public Carrier getOne(String name) {
+		return CarriersRepository.getInstance(em).findById(name);
 	}
 
 	@GET
@@ -46,58 +57,70 @@ public class CarrierWS {
 		Stream<Carrier> carriers = CarriersRepository.getInstance(em).findAll();
 
 		if (tags != null && !tags.isEmpty()) {
-			logger.info("tags detected : " + tags);
+			logger.finer("tags detected : " + tags);
 			carriers = carriers.filter(c -> c.getTags().containsAll(tags));
 		}
-
 		return carriers;
 	}
 
 	@POST
 	@Consumes(value = MediaType.APPLICATION_JSON)
-	public Response add(Carrier carrier) {
+	public Response add_WS(Carrier carrier) {
+		if (carrier == null) {
+			return WSUtils.response(Status.BAD_REQUEST, servReq,
+			  "Le corps du message n'a pas pu interprété comme un Transporteur (Carrier)");
+		}
+		if ("".equals(carrier.getName())) {
+			return WSUtils.response(Status.BAD_REQUEST, servReq,
+			  "Le nom du Transporteur ne peut pas être vide (Carrier.name)");
+		}
+
 		try {
-			carrier = CarriersRepository.getInstance(em).insert(carrier);
+			carrier = this.add(carrier);
 			return Response.created(UriBuilder.fromUri("./carriers").path(carrier.getName()).build()).build();
 		} catch (jakarta.persistence.EntityExistsException exc) {
-			throw new WebApplicationException("Carrier already exists with the same name", Response.Status.CONFLICT);
-		} catch (com.acadiainfo.util.DataIntegrityViolationException exc) {
-			throw new WebApplicationException(exc.getMessage(), Response.Status.BAD_REQUEST);
+			return WSUtils.response(Status.CONFLICT, servReq,
+					"Le nom du Transporteur (Carrier.name) doit être unique.");
 		}
+	}
+
+	public Carrier add(Carrier carrier) {
+		CarriersRepository carriersRepo = CarriersRepository.getInstance(em);
+		return carriersRepo.insert(carrier);
 	}
 
 	@PUT
 	@Path("/{name}")
 	@Consumes(value = MediaType.APPLICATION_JSON)
-	public Response update(@PathParam("name") String name, Carrier carrier) {
+	public Response update_WS(@PathParam("name") String name, Carrier carrier) {
+		// Carrier-specific : key is "name", so it is also provided in JSON payload
+		if ("".equals(name) || !name.equals(carrier.getName())) {
+			return WSUtils.response(Status.BAD_REQUEST, servReq,
+			  "Nom de transporteur (Carrier.name) manquant ou incohérent dans l'URI et le corps du message."
+			 +" Rappel : le nom ne peut pas être modifié après création.");
+		}
 		try {
-			// Carrier-specific : key is "name", so it is also provided in JSON payload
-			if ("".equals(name) || !name.equals(carrier.getName())) {
-				throw new BadRequestException("Missing or inconsistent name in URI and JSON payload"
-						+ " (Carrier's name cannot be changed)");
-			}
-
 			carrier = CarriersRepository.getInstance(em).update(carrier, false);
 			return Response.noContent().entity(carrier).build();
 		} catch (jakarta.persistence.OptimisticLockException exc) {
-			throw new WebApplicationException("Update error: " + exc.getMessage(), Response.Status.CONFLICT);
-		} catch (com.acadiainfo.util.DataIntegrityViolationException exc) {
-			throw new WebApplicationException(exc.getMessage(), Response.Status.BAD_REQUEST);
+			return WSUtils.response(Status.CONFLICT, servReq,
+			  "Transporteur peut-être modifié depuis (\"_v_lock\" non-concordant).");			
+		} catch (jakarta.persistence.EntityNotFoundException exc) {
+			return WSUtils.response(Status.NOT_FOUND, servReq,
+			  "Transporteur peut-être supprimé depuis.");
 		}
 	}
 
 
 	@DELETE
 	@Path("/{name}")
-	@Produces(MediaType.APPLICATION_JSON)
-	public Response delete(@PathParam("name") String name) {
+	public Response delete_WS(@PathParam("name") String name) {
 		try {
 			CarriersRepository.getInstance(em).deleteById(name);
 			return Response.noContent().build();
 		} catch (jakarta.persistence.EntityNotFoundException exc) {
-			throw new NotFoundException("Carrier not found with \"name\"=" + name);
-		} catch (com.acadiainfo.util.DataIntegrityViolationException exc) {
-			throw new WebApplicationException(exc.getMessage(), Response.Status.BAD_REQUEST);
+			return WSUtils.response(Status.NOT_FOUND, servReq,
+			  "Transporteur peut-être supprimé depuis.");
 		}
 	}
 

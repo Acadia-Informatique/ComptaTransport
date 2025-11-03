@@ -40,13 +40,14 @@ Dependencies :
 							sortable: true,  // default is true
 							mandatory: false, // default is false
 							format: {pattern:/\d+/, errorMsg:"Must be an integer"} // if length *strictly* over 0, that will set a limit to it
-							//renderer : built-in (textarea) or "custom-vue-component", default is plain div 
+							//renderer : built-in (textarea) or "custom-vue-component", default is plain div
 							//editor:    built-in (textarea) or "custom-vue-component", default is simple input
 
 						}
 					],
 					inferColumns: true, // default is true
 					confirmDelete: true, // default is false
+					selectRowAction : 'none' // among 'none', 'edit' or function(entity) ; default is 'none'
 				}
 			}
 		},
@@ -56,10 +57,26 @@ Dependencies :
 				entityList: [],
 				editingEntity: null,
 				editingValidation: new Map(),
+				selectedEntity: null,
 				_technical_key_seq: 0, // sequence counter, used to uniquely identify rows in grid
 			};
 		},
-
+		watch: {
+			columnList(){
+				this.$nextTick(() => {
+					this.$refs.columnTooltip.forEach(el => {
+						var tooltip = bootstrap.Tooltip.getOrCreateInstance(el);
+					});
+				});
+			},
+			resourceUri(v){
+				console.debug("resourceUri changed : ", v);
+				this.refreshFullGrid();				
+			}
+		},
+		mounted(){
+			this.refreshFullGrid();
+		},
 		methods:{
 			refreshFullGrid(){
 				axios_backend.get(this.resourceUri)
@@ -68,6 +85,7 @@ Dependencies :
 					this.entityList = this._buildRowList(response.data);
 				})
 				.catch(error => {
+					this.columnList = this._buildColumnList();
 					showAxiosErrorDialog(error);
 				})
 				.finally(() => {
@@ -209,8 +227,39 @@ Dependencies :
 				}
 				this.editingEntity = null;
 				this.editingValidation.clear();
+				
+				this.selectedEntity = null; //not necessarily related but...
 			},
-
+			selectRow(entity){
+				this.selectedEntity = entity;
+				
+				switch(this.config.selectRowAction) {
+				case 'none': break;
+				case 'edit': {
+					if (!this.isEditingRow(entity)){
+						this.startEditingRow(entity);
+					}
+					break;
+				}
+				default:
+					if (!this.config.selectRowAction) {
+						break; /* default : same as 'none' */
+					} else if (typeof this.config.selectRowAction == 'function'){
+						try {
+							this.config.selectRowAction(entity);
+						} catch(error){
+							console.warn("Error calling config.selectRowAction in Component EntityDataGrid", this.config.selectRowAction);
+						}
+					} else {
+						console.warn("Unrecognized config.selectRowAction in Component EntityDataGrid", this.config.selectRowAction);
+						break;
+					}
+				}
+			},
+			isRowSelected(entity){
+				if (entity == null || this.selectedEntity == null) return false; 
+				return this.selectedEntity["#key"] == entity["#key"];
+			},
 			_buildPayload(entityObj) {
 				let payloadObj = deepClone(entityObj);
 
@@ -269,6 +318,15 @@ Dependencies :
 
 						this.renderer = columnConfig.renderer;
 						this.editor = columnConfig.editor;
+
+						this.descriptionIcon = null;
+						if (typeof columnConfig.descriptionIcon != 'undefined') {
+							this.descriptionIcon = columnConfig.descriptionIcon;
+						}
+						this.description = null;
+						if (typeof columnConfig.description != 'undefined') {
+							this.description = columnConfig.description;
+						}
 					}
 				}
 				let columnDefList = []; // return val
@@ -331,18 +389,13 @@ Dependencies :
 				}
 			}
 		},
-
-		mounted(){
-			this.refreshFullGrid();
-		},
-
 		template: '#entityDataList-template'
 	};
 </script>
 
 <script type="text/x-template" id="entityDataList-template">
-	<table class="table table-bordered table-hover table-sm gridTable" style="table-layout: fixed">
-		<caption>{{ resourceName }}</caption>
+	<table class="table table-bordered table-hover table-sm gridTable caption-top" style="table-layout: fixed">
+		<caption class="fs-3 ms-2">{{ resourceName }}</caption>
 		<colgroup>
 			<col style="width:55px"/><%-- class="btns-first" --%>
 			<template v-for="column in columnList.filter(c=>c.visible)">
@@ -351,17 +404,24 @@ Dependencies :
 			</template>
 			<col style="width:55px" /><%-- class="btns-last" --%>
 		</colgroup>
-		<thead>
+		<thead class="shadow sticky-top">
 			<tr>
 				<th class="btns-first">
 					<button type="button" class="btn bi bi-plus-lg btn-primary" @click="createEntity(entity)"></button>
 				</th>
-				<th v-for="column in columnList.filter(c=>c.visible)" :class="columnClassObj(column)">
+				<th v-for="column in columnList.filter(c=>c.visible)"
+				  class="position-relative" :class="columnClassObj(column)"
+				  data-bs-toggle="tooltip" :title="column.description" ref="columnTooltip">					
 					{{ column.label }}
+
+					<i v-if="column.descriptionIcon"  
+					  class="position-absolute top-0 end-0 mt-1 me-1 bi" :class="'bi-'+column.descriptionIcon"></i>
+
 					<div v-if="column.sortable" class="sort-buttons">
-						<a class="bi bi-caret-down-fill" @click="orderData(column.name, +1)"></a>
-						<a class="bi bi-caret-up-fill" @click="orderData(column.name, -1)"></a>
+						<a role="button" class="bi bi-caret-down-fill" @click="orderData(column.name, +1)"></a>
+						<a role="button" class="bi bi-caret-up-fill" @click="orderData(column.name, -1)"></a>
 					</div>
+
 				</th>
 				<th class="btns-last">
 					<button type="button" class="btn bi bi-arrow-clockwise btn-primary" @click="refreshFullGrid()"></button>
@@ -370,14 +430,14 @@ Dependencies :
 		</thead>
 		<tbody>
 			<TransitionGroup name="list">
-			<tr v-for="entity in entityList" :key="entity['#key']">
+			<tr v-for="entity in entityList" :key="entity['#key']" @click="selectRow(entity)" :class="{'table-active':isRowSelected(entity)}">
 				<td class="btns-first">
 					<template v-if="isEditingRow(entity)" >
-						<button type="button" class="btn bi bi-check-lg btn-success" @click="stopEditingRow()"></button>
-						<button type="button" class="btn bi bi-escape btn-secondary" @click="clearEditingRow()" ref="scrollAnchor"></button>
+						<button type="button" class="btn bi bi-check-lg btn-success" @click.stop="stopEditingRow()"></button>
+						<button type="button" class="btn bi bi-escape btn-secondary" @click.stop="clearEditingRow()" ref="scrollAnchor"></button>
 					</template>
 					<template v-else >
-						<button type="button" class="btn bi bi-pencil" @click="startEditingRow(entity)"></button>
+						<button type="button" class="btn bi bi-pencil" @click.stop="startEditingRow(entity)"></button>
 					</template>
 				</td>
 				<td v-for="column in columnList.filter(c=>c.visible)" :class="columnClassObj(column)">
@@ -386,19 +446,20 @@ Dependencies :
 						<template v-if="(isNew(entity) && column.insertable) || (!isNew(entity) && column.updatable)">
 							<textarea v-if="column.editor == 'textarea'"
 							  style="width:100%"
-							  v-model="editingEntity[column.name]" @input="validateField(editingEntity,column)">
+							  v-model.trim="editingEntity[column.name]" @input="validateField(editingEntity,column)">
 							</textarea>
 							<component v-else-if="column.editor" :is="column.editor"
-							  v-model="editingEntity[column.name]" @change="validateField(editingEntity,column)">
+							  v-model.trim="editingEntity[column.name]" @change="validateField(editingEntity,column)">
 							</component>
 							<input v-else
 							  style="width:100%"
-							  v-model="editingEntity[column.name]" @input="validateField(editingEntity,column)">
+							  v-model.trim="editingEntity[column.name]" @input="validateField(editingEntity,column)">
 						</template>
 						<template v-else>
-							<span v-if="column.renderer == 'textarea'">
-								{{ editingEntity[column.name] }}
-							</span>
+							<textarea v-if="column.renderer == 'textarea'" disabled
+							  style="width:100%"
+							  v-model="editingEntity[column.name]">
+							</textarea>
 							<component v-else-if="column.renderer" :is="column.renderer"
 							  v-model="editingEntity[column.name]">
 							</component>
@@ -414,7 +475,7 @@ Dependencies :
 						</div>
 					</template>
 					<template v-else >
-						<span v-if="column.renderer == 'textarea'">
+						<span v-if="column.renderer == 'textarea'" style="white-space:pre-wrap">
 							{{ entity[column.name] }}
 						</span>
 						<component v-else-if="column.renderer" :is="column.renderer" v-model="entity[column.name]"></component>
@@ -424,10 +485,10 @@ Dependencies :
 				<td class="btns-last">
 					<template v-if="isEditingRow(entity)" >
 						<button v-if="isNew(entity)" type="button" class="btn bi bi-trash3 btn-secondary" disabled></button>
-						<button v-else               type="button" class="btn bi bi-trash3 btn-danger" @click="deleteEntity(entity)"></button>
+						<button v-else               type="button" class="btn bi bi-trash3 btn-danger" @click.stop="deleteEntity(entity)"></button>
 					</template>
 					<template v-else >
-						<button type="button" class="btn bi bi-arrow-clockwise" @click="refreshGridRow(entity)"></button>
+						<button type="button" class="btn bi bi-arrow-clockwise" @click.stop="refreshGridRow(entity)"></button>
 					</template>
 				</td>
 			</tr>

@@ -15,35 +15,20 @@
   </head>
   <body>
 	<style>
-		table#carrier-grid caption {
-			caption-side: top;
-    		font-size: 1.5em;
-    		margin-left: 0.5em;
-		}	
-
-		table#carrier-grid thead {
-		  	position: sticky;
-			top: 0; /* Don't forget this, required for the stickiness */
-			box-shadow: 0px 8px 10px 0px rgba(0, 0, 0, 0.4);
-			z-index:3;
-		}
-
-		table#carrier-grid th.identifier-col {
-			position: relative;
-		}
-
+	
+		/* Some table column styling */
 		table#carrier-grid th.identifier-col::after {
 			position: absolute;
-			top: 2px; right: 5px;
+			top: 2px; left: 5px;
 			content: "\01F511"; /* emoji "Key" */
 		}
 
 		table#carrier-grid tr td.mandatory-col {
-			background-color: rgb(255, 255, 250);
+			background-color: rgb(255, 255, 200);
 		}
 
 		table#carrier-grid div.validation li::marker {
-		  content: "\00274C"; /* emoji key */
+		  content: "\00274C"; /* emoji "Red X" */
 		}
 
 
@@ -108,36 +93,45 @@
 								insertable: true,
 								updatable: false,
 								mandatory: true,
-								format: {pattern:/^.{0,32}$/, errorMsg:"Longueur max: 32"}
+								format: {pattern:/^\w{1,32}$/, errorMsg:"Entre 1 et 32 lettres et chiffres"},
+								description:"Identifiant du transporteur"
 							},
 							{
 								name: "label",
 								label: "Libellé",
 								mandatory: true,
-								format: {pattern:/^.{0,64}$/, errorMsg:"Longueur max: 64"}
+								format: {pattern:/^.{0,64}$/, errorMsg:"Longueur max: 64"},
+								description:"Libellé libre"								
 							},
 							{
 								name: "shortName",
 								label: "Lib. court",
-								width: "8em",
-								format: {pattern:/^.{0,16}$/, errorMsg:"Longueur max: 16"}
+								visible: false,
+								format: {pattern:/^.{0,16}$/, errorMsg:"Longueur max: 16"},
+								description: "(existe dans X3, probablement inutilisé)"
 							},
 							{
 								name: "groupName",
 								label: "Groupe de contrôle",
 								width: "8em",
-								format: {pattern:/^.{0,32}$/, errorMsg:"Longueur max: 32"}
+								format: {pattern:/^.{0,32}$/, errorMsg:"Longueur max: 32"},
+								descriptionIcon : "exclamation-diamond",
+								description: "Référence pour les Grilles Tarifaires, les Contrôles, etc."
 							},
 							{
 								name: "tags",
 								label: "Tags",
 								renderer: "renderer-carrier-tags",
-								editor: "editor-carrier-tags"
+								editor: "editor-carrier-tags",
+								descriptionIcon : "exclamation-diamond",
+								description: "Description complémentaire, notamment utilisé par le module Clients forfaits" 
 							},
 							{
 								name: "warningMessage",
 								label: "Message d'alerte",
-								format: {pattern:/^.{0,64}$/, errorMsg:"Longueur max: 64"}
+								format: {pattern:/^.{0,64}$/, errorMsg:"Longueur max: 64"},
+								descriptionIcon : "exclamation-diamond",
+								description: "Signale les Transporteurs problématiques, ce qui lève une alerte au niveau des contrôles."
 							},
 							{
 								name: "description",
@@ -145,7 +139,8 @@
 								width: "10%",
 								renderer: "textarea",
 								editor: "textarea",
-								format: {pattern:/^.{0,256}$/, errorMsg:"Longueur max: 256"}
+								format: {pattern:/^(?:.|\n|\r){0,256}$/, errorMsg:"Longueur max: 256"},
+								description: "Description libre"
 							},
 							{
 								name: "_v_lock",
@@ -164,7 +159,8 @@
 							},
 						],
 						inferColumns: true,
-						confirmDelete: true
+						confirmDelete: true,
+						selectRowAction: "edit"
 					}
 				};
 			}

@@ -14,10 +14,10 @@ import jakarta.persistence.Version;
 
 @Entity
 @Table(schema = "ComptaTransport", name = "CARRIER")
-@NamedQuery(name = "findAll", query = "SELECT c FROM Carrier c ORDER BY c.name")
+@NamedQuery(name = "Carrier.findAll", query = "SELECT c FROM Carrier c ORDER BY c.name")
 public class Carrier implements Auditable, VersionLockable {
 
-	/** X3 name **/
+	/** X3 name, PK */
 	@Id
 	@Column(name = "name")
 	private String name;
@@ -41,9 +41,7 @@ public class Carrier implements Auditable, VersionLockable {
 	@Column(name = "description")
 	private String description;
 
-	/**
-	 * Tags can be used for technical filtering (e.g. "zero-fee") or for expressing customer preferences.
-	 */
+	/** Tags can be used for technical filtering (e.g. "zero-fee") or for expressing customer preferences. */
 	@Column(name = "tags")
 	private Set<String> tags = new TreeSet<String>();
 
@@ -56,7 +54,7 @@ public class Carrier implements Auditable, VersionLockable {
 	@Column(name = "warning_msg", nullable = true)
 	private String warningMessage;
 	
-	/*
+	/**
 	 * JPA Optimistic lock
 	 */
 	@Version

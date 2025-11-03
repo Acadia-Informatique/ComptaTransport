@@ -6,7 +6,7 @@ CREATE TABLE `CARRIER` (
   `label` varchar(64) NOT NULL COMMENT 'inspiré de X3',
   `description` varchar(256) DEFAULT NULL COMMENT 'libre, pour doc.',
   `group_name` varchar(32) DEFAULT NULL COMMENT 'Pour le contrôle, tiré de la feuille Excel',
-  `tags` varchar(256) DEFAULT NULL COMMENT 'qualification tech ou pour les préférences client',
+  `tags` varchar(256) DEFAULT NULL COMMENT '"semicolon-separated string", qualification tech ou pour les préférences client',
   `warning_msg` varchar(64) DEFAULT NULL COMMENT 'Pour le contrôle',
   `_v_lock` bigint unsigned NOT NULL DEFAULT '0' COMMENT '(technical: JPA @Version)',
   `_date_created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '(audit)',

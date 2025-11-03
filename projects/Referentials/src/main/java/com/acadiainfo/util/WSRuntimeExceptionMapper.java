@@ -1,10 +1,16 @@
 package com.acadiainfo.util;
 
 
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response.Status;
 import jakarta.ws.rs.ext.ExceptionMapper;
 
+/**
+ * Last chance to provide some readable error message for WS calls.
+ * Messages caught at this level are unlikely to be localized (to french, namely).
+ */
 @jakarta.ws.rs.ext.Provider
 public class WSRuntimeExceptionMapper implements ExceptionMapper<RuntimeException> {
 	private static final java.util.logging.Logger logger
@@ -17,7 +23,13 @@ public class WSRuntimeExceptionMapper implements ExceptionMapper<RuntimeExceptio
 		int responseStatus;
 		String responseMessage;
 
-		if (exc instanceof jakarta.ws.rs.WebApplicationException) {
+		if (exc instanceof jakarta.persistence.OptimisticLockException) {
+			responseStatus = Response.Status.CONFLICT.getStatusCode();
+			responseMessage = "JPA Optimistic lock error : " + exc.getMessage();
+		} else if (exc instanceof com.acadiainfo.util.DataIntegrityViolationException) {
+			responseStatus = Response.Status.BAD_REQUEST.getStatusCode();
+			responseMessage = "Data integrity violation : " + exc.getMessage();
+		} else if (exc instanceof jakarta.ws.rs.WebApplicationException) {
 			Response webappResponse = ((jakarta.ws.rs.WebApplicationException) exc).getResponse();
 			
 			responseStatus = webappResponse.getStatus(); 
