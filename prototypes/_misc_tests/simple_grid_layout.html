@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>test bootstrap</title>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+	<style>
+		.custom-3b-layout {
+			display: grid;
+			grid-template-columns: auto;
+			grid-template-rows: auto auto auto;
+			grid-template-areas:
+				"header"
+				"sidebar"
+				"main";
+		}
+
+
+		.custom-3b-header {
+			grid-area:header;
+		}
+		.custom-3b-sidebar {
+			grid-area:sidebar;
+		}
+		.custom-3b-main {
+			grid-area:main;
+		}
+
+		/* Custom styles for large devices (≥992px) */
+		@media only screen and (min-width: 992px) {
+			.custom-3b-layout {
+				display: grid;
+				grid-template-columns: 5fr 2fr;
+				grid-template-rows: 100px auto;
+				grid-template-areas:
+					"header sidebar"
+					"main  sidebar";
+
+			}
+			.custom-3b-sidebar {
+				grid-area:sidebar;
+				height: 100vh;
+			}
+		}
+
+
+
+		.buildingblock {
+			border: 30px outset grey;
+		}
+
+
+
+	</style>
+</head>
+<body>
+	<div class="container-fluid custom-3b-layout">
+		<div class="buildingblock custom-3b-header">HEAD</div>
+		<div class="buildingblock custom-3b-sidebar">RIGHT_PANEL</div>
+		<div class="buildingblock custom-3b-main">EDITOR</div>
+	</div>
+</body>
+</html>
