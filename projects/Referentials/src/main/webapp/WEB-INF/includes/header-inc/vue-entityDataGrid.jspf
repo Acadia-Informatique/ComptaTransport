@@ -47,7 +47,8 @@ Dependencies :
 					],
 					inferColumns: true, // default is true
 					confirmDelete: true, // default is false
-					selectRowAction : 'none' // among 'none', 'edit' or function(entity) ; default is 'none'
+					selectRowAction : 'none', // among 'none', 'edit' or function(entity) ; default is 'none'
+					payloadProcessor: null // function(entityPayload) which modifies its argument before sending ; default is null
 				}
 			}
 		},
@@ -61,7 +62,7 @@ Dependencies :
 				_technical_key_seq: 0, // sequence counter, used to uniquely identify rows in grid
 			};
 		},
-		watch: {
+		watch:{
 			columnList(){
 				this.$nextTick(() => {
 					this.$refs.columnTooltip.forEach(el => {
@@ -71,7 +72,7 @@ Dependencies :
 			},
 			resourceUri(v){
 				console.debug("resourceUri changed : ", v);
-				this.refreshFullGrid();				
+				this.refreshFullGrid();
 			}
 		},
 		mounted(){
@@ -227,15 +228,15 @@ Dependencies :
 				}
 				this.editingEntity = null;
 				this.editingValidation.clear();
-				
+
 				this.selectedEntity = null; //not necessarily related but...
 			},
 			selectRow(entity){
-				this.selectedEntity = entity;
-				
 				switch(this.config.selectRowAction) {
-				case 'none': break;
+				case 'none':
+					break;
 				case 'edit': {
+					this.selectedEntity = entity;
 					if (!this.isEditingRow(entity)){
 						this.startEditingRow(entity);
 					}
@@ -245,6 +246,7 @@ Dependencies :
 					if (!this.config.selectRowAction) {
 						break; /* default : same as 'none' */
 					} else if (typeof this.config.selectRowAction == 'function'){
+						this.selectedEntity = entity;
 						try {
 							this.config.selectRowAction(entity);
 						} catch(error){
@@ -252,12 +254,12 @@ Dependencies :
 						}
 					} else {
 						console.warn("Unrecognized config.selectRowAction in Component EntityDataGrid", this.config.selectRowAction);
-						break;
 					}
+					break;
 				}
 			},
 			isRowSelected(entity){
-				if (entity == null || this.selectedEntity == null) return false; 
+				if (entity == null || this.selectedEntity == null) return false;
 				return this.selectedEntity["#key"] == entity["#key"];
 			},
 			_buildPayload(entityObj) {
@@ -265,6 +267,12 @@ Dependencies :
 
 				//clear all technical markers
 				delete payloadObj["#key"];
+
+				//custom payload cleaner
+				if (this.config.payloadProcessor) {
+					this.config.payloadProcessor(payloadObj);
+				}
+
 				console.debug("Payload built", payloadObj);
 				return payloadObj;
 			},
@@ -411,10 +419,10 @@ Dependencies :
 				</th>
 				<th v-for="column in columnList.filter(c=>c.visible)"
 				  class="position-relative" :class="columnClassObj(column)"
-				  data-bs-toggle="tooltip" :title="column.description" ref="columnTooltip">					
+				  data-bs-toggle="tooltip" :title="column.description" ref="columnTooltip">
 					{{ column.label }}
 
-					<i v-if="column.descriptionIcon"  
+					<i v-if="column.descriptionIcon"
 					  class="position-absolute top-0 end-0 mt-1 me-1 bi" :class="'bi-'+column.descriptionIcon"></i>
 
 					<div v-if="column.sortable" class="sort-buttons">

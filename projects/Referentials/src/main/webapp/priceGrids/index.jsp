@@ -12,9 +12,16 @@
 
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityDataGrid.jspf" %>
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityAttributeComponents.jspf" %>
-  </head>
-  <body>
+
 	<style>
+		/* Custom styles for large devices (≥992px) */
+		@media only screen and (min-width: 992px) {
+			/* equivalent of lg-* versions of vh-100 and overflow-y */
+			div.custom-lg-scrollcolumn {
+				overflow-y: auto !important;
+				height: 100vh !important;
+			}
+		}
 
 		/* Some table column styling */
 		table#pricegrid-grid div.validation li::marker {
@@ -40,6 +47,14 @@
 		.list-leave-active {
 			position: absolute;
 		}
+
+
+
+		.p-datepicker-calendar-container {
+			background-color: pink;
+			
+		}
+
 	</style>
 
 </head>
@@ -49,10 +64,10 @@
 
 	<div id="app" class="container-fluid">
 		<div class="row">
-			<div class="col-7 vh-100 overflow-auto">
+			<div class="col-12 col-lg-5 custom-lg-scrollcolumn">
 				<entity-data-grid id="pricegrid-grid" resource-name="Liste de Grilles tarifaires" resource-uri="price-grids" identifier="id" :config="pricegridGridConfig"></entity-data-grid>
 			</div>
-			<div class="col-5 vh-100 overflow-auto">
+			<div class="col-12 col-lg-7 custom-lg-scrollcolumn">
 				<template v-if="selectedPriceGridId">
 					<entity-data-grid id="pricegridversion-grid" resource-name="Versions" :resource-uri="'price-grids/'+ selectedPriceGridId +'/versions'" identifier="id" :config="pricegridversionGridConfig"></entity-data-grid>
 				</template>
@@ -62,20 +77,10 @@
 			</div>
 		</div>
 	</div>
-
-
+	
 	<!-- =========================================================== -->
 	<!-- =============== Vue components ============================ -->
 
-	<!-- ========== (some) component templates ============== -->
-
-
-
-
-
-
-
-	<!-- ========== component logic ============== -->
 	<script type="module">
 
 		/* shared state for the page */
@@ -150,9 +155,14 @@
 					pricegridversionGridConfig : {
 						defaultNewEntity : {
 							"version": "YYYY-MM",
-							"published_date": null,
+							"publishedDate": null,
 						},
 						columns: [
+							{
+								// note : parent is fetched for other use cases.
+								name: "priceGrid",
+								visible: false
+							},
 							{
 								name: "id",
 								label: "ID",
@@ -167,7 +177,15 @@
 								description:"Identifiant de version (ordre par défaut)"
 							},
 							{
-								name: "published_date",
+								name: "description",
+								label: "Description",
+								renderer: "textarea",
+								editor: "textarea",
+								format: {pattern:/^(?:.|\n|\r){0,256}$/, errorMsg:"Longueur max: 256"},
+								description: "Description libre"
+							},
+							{
+								name: "publishedDate",
 								label: "Publié le",
 								//renderer: TODO date picker
 								//editor: TODO date picker, publishing tool ?
@@ -198,7 +216,10 @@
 							},
 						],
 						inferColumns: true,
-						confirmDelete: true
+						confirmDelete: true,
+						payloadProcessor: (entity)=>{
+							delete entity.priceGrid;
+						}
 					},
 
 				};
@@ -241,11 +262,12 @@
 		app.component("pricegrid-edit-launcher", {
 			props: ['modelValue'],
 			inject: ['pgid'],
-			template: `<a :href="'grid-edit.jsp?pgid='+pgid+'&version='+modelValue" class="btn btn-primary">Éditer la grille</a>`
+			template: `<a :href="'grid-edit.jsp?pgid='+pgid+'&pgvid='+modelValue" class="btn btn-primary">Éditer la grille</a>`
 		});
 
 
 		app.component("entity-data-grid", EntityDataGrid);
+
 		app.mount('#app');
 	</script>
 

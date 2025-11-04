@@ -30,7 +30,6 @@ public class PriceGridVersion implements Auditable, VersionLockable {
 	private Long id;
 
 	/** FK to parent entity */
-	@jakarta.json.bind.annotation.JsonbTransient
 	@ManyToOne
 	@JoinColumn(name = "price_grid_id", nullable = false)
 	private PriceGrid priceGrid;
@@ -39,10 +38,13 @@ public class PriceGridVersion implements Auditable, VersionLockable {
 	@Column(name = "version", nullable = false)
 	private String version;
 
+	/** detailed description, explanation, comments... */
+	@Column(name = "description")
+	private String description;
+
 	/** Publication date, may be in the future for planned publish */
 	@Column(name = "published_date")
 	private LocalDateTime publishedDate;
-
 
 	@Lob
 	@Column(name = "json_content")
@@ -82,6 +84,14 @@ public class PriceGridVersion implements Auditable, VersionLockable {
 
 	public void setVersion(String version) {
 		this.version = version;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
 	}
 
 	public LocalDateTime getPublishedDate() {

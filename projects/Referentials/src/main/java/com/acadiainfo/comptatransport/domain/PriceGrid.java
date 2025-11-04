@@ -33,7 +33,7 @@ public class PriceGrid implements Auditable, VersionLockable {
 	@Column(name = "tags")
 	private Set<String> tags = new TreeSet<String>();
 
-	/** detailed description, explanation, comments.. */
+	/** detailed description, explanation, comments... */
 	@Column(name = "description")
 	private String description;
 

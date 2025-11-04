@@ -6,8 +6,8 @@ import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 import com.acadiainfo.comptatransport.domain.VersionLockable;
+
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.Parameter;
 import jakarta.persistence.Query;
 
 /**
@@ -272,6 +272,10 @@ public abstract class CrudRepositoryImpl<T, K> {
 				continue;
 			}
 
+			if (this.excludeFromPatchBean(propertyName)) {
+				continue;
+			}
+
 			String getterName;
 			if (propertyType == Boolean.class ||  propertyType == Boolean.TYPE) {
 				getterName = "is" + propertyName;
@@ -291,6 +295,15 @@ public abstract class CrudRepositoryImpl<T, K> {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Override to change {@link #patchBean(Object, Object, boolean)}'s behavior.
+	 * @param propertyName - non-canonical name, starts with upperCase probably (it is "XYZ" as in setXYZ and getXYZ) 
+	 * @return true to exclude property from automatic copy (in updates).
+	 */
+	protected boolean excludeFromPatchBean(String propertyName) {
+		return false;
 	}
 
 	/** 

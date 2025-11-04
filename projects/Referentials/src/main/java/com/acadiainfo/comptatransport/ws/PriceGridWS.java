@@ -1,6 +1,5 @@
 package com.acadiainfo.comptatransport.ws;
 
-import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
@@ -12,14 +11,24 @@ import com.acadiainfo.util.WSUtils;
 
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.NamedQuery;
 import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.Query;
 import jakarta.servlet.http.HttpServletRequest;
-
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.*;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
+import jakarta.ws.rs.core.StreamingOutput;
+import jakarta.ws.rs.core.UriBuilder;
 
 @Stateless
 @Path("/price-grids")
@@ -164,6 +173,25 @@ public class PriceGridWS {
 	}
 
 	/**
+	 *  (utility for versions)
+	 * @param v_id
+	 * @param priceGrid
+	 * @return PriceGridVersion, throws {@link NotFoundException} if none consistent found
+	 */
+	private PriceGridVersion ensureConsistentGridVersion(Long v_id, PriceGrid priceGrid) {
+		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
+		PriceGridVersion priceGridVersion = priceGridVersionsRepo.findById(v_id);
+
+		if (priceGridVersion == null) {
+			throw new NotFoundException("Version de Grille Tarifaire peut-être supprimée depuis.");
+		}
+		if (!priceGrid.getId().equals(priceGridVersion.getPriceGrid().getId())) {
+			throw new NotFoundException("Version de Grille Tarifaire incohérente avec la Grille.");
+		}
+		return priceGridVersion;
+	}
+
+	/**
 	 * Get all versions of a PriceGrid
 	 * @param pgid - Parent PriceGrid id
 	 * @return
@@ -196,6 +224,9 @@ public class PriceGridWS {
 			if (priceGridVersion.getId() != null) {
 				throw new IllegalArgumentException("L'identifiant de Version de Grille Tarifaire ne doit pas être incluse dans le corps du message.");
 			}
+			if (priceGridVersion.getPriceGrid() != null) {
+				throw new IllegalArgumentException("Le corps de la requête ne doit pas comporter de Grille (\"priceGrid\").");
+			}
 
 			PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
 			PriceGridVersion duplicatePriceGridVersion = priceGridVersionsRepo
@@ -222,18 +253,7 @@ public class PriceGridWS {
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response versions_getOne_WS(@PathParam("id") Long id, @PathParam("v_id") Long v_id) {
 		PriceGrid priceGrid = ensureParentPricePrid(id);
-
-		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
-		PriceGridVersion priceGridVersion = priceGridVersionsRepo.findById(v_id);
-		
-		if (priceGridVersion == null) {
-			return WSUtils.response(Status.NOT_FOUND, servReq,
-			  "Version de Grille Tarifaire non-trouvée avec ces identifiants.");
-		}
-		if (!priceGrid.getId().equals(priceGridVersion.getPriceGrid().getId())) {
-			return WSUtils.response(Status.NOT_FOUND, servReq,
-			  "Version de Grille Tarifaire incohérente avec la Grille.");
-		}
+		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
 
 		return Response.ok().entity(priceGridVersion).build();
 	}
@@ -242,18 +262,7 @@ public class PriceGridWS {
 	@Path("/{id}/versions/{v_id}")
 	public Response versions_delete_WS(@PathParam("id") Long id, @PathParam("v_id") Long v_id) {
 		PriceGrid priceGrid = ensureParentPricePrid(id);
-
-		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
-		PriceGridVersion priceGridVersion = priceGridVersionsRepo.findById(v_id);
-		
-		if (priceGridVersion == null) {
-			return WSUtils.response(Status.NOT_FOUND, servReq,
-			  "Version de Grille Tarifaire peut-être supprimée depuis.");
-		}
-		if (!priceGrid.getId().equals(priceGridVersion.getPriceGrid().getId())) {
-			return WSUtils.response(Status.NOT_FOUND, servReq,
-			  "Version de Grille Tarifaire incohérente avec la Grille.");
-		}
+		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
 		
 		em.remove(priceGridVersion);
 		em.flush();
@@ -265,18 +274,7 @@ public class PriceGridWS {
 	@Consumes(value = MediaType.APPLICATION_JSON)
 	public Response versions_update_WS(@PathParam("id") Long id, @PathParam("v_id") Long v_id, PriceGridVersion priceGridVersion_payload) {
 		PriceGrid priceGrid = ensureParentPricePrid(id);
-
-		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
-		PriceGridVersion priceGridVersion = priceGridVersionsRepo.findById(v_id);
-		
-		if (priceGridVersion == null) {
-			return WSUtils.response(Status.NOT_FOUND, servReq,
-			  "Version de Grille Tarifaire peut-être supprimée depuis.");
-		}
-		if (!priceGrid.getId().equals(priceGridVersion.getPriceGrid().getId())) {
-			return WSUtils.response(Status.NOT_FOUND, servReq,
-			  "Version de Grille Tarifaire incohérente avec la Grille.");
-		}
+		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
 		
 		// payload check		
 		if (priceGridVersion_payload.getId() != null && !priceGridVersion_payload.getId().equals(v_id)) {
@@ -286,10 +284,11 @@ public class PriceGridWS {
 		}
 		if (priceGridVersion_payload.getPriceGrid() != null) {
 			return WSUtils.response(Status.BAD_REQUEST, servReq,
-			  "Le corps de la requête ne doit pas comporter de Grille. Il est impossible de la réattacher une Version à une autre Grille.");
+			  "Le corps de la requête ne doit pas comporter de Grille (\"priceGrid\"). Il est impossible de réattacher une Version à une autre Grille.");
 		}
 
 		// constraint check
+		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
 		PriceGridVersion duplicatePriceGridVersion = priceGridVersionsRepo
 		  .findVersionOfOnePriceGrid(id, priceGridVersion.getVersion());
 		if (!duplicatePriceGridVersion.getId().equals(v_id)) {
@@ -298,14 +297,10 @@ public class PriceGridWS {
 		}
 
 		try {
+			priceGridVersion_payload.setId(v_id);
+			priceGridVersion_payload.setPriceGrid(priceGrid);
 
-			priceGridVersion.set_v_lock(priceGridVersion_payload.get_v_lock());
-			priceGridVersion.setVersion(priceGridVersion_payload.getVersion());
-			priceGridVersion.setPublishedDate(priceGridVersion_payload.getPublishedDate());
-			em.flush();
-
-			// probably a bug involving the json_content @Lob
-			// priceGridVersionsRepo.update(priceGridVersion_payload, false);
+			priceGridVersionsRepo.update(priceGridVersion_payload, false);
 			return Response.noContent().build();
 		} catch (jakarta.persistence.OptimisticLockException exc) {
 			return WSUtils.response(Status.CONFLICT, servReq,
@@ -316,5 +311,42 @@ public class PriceGridWS {
 		}
 	}
 
+	@GET
+	@Path("/{id}/versions/{v_id}/jsonContent")
+	@Produces(value = MediaType.APPLICATION_JSON)
+	public String versions_getJsonContent(@PathParam("id") Long id, @PathParam("v_id") Long v_id) {
+		PriceGrid priceGrid = ensureParentPricePrid(id);
+		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
+		return priceGridVersion.getJsonContent();
+	}
+
+	@PUT
+	@Path("/{id}/versions/{v_id}/jsonContent")
+	@Consumes(value = MediaType.APPLICATION_JSON)
+	@jakarta.ejb.TransactionAttribute(jakarta.ejb.TransactionAttributeType.REQUIRES_NEW)
+	public Response versions_setJsonContent(@PathParam("id") Long id, @PathParam("v_id") Long v_id,
+			@QueryParam("_v_lock") Long _v_lock, String jsonContent) {
+		//BTW, we won't check the payload for JSON conformance
+		PriceGrid priceGrid = ensureParentPricePrid(id);
+		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
+
+		if (_v_lock == null) {
+			return WSUtils.response(Status.BAD_REQUEST, servReq,
+			  "Un numéro de version doit être passé en paramètre de requête (_v_lock)");
+		} else if (!_v_lock.equals(priceGridVersion.get_v_lock())) {
+			WSUtils.response(Status.CONFLICT, servReq,
+					"Version de Grille Tarifaire peut-être modifiée depuis (\"_v_lock\" non-concordant).");
+		}
+		
+		try {
+			priceGridVersion.setJsonContent(jsonContent);
+			em.flush(); // to make it fail faster, if needed
+			return Response.noContent().build();
+		} catch (jakarta.persistence.PersistenceException exc) {
+			Throwable cause = com.acadiainfo.util.ExceptionUtils.unwrapToSqlBasedException(exc);
+			throw com.acadiainfo.util.ExceptionUtils.sneakyThrow(cause);
+		}
+	}
+	
 
 }

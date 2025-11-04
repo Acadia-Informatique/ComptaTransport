@@ -27,6 +27,8 @@ public class WSUtils {
 
 	private static class JsonArrayElementWriter {
 		private jakarta.json.bind.Jsonb jsonb = jakarta.json.bind.JsonbBuilder.create();
+		// JsonbBuilder.create() uses a default JsonbConfig with encoding set to UTF-8
+
 		private volatile boolean isFirst = true;
 
 		public void writeOne(Object element, java.io.OutputStream out) {
@@ -49,7 +51,6 @@ public class WSUtils {
 			@Override
 			public void write(java.io.OutputStream out)
 					throws java.io.IOException, jakarta.ws.rs.WebApplicationException {
-
 				JsonArrayElementWriter writer = new JsonArrayElementWriter();
 				out.write('[');
 				entityStream.forEach(c -> writer.writeOne(c, out));

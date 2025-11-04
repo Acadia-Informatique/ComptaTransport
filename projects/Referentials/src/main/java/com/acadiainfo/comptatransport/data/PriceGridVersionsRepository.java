@@ -35,6 +35,14 @@ public class PriceGridVersionsRepository extends CrudRepositoryImpl<PriceGridVer
 	}
 
 	/**
+	 * That TEXT column behaves weirdly regarding transactions, worth investigating.  
+	 */
+	@Override
+	protected boolean excludeFromPatchBean(String propertyName) {
+		return "JsonContent".equalsIgnoreCase(propertyName);
+	}
+
+	/**
 	 * Substitute to a OneToMany relationship (PriceGrid.versions).
 	 * @param id - parent PriceGrid id
 	 * @return

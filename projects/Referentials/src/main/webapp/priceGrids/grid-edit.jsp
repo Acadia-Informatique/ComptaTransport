@@ -1,22 +1,24 @@
-<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>   
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<!doctype html>
-<html lang="en">
+<!doctype html><html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
 	<title>Édition de Grille tarifaire Transport</title>
-	
-	<%@ include file="/WEB-INF/includes/header-inc/client-stack.jspf" %>
-	
-	<script src="${libsUrl}/grid.js"></script>
+
+	<%@include file="/WEB-INF/includes/header-inc/client-stack.jspf"%>
+
+	<%@ include file="/WEB-INF/includes/header-inc/vue-entityAttributeComponents.jspf" %>
+
+	<script src="${libsUrl}/pricegrid.js"></script>
 
 	<script type="text/javascript">
 		"use strict";
 
-		// my Q&D data obj clone polyfill, used on VueJS reactive objects
-		window.deepClone = function(v){return JSON.parse(JSON.stringify(v));};
+		let params = new URL(document.location.toString()).searchParams;
+		var PRICE_GRID_ID          = params.get("pgid");
+		var PRICE_GRID_VERSION_ID  = params.get("pgvid");
 
 
 		class CommandeALivrer {
@@ -56,10 +58,6 @@
 
 	<style>
 		/** Bootstrap global overrides */
-		body {
-			background-color: rgb(235, 255, 254);
-		}
-
 		.accordion {
 			--bs-accordion-btn-color: black;
 			--bs-accordion-btn-bg: rgb(32, 211, 194);
@@ -67,22 +65,56 @@
 			--bs-accordion-active-bg: rgb(0, 0, 172);
 		}
 
-		/* Custom styles for large devices (≥992px) */
-		@media only screen and (min-width: 992px) {
-			div.pricinggrid-pane {
+		/** General layout */
+		#pricinggrids-builder {
+			display: grid;
+			grid-template-columns: auto;
+			grid-template-rows: auto auto auto;
+			grid-template-areas:
+				"header"
+				"sidebar"
+				"main";
+		}
+
+		div#header-pane {
+			grid-area: header;
+		}
+		div#tool-pane {
+			grid-area: sidebar;
+		}
+		div#pricinggrid-pane {
+			grid-area: main;
+			scroll-behavior: smooth;
+		}
+
+		@media only screen and (min-width: 992px) { /* Custom styles for large devices (≥992px) */
+			#pricinggrids-builder {
+				display: grid;
+				grid-template-columns: auto 25em;
+				grid-template-rows: auto 1fr;
+				grid-template-areas:
+					"header sidebar"
+					"main  sidebar";
+				column-gap: 0.5em;
+			}
+			div#tool-pane {
 				overflow-y: auto !important;
-				height: 100vh !important;
+				height: 100vh;
+			}
+			div#pricinggrid-pane {
+				overflow-y: auto !important;
+				height: 85vh !important;
 			}
 			div#gridViewport {
 				overflow-y: auto;
-				height: 85vh;
+				height: 60vh;
 			}
 		}
 
 
 		/** App specifics */
-		div.pricinggrid-pane {
-			scroll-behavior: smooth;
+		.tooltip-pre {
+			white-space: pre;
 		}
 		div#gridViewport {
 			border: 3px inset grey;
@@ -143,6 +175,11 @@
 			visibility: hidden;
 		}
 
+		/** Save button animation */
+		.bi-floppy2-fill {
+			transition: all 500ms;
+		}
+
 		/** List animations */
 		.list-move, /* apply transition to moving elements */
 		.list-enter-active,
@@ -166,98 +203,105 @@
 </head>
 
 <body>
-	<%@ include file="/WEB-INF/includes/body-inc/bs-confirmDialog.jspf" %>
-	
-	<div id="pricinggrids-builder">
-		<div class="container-fluid"><div class="row">
-			<div class="accordion shadow col-12 col-lg-5 col-xl-3 order-lg-last pt-2" id="tool-pane">
-				<div class="accordion-item">
-					<h2 class="accordion-header">
-						<button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
-							Test frais livraison
-						</button>
-					</h2>
-					<div id="collapseOne" class="accordion-collapse collapse show" data-bs-parent="#tool-pane">
-						<div class="accordion-body">
-							<pricingtest-form :ui_state="ui_state"></pricingtest-form>
-						</div>
+	<%@include file="/WEB-INF/includes/body-inc/bs-confirmDialog.jspf"%>
+
+	<div id="pricinggrids-builder" class="container-fluid">
+
+		<div id="header-pane" class="d-flex flex-row justify-content-between align-items-center me-2">
+			<a class="nav-link" href="./">&lt;&nbsp;Retour</a>
+
+			<template v-if="pgv_metadata">
+				<div class="d-flex flex-wrap align-items-center mx-3">
+				
+					<%--	
+					<i v-if="needSaving" role="button" @click="apiPutJsonContent"
+					  class="bi bi-floppy2-fill text-danger fs-1 me-2"></i>
+					<i v-else
+					  class="bi bi-floppy2-fill text-success fs-2 me-2"></i>
+					... more obvious, but changed to a single "mutating" element, to allow animation
+					--%>
+					<i class="bi bi-floppy2-fill me-2" 
+					  :role="needSaving ? 'button' : null"
+					  @click="needSaving ? apiPutJsonContent() : null"
+					  :class="needSaving ? ['text-danger','fs-1'] : ['text-success','fs-2']"></i>
+					  
+					<div class="fs-2 fw-bold me-2" ref="gridLabel">{{pgv_metadata.priceGrid.name}}</div>
+					<div class="fs-4 me-2" ref="versionLabel">{{pgv_metadata.version}}</div>
+					<text-tags v-model="pgv_metadata.priceGrid.tags"></text-tags>
+				</div>
+
+				<audit-info class="small text-nowrap" v-model="pgv_metadata.auditingInfo"></audit-info>
+			</template>
+		</div>
+
+		<div id="tool-pane" class="accordion shadow pt-2">
+			<div class="accordion-item">
+				<h2 class="accordion-header">
+					<button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+						Test frais livraison
+					</button>
+				</h2>
+				<div id="collapseOne" class="accordion-collapse collapse show" data-bs-parent="#tool-pane">
+					<div class="accordion-body">
+						<pricingtest-form :ui_state="ui_state"></pricingtest-form>
 					</div>
 				</div>
-				<div class="accordion-item">
-					<h2 class="accordion-header">
-						<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
-							Charger / Enregistrer
-						</button>
-					</h2>
-					<div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#tool-pane">
-						<div class="accordion-body">
-							<div class="input-group">
-								<div class="col-4">
-									<label class="col-form-label" for="inputSysName">Système</label>
-								</div>
-								<div class="col-8">
-									<input class="form-control" id="inputSysName" placeholder="Nom du système"
-										v-model.trim="ui_state.system.name">
-								</div>
-								<div class="form-text">
-									Nom du système de grilles (ex. par compagnie : Acadia, Chronopost, UPS, etc.)
-								</div>
+			</div>
+			<div class="accordion-item">
+				<h2 class="accordion-header">
+					<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+						Charger / Enregistrer
+					</button>
+				</h2>
+				<div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#tool-pane">
+					<div class="accordion-body">
+						<div class="d-flex flex-column">
+							<div class="input-group mb-3 col-3">
+								<button class="btn btn-primary"                @click="localStorage_saveSystem">Sauver une copie d'urgence</button>
+								<button class="btn btn-primary bi bi-cassette" @click="localStorage_saveSystem"></button>
 							</div>
-							<hr>
-
-							<div class="d-flex">
-								<button class="btn btn-primary mb-2" @click="localStorage_saveSystem">Sauver système "{{ui_state.system.name}}"</button>
+							<div v-if="localStorage_hasSystem" class="input-group mb-3 col-3">
+								<button class="btn btn-warning"             @click="localStorage_loadSystem">Charger la copie d'urgence</button>
+								<button class="btn btn-danger bi bi-trash"  @click="localStorage_delSystem"></button>
 							</div>
-
-							<div v-for="(name, idx) of localStorage_listSystems" class="d-flex align-items-baseline mb-1">
-								<button class="btn btn-warning bi" :class="idx==0?'bi-bookmark-heart':'bi-bookmark'"
-								  @click="localStorage_loadSystem(name)">
-									Charger système "{{name}}"
-								</button>
-
-								<button class="btn btn-danger bi bi-bookmark-x" @click="localStorage_delSystem(name)"></button>
-							</div>
-
-						</div>
-					</div>
-				</div>
-				<div class="accordion-item">
-					<h2 class="accordion-header">
-						<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
-							Export / Import
-						</button>
-					</h2>
-					<div id="collapseThree" class="accordion-collapse collapse" data-bs-parent="#tool-pane">
-						<div class="accordion-body">
-							<button class="btn btn-outline-primary" @click="downloadSystemByLink">Exporter système de grilles</button>
-							<a class="hiddenFileImpExp" ref="downloadSystemLink">Download link</a>
-							<div class="form-text">
-								Vous trouverez les fichiers exportés dans les "Téléchargements" de votre navigateur,
-								nommés par ex. {{ downloadSystemByLink_filename() }}.
-							</div>
-
-							<button class="btn btn-outline-primary" @click="$refs.uploadSystemInput.click()">Importer</button>
-							<input class="hiddenFileImpExp" type="file" @change="uploadSystem" ref="uploadSystemInput" accept=".grille">
-
-							<br><A href="./tarifs_ACA_202509.grille" download="tarifs_ACA_202509.grille">Exemple de fichier à importer</A>
 						</div>
 					</div>
 				</div>
 			</div>
-			<div class="pricinggrid-pane col-12 col-lg-7 col-xl-9 pt-2">
-				<pricinggrids-tabs :ui_state="ui_state"></pricinggrids-tabs>
+			<div class="accordion-item">
+				<h2 class="accordion-header">
+					<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+						Export / Import
+					</button>
+				</h2>
+				<div id="collapseThree" class="accordion-collapse collapse" data-bs-parent="#tool-pane">
+					<div class="accordion-body">
+						<button class="btn btn-outline-primary" @click="downloadSystemByLink">Exporter système de grilles</button>
+						<a class="hiddenFileImpExp" ref="downloadSystemLink">Download link</a>
+						<div class="form-text">
+							Vous trouverez les fichiers exportés dans les "Téléchargements" de votre navigateur,
+							nommés par ex. {{ downloadSystemByLink_filename() }}.
+						</div>
 
-				<div id="gridViewport" class="mb-3">
-					<pricinggrids-grid :ui_state="ui_state"></pricinggrids-grid>
+						<button class="btn btn-outline-primary" @click="$refs.uploadSystemInput.click()">Importer</button>
+						<input class="hiddenFileImpExp" type="file" @change="uploadSystem" ref="uploadSystemInput" accept=".grille">
+
+						<br><a href="./tarifs_ACA_202509.grille" download="tarifs_ACA_202509.grille">Exemple de fichier à importer</a>
+					</div>
 				</div>
-
-				<h3 id="dimension-list"><a href="#dimension-list">Légende</a></h3>
-				<pricinggrids-dim-list :ui_state="ui_state"></pricinggrids-dim-list>
 			</div>
-		</div></div>
+		</div>
 
+		<div id="pricinggrid-pane" class="pt-2">
+			<pricinggrids-tabs :ui_state="ui_state"></pricinggrids-tabs>
 
+			<div id="gridViewport" class="mb-3">
+				<pricinggrids-grid :ui_state="ui_state"></pricinggrids-grid>
+			</div>
 
+			<h3 id="dimension-list"><a href="#dimension-list">Légende</a></h3>
+			<pricinggrids-dim-list :ui_state="ui_state"></pricinggrids-dim-list>
+		</div>
 
 	</div><!-- app end -->
 
@@ -710,7 +754,7 @@
 
 	<script type="text/x-template" id="PricingTest-Form-template">
 		<form>
-			<div class="d-flex justify-content-evenly">
+			<div class="d-flex column-gap-3">
 				<div><input type="radio" v-model="ui_state.testPricedObj.market" value="BTB"> BTB</div>
 				<div><input type="radio" v-model="ui_state.testPricedObj.market" value="BTC"> BTC</div>
 				<div><input type="checkbox" v-model="ui_state.testPricedObj.isIntegration" value="true"> Integration</div>
@@ -874,7 +918,7 @@
 
 	<!-- ========== component logic ============== -->
 	<script type="module">
-		
+
 		let typicalRawCoords = Object.entries(new CommandeALivrer(0, "01000").getPPGRawCoordinates()); //arguably typical ?...
 
 		const numericRawCoords =  typicalRawCoords.filter(([k,v]) => typeof v == "number").map(([k,v]) => k);
@@ -911,6 +955,7 @@
 		const gridBuilderApp = Vue.createApp({
 			data() {
 				return {
+					pgv_metadata:null,
 					ui_state: { // TODO utiliser un bus global ?...
 						system: DEFAULT_PRICINGSYSTEM,
 						currentGrid: DEFAULT_PRICINGSYSTEM.grids[0],
@@ -950,56 +995,100 @@
 
 						}
 					},
-					localStorage_listSystems:[],
+					localStorage_hasSystem : false, // since cannot make localStorage reactive ;-)
+					needSaving: false, // "dirty" mark on PriceGrids
 				}
 			},
+			watch:{
+				"ui_state.system": {
+		            handler: function(){
+						this.needSaving = true;
+                    },
+            		deep: true,
+            		immediate: false
+				},
+				needSaving(v){
+					if (v) {console.log("sauvez-moi");}
+else  {console.log("sans façon");}
+					
+				} 
+
+        	},
 			mounted(){
-				console.info(`LocalStorage read for "list-systems"`);
-				let list = localStorage.getItem("list-systems");
-				list = list ? JSON.parse(list) : [];
-				this.localStorage_listSystems.push(...list); //WATCHER BUG : not triggering (which is taken advantage of here)
+				this.apiGetMetadata();
+				this.apiGetJsonContent();
 
-				//autoload of 1st one
-				if (this.localStorage_listSystems.length>0) {
-					console.info(`Autoload of 1st system in "list-systems"`);
-					this.localStorage_loadSystem(this.localStorage_listSystems[0], false);
-				}
+				let saved = localStorage.getItem("save.system");
+				this.localStorage_hasSystem = !(saved == null || typeof saved == "undefined" || saved == "");
 
-				//autosave of current
 				window.addEventListener('beforeunload',()=>{
-					console.info(`Emergency autosave of current`);
+					console.info(`Emergency autosave of current PriceGrid to localStorage`);
 					this.localStorage_saveSystem(false);
 				});
 			},
-			watch:{
-				'localStorage_listSystems'(newValue){
-					console.info(`LocalStorage written for "list-systems"`);
-					localStorage.setItem("list-systems", JSON.stringify(newValue));
-				},
-				'ui_state.system.name'(newValue){
-					document.title = `Prototype - Tarifs de port "${newValue}"`;
-				},
-			},
 			methods: {
-				localStorage_saveSystem(useAlert = true){
-					let name = this.ui_state.system.name;
-					let alreadyExist = this.localStorage_listSystems.includes(name);
+				loadSystemFromString(data){
+					if (data) {
+						this.ui_state.system = PricingSystem.fromJSON(data);
+						this.ui_state.currentGrid = this.ui_state.system.grids[0];
+					} else {
+						throw new Error("Could not load from empty data");
+					}
+					this.$nextTick(() => {						
+						this.needSaving = false;
+					});
+				},
+				apiGetMetadata(){
+					let metadataUri =`price-grids/\${PRICE_GRID_ID}/versions/\${PRICE_GRID_VERSION_ID}`;
 
+					axios_backend.get(metadataUri)
+					.then(response => {
+						this.pgv_metadata = response.data;
+						this.$nextTick(() => {
+							let gridDesc = this.pgv_metadata.priceGrid.description;
+							let versionDesc = this.pgv_metadata.description;
+
+							if (gridDesc) new bootstrap.Tooltip(this.$refs.gridLabel, {title:gridDesc, customClass:"tooltip-pre"});
+							if (versionDesc) new bootstrap.Tooltip(this.$refs.versionLabel, {title:versionDesc, customClass:"tooltip-pre"});
+						});
+					})
+					.catch(error => {
+						showAxiosErrorDialog(error);
+					})
+				},
+				apiGetJsonContent(){
+					let dataUri =`price-grids/\${PRICE_GRID_ID}/versions/\${PRICE_GRID_VERSION_ID}/jsonContent`;
+
+					axios_backend.get(dataUri)
+					.then(response => {
+						this.loadSystemFromString(response.data);
+					})
+					.catch(error => {
+						showAxiosErrorDialog(error);
+					})
+				},
+				apiPutJsonContent(){
+					let _v_lock = this.pgv_metadata._v_lock;
+					let dataUri =`price-grids/\${PRICE_GRID_ID}/versions/\${PRICE_GRID_VERSION_ID}/jsonContent?_v_lock=\${_v_lock}`;
+
+					axios_backend.put(dataUri, this.ui_state.system)
+					.then(response => {
+						this.apiGetMetadata();
+						this.needSaving = false;
+					})
+					.catch(error => {
+						showAxiosErrorDialog(error);
+					})
+				},
+				localStorage_saveSystem(useAlert = true){
 					let handler = ()=>{
 						let data = JSON.stringify(this.ui_state.system);
-						localStorage.setItem(`system.${name}`, data);
-
-						//update list : save to 1st position
-						if (alreadyExist){
-							const index = this.localStorage_listSystems.indexOf(name);
-							if (index > -1) this.localStorage_listSystems.splice(index, 1);
-						}
-						this.localStorage_listSystems.unshift(name);
-						this.localStorage_listSystems = this.localStorage_listSystems.slice(); //WATCHER BUG : force trigger
+						localStorage.setItem("save.system", data);
+						this.localStorage_hasSystem = true;
 					};
 
-					if (useAlert && alreadyExist) {
-						confirm_dialog("Stockage local",`Écraser  sauvegarde "${name}" ?`,{
+					if (useAlert && this.localStorage_hasSystem) {
+						confirm_dialog("Stockage local","Écraser sauvegarde d'urgence ?",{
 							label:'Continuer', class: 'btn-primary', autofocus:true,
 							handler
 						}, {
@@ -1011,17 +1100,12 @@
 				},
 				localStorage_loadSystem(name, useAlert = true){
 					let handler = ()=>{
-						let data = localStorage.getItem(`system.${name}`);
-						if (data) {
-							this.ui_state.system = PricingSystem.fromJSON(data);
-							this.ui_state.currentGrid = this.ui_state.system.grids[0];
-						} else {
-							throw new Error("Could not retrieve Pricing system from localStorage", name);
-						}
+						let data = localStorage.getItem("save.system");
+						this.loadSystemFromString(data);
 					};
 
 					if (useAlert) {
-						confirm_dialog("Stockage local",`Attention, en ouvrant cette sauvegarde "${name}", vous allez remplacer toutes les grilles courantes par la sauvegarde.`,{
+						confirm_dialog("Stockage local","Attention, en ouvrant cette sauvegarde d'urgence, vous allez remplacer toutes les grilles courantes par la sauvegarde.",{
 							label:'Continuer', class: 'btn-primary', autofocus:true,
 							handler
 						}, {
@@ -1031,16 +1115,12 @@
 						handler();
 					}
 				},
-				localStorage_delSystem(name){ // option for localStorage.clear(); ?
-					confirm_dialog("Stockage local",`Supprimer cette sauvegarde "${name}" ?`,{
+				localStorage_delSystem(){ // option for localStorage.clear(); ?
+					confirm_dialog("Stockage local","Supprimer la sauvegarde d'urgence ?",{
 						label:'Continuer', class: 'btn-primary', autofocus:true,
 						handler : ()=>{
-							localStorage.removeItem(`system.${name}`);
-
-							//update list
-							const index = this.localStorage_listSystems.indexOf(name);
-							if (index > -1) this.localStorage_listSystems.splice(index, 1);
-							this.localStorage_listSystems = this.localStorage_listSystems.slice(); //WATCHER BUG : force trigger
+							localStorage.removeItem("save.system");
+							this.localStorage_hasSystem = false;
 						}
 					}, {
 						label:'Abandonner', class: 'btn-secondary',
@@ -1059,22 +1139,32 @@
 					el.click();
 				},
 				downloadSystemByLink_filename(){
-					return "tarifs_" + encodeURIComponent(this.ui_state.system.name) + ".grille";
+					if (!this.pgv_metadata) return null;
+					let dateTag = ((dtUTC) => { /* expected data format by JaxRS : "2025-10-30T10:24:43Z[UTC]" */
+						if (dtUTC == null || dtUTC == "") return "";
+						if (/^(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})(\.\d+)?Z\[UTC\]$/.test(dtUTC)) {
+							dtUTC = dtUTC.slice(0, -("[UTC]".length)); //changed to a JS supported "simplified ISO8061"
+							let date = new Date(Date.parse(dtUTC));
+							return date.toISOString().replaceAll(/[^\d]/g, "").slice(0,12);
+						} else {
+							return "";
+						}
+					})(this.pgv_metadata?.auditingInfo?.dateModified);
+
+					return this.pgv_metadata.priceGrid.name
+						+ "__" + this.pgv_metadata.version
+						+(dateTag ? "["+ dateTag+"]" : "")
+						+".grille";
 				},
 				uploadSystem(event){
 					let inputFld = event.target;
 					let file = (inputFld?.files && inputFld.files.length > 0) ?  inputFld.files[0] : null;
 					if (!file) return; // silently
-					// if (file.type && file.type != 'application/json') {
-					// 	alert_dialog("Import de Grille", "Import impossible, format de fichier attendu : JSON");
-					// 	return;
-					// }
 					const fileReader = new FileReader();
 					fileReader.onload = ()=>{
 						try {
-							this.ui_state.system = PricingSystem.fromJSON(fileReader.result);
-							this.ui_state.currentGrid = this.ui_state.system.grids[0];
-						}catch(err){
+							this.loadSystemFromString(fileReader.result);
+						} catch(err){
 							alert_dialog("Import de Grille", "Erreur d'import: "+ err);
 						}
 					};
@@ -1085,11 +1175,6 @@
 				}
 
 			},
-			computed:{
-
-			}
-
-
 		});
 
 
@@ -1852,42 +1937,6 @@
 		};
 
 
-
-
-		/** Rounding to cents */
-		var MoneyInput = {
-			props: ['modelValue', 'modelModifiers', 'decimals'],
-			//	modelValue: optional Number ?,
-			//	modelModifiers: capture and ignore
-			// },
-			data(){
-				return {
-					decimalsInt: 2,
-					rounding: 0
-				}
-			},
-			emits: ['update:modelValue'],
-			created(){
-				if (this.decimals)
-					this.decimalsInt = parseInt(this.decimals,10);
-				this.rounding = Math.pow(10, this.decimalsInt);
-			},
-			computed: {
-				value: {
-					get() {
-						return typeof this.modelValue == 'number' ?  this.modelValue.toFixed(this.decimalsInt) : "";
-					},
-					set(v) {
-						v = Number.parseFloat(v);
-						v = Number.isNaN(v) ? v = null : Math.round(v * this.rounding) / this.rounding; // shouldn't it be Math.floor ?...maybe not for float decimals :-(
-						this.$forceUpdate(); // needed to "visually" truncate the field, when the value is *not* changed by adding 0.00001
-						this.$emit('update:modelValue', v);
-					}
-				}
-			},
-			template: `<input type="number" :step="1/rounding" v-model.lazy.number="value" class="money-input"/>`
-		};
-
 		/** Splitting to array */
 		var SplittingInput = {
 			props: {
@@ -1911,6 +1960,9 @@
 			template: `<input v-model="value" />`
 		};
 
+
+		gridBuilderApp.component("audit-info", AuditingInfoRenderer);
+		gridBuilderApp.component("text-tags", TextTagsComponent);
 
 		gridBuilderApp.component("money-input", MoneyInput);
 		gridBuilderApp.component("splitting-input", SplittingInput);
@@ -1938,3 +1990,4 @@
 
 
 </html>
+
