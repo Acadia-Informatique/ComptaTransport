@@ -1,3 +1,6 @@
+# Maven compile folder
+target/
+
 # Compiled class file
 *.class
 
