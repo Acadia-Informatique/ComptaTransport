@@ -12,10 +12,9 @@
 
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityDataGrid.jspf" %>
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityAttributeComponents.jspf" %>
-  </head>
-  <body>
+
 	<style>
-	
+
 		/* Some table column styling */
 		table#carrier-grid th.identifier-col::after {
 			position: absolute;
@@ -64,15 +63,7 @@
 	<!-- =========================================================== -->
 	<!-- =============== Vue components ============================ -->
 
-	<!-- ========== (some) component templates ============== -->
 
-
-
-
-
-
-
-	<!-- ========== component logic ============== -->
 	<script type="module">
 
 		/* shared state for the page */
@@ -101,7 +92,7 @@
 								label: "Libellé",
 								mandatory: true,
 								format: {pattern:/^.{0,64}$/, errorMsg:"Longueur max: 64"},
-								description:"Libellé libre"								
+								description:"Libellé libre"
 							},
 							{
 								name: "shortName",
@@ -124,7 +115,7 @@
 								renderer: "renderer-carrier-tags",
 								editor: "editor-carrier-tags",
 								descriptionIcon : "exclamation-diamond",
-								description: "Description complémentaire, notamment utilisé par le module Clients forfaits" 
+								description: "Description complémentaire, notamment utilisé par le module Clients forfaits"
 							},
 							{
 								name: "warningMessage",
@@ -151,7 +142,7 @@
 							},
 							{
 								name: "auditingInfo",
-								label: "(audit)",			
+								label: "(audit)",
 								width: "50px",
 								sortable: false,
 								editable: false,

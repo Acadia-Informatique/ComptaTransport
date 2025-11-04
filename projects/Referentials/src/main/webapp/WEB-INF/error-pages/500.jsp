@@ -25,8 +25,9 @@
 			<li>avec l'<a href="http://192.168.0.8/glpi/">outil de ticketing IT-helpdesk</a></li>
 			<li>sur Microsoft Teams : contactez <code>exploitIT</code></li>
 		</ul>
-		<!-- TODO stabiliser l'URL du ticketing IT-helpdesk -->
 	</p>
+
+			<!-- TODO stabiliser l'URL du ticketing IT-helpdesk -->
 	
 	<p>
 		Afin de faciliter le traitement du problème, vous pouvez leur transmettre les informations suivantes :
@@ -69,5 +70,3 @@ The Servlet name of the servlet that the errored request was dispatched to/
 
 javax.servlet.error.status_code
  -->
-</body>
-</html>
