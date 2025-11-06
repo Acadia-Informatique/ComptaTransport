@@ -1,0 +1,69 @@
+
+<!DOCTYPE html>
+<html lang="en">
+		<head>
+			<meta charset="UTF-8" />
+			<title>VueJS Slots with inject 2</title>
+
+			<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+		</head>
+		<body>
+
+		<H1>application to something like "configurable children"</H1>
+		<div id="app">
+			<restclient>
+				Recette :
+				<ul>
+					<li>Eggs : <qparam type="number" name="eggs"></param></li>
+					<li>Spam : <qparam type="text" name="spam"></param></li>
+				</ul>
+			</restclient>
+		</div>
+
+
+
+		<script>
+			const { createApp, ref, computed } = Vue;
+
+			var SomeRestClient = {
+				data(){
+					return {
+						internalQueryParams: {
+							"eggs": 3,
+							"spam" : "excellent"
+						}
+					};
+				},
+				provide(){
+					return {
+						queryParams: computed({get:()=>this.internalQueryParams, set:(v)=>this.internalQueryParams=v})
+					};
+				},
+				computed:{
+					querystring(){
+						return Object.keys(this.internalQueryParams)
+						   .map(k => k + "=" + this.internalQueryParams[k])
+						   .reduce((acc, value) => acc + "&" + value, "?some=one");
+					}
+				},
+				template: ` URL : baseurl/path{{ querystring }} <br>
+							<div>
+								<slot></slot>
+							</div>`
+			};
+
+
+			var ParamComponent = {
+				inject: ['queryParams'],
+				props: ['name'],
+				template: `<input v-model="queryParams[name]"/>`
+			};
+
+
+			const app = createApp({});
+			app.component('restclient', SomeRestClient);
+			app.component('qparam', ParamComponent);
+			app.mount('#app');
+		</script>
+	</body>
+</html>

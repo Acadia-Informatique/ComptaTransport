@@ -5,7 +5,9 @@
 - confirm_dialog
     usage :
 		confirm_dialog ([title,] message [,choice1, choice2, etc.]);
-	where each "choice" object gives a button, according to its attributes :
+	where :
+	- "message" is displayed as "white-space:pre", truncated at a predefined length (look for TXT_MAX_LENGTH).
+	- each "choice" object gives a button, according to its attributes :
 		- label : text on the button (if empty, the button will not be displayed)
 		- class (optional) : CSS class name(s) for the button
 		- handler (optional) : callback function called for this choice (if not set, makes a default close button (X) to appear)
@@ -38,11 +40,13 @@ function confirm_dialog(txt, ...choiceObjs) {
 	}
 	const modalTitle = modal.querySelector(".modal-title");
 	modalTitle.textContent = title;
-
+	
 	//- main text (required)
+	const TXT_MAX_LENGTH = 512; // so arbitrary...
+	if (txt.length > TXT_MAX_LENGTH) txt = txt.substring(0, TXT_MAX_LENGTH) + "[...]" 
 	const modalMsg = modal.querySelector(".msg");
-	modalMsg.textContent = txt; //note : main text is a mandatory arg
-
+	modalMsg.textContent = txt;
+	
 	// 2) default close button (X)
 	const buttonClose = modal.querySelector(".btn-close");
 	if (choiceObjs && choiceObjs.length > 0) {
@@ -131,7 +135,7 @@ function alert_dialog(txt1, txt2) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="msg"></div>
+                <div class="msg" style="white-space:pre-wrap"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" id="button-template" class="btn col mx-2"></button>

@@ -6,7 +6,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-	<title>Grilles tarifaires</title>
+	<title>Grilles tarifaires de port</title>
 
 	<%@ include file="/WEB-INF/includes/header-inc/client-stack.jspf" %>
 
@@ -52,7 +52,7 @@
 
 		.p-datepicker-calendar-container {
 			background-color: pink;
-			
+
 		}
 
 	</style>
@@ -65,19 +65,19 @@
 	<div id="app" class="container-fluid">
 		<div class="row">
 			<div class="col-12 col-lg-5 custom-lg-scrollcolumn">
-				<entity-data-grid id="pricegrid-grid" resource-name="Liste de Grilles tarifaires" resource-uri="price-grids" identifier="id" :config="pricegridGridConfig"></entity-data-grid>
+				<entity-data-grid id="pricegrid-grid" resource-name="Grilles tarifaires de port" resource-uri="price-grids" identifier="id" :config="pricegridGridConfig"></entity-data-grid>
 			</div>
 			<div class="col-12 col-lg-7 custom-lg-scrollcolumn">
 				<template v-if="selectedPriceGridId">
 					<entity-data-grid id="pricegridversion-grid" resource-name="Versions" :resource-uri="'price-grids/'+ selectedPriceGridId +'/versions'" identifier="id" :config="pricegridversionGridConfig"></entity-data-grid>
 				</template>
-				<div v-else>
+				<div v-else class="mt-5">
 					Sélectionnez une grille pour en voir les versions.
 				</div>
 			</div>
 		</div>
 	</div>
-	
+
 	<!-- =========================================================== -->
 	<!-- =============== Vue components ============================ -->
 
@@ -128,7 +128,7 @@
 								renderer: "textarea",
 								editor: "textarea",
 								format: {pattern:/^(?:.|\n|\r){0,256}$/, errorMsg:"Longueur max: 256"},
-								description: "Description libre"
+								description: "Commentaire libre"
 							},
 							{
 								name: "_v_lock",
@@ -173,7 +173,7 @@
 								name: "version",
 								label: "Version",
 								mandatory: true,
-								format: {pattern:/^[\w-]{0,64}$/, errorMsg:"64 caractères max., parmi a..z, 0..9, -, _"},
+								format: {pattern:/^.{0,64}$/, errorMsg:"Longueur max: 64"},
 								description:"Identifiant de version (ordre par défaut)"
 							},
 							{
@@ -182,7 +182,7 @@
 								renderer: "textarea",
 								editor: "textarea",
 								format: {pattern:/^(?:.|\n|\r){0,256}$/, errorMsg:"Longueur max: 256"},
-								description: "Description libre"
+								description: "Commentaire libre"
 							},
 							{
 								name: "publishedDate",
@@ -193,11 +193,17 @@
 							},
 							{
 								name: "id",
-								label: "Éditer la grille",
-								editable: false,
-								visible: true,
+								label: "Éditer",
+								width: "150px",						
 								renderer: "pricegrid-edit-launcher",
-								editor:   "pricegrid-edit-launcher"
+								editor: "none"
+							},
+							{
+								name: "#uri",
+								label: "Copie",
+								width: "100px",
+								renderer: "pricegrid-action-copy",
+								editor: "none"
 							},
 							{
 								name: "_v_lock",
@@ -210,7 +216,6 @@
 								name: "auditingInfo",
 								label: "",
 								width: "50px",
-								sortable: false,
 								editable: false,
 								renderer: "renderer-auditing-info"
 							},
@@ -260,9 +265,37 @@
 		app.component("renderer-auditing-info", AuditingInfoRenderer_IconWithPopover);
 
 		app.component("pricegrid-edit-launcher", {
-			props: ['modelValue'],
-			inject: ['pgid'],
-			template: `<a :href="'grid-edit.jsp?pgid='+pgid+'&pgvid='+modelValue" class="btn btn-primary">Éditer la grille</a>`
+			props: ["modelValue"],
+			inject: ["pgid"],
+			template: `<a role="button" :href="'grid-edit.jsp?pgid='+pgid+'&pgvid='+modelValue" class="btn btn-primary bi bi-arrow-return-right">Éditer la grille</a>`
+		});
+
+		app.component("pricegrid-action-copy", {
+			inject: ["pgid"],
+			props: ["modelValue"],
+			emits:["entities-changed"],
+			methods:{
+				responseHandler(response){
+					if (response.status == 201){
+						this.$emit('entities-changed');
+					} else {
+						let error = response; // since we don't like ;-)
+ 						error.message = "Statut HTTP attendu = 201 (Created)";
+						error.code = "Error de copie";
+						throw error;
+					}
+				}
+			},
+			components:{
+				"client-button" : EntityActionClient,
+				"param-field" : QueryParamComponent
+			},
+			template:
+				`<client-button :resource-uri="modelValue + '/copy'" needs-params
+				  btn-text="Copie" btn-icon="copy"
+				  :success-callback="responseHandler">
+					<param-field name="newVersion" placeholder="Version à créer" class="form-control form-control-sm" type="text"></param-field>
+				</client-button>`
 		});
 
 

@@ -3,6 +3,8 @@ package com.acadiainfo.util;
 import java.io.IOException;
 import java.util.stream.Stream;
 
+import com.acadiainfo.comptatransport.domain.PriceGrid;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.core.*;
 

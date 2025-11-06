@@ -1,0 +1,77 @@
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>VueJS Slots with inject</title>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width" />
+		<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    </head>
+    <body>
+        <div id="app">
+
+
+			<parent-comp>
+				<template v-slot:head-cell>
+					<i>hi</i>
+				</template>
+				<template #foot-cell> <!-- # = shorthand for v-slot: -->
+					<child-comp ></child-comp>
+				</template>
+				<button onclick="alert('ha')" >AH</button>
+			</parent-comp>
+        </div>
+
+
+
+        <script>
+			const { createApp, ref, computed } = Vue;
+
+			var ParentComponent = {
+				data(){
+					return {
+						dutexte:"erf"
+					}
+				},
+				provide(){
+					return {
+						pasreactext: this.dutexte,
+						reactext: computed({get:()=>this.dutexte, set:(v)=>this.dutexte=v})
+					};
+				},
+				template: ` {{ dutexte }} <br>
+							<input v-model="dutexte"></input><br>
+							<table border="1">
+								<tr>
+									<th v-for="x in 3">
+										<slot name="head-cell">hd{{ x }}</slot>
+									</th>
+								</tr>
+								<tr v-for="y in 5">
+									<td v-for="x in 3">
+										<slot>{{ x * y }}</slot>
+									</td>
+								</tr>
+								<tr>
+									<th v-for="x in 3">
+										<slot name="foot-cell">ft{{ x }}</slot>
+									</th>
+								</tr>
+							</table>`
+			};
+
+
+			var ChildComponent = {
+				inject: ['pasreactext', 'reactext'],
+				template: `<input type="text" v-model="pasreactext"/><input type="text" v-model="reactext"/>`
+			};
+
+
+            const app = createApp({});
+
+			app.component('parent-comp', ParentComponent);
+            app.component('child-comp', ChildComponent);
+            app.mount('#app');
+        </script>
+    </body>
+</html>

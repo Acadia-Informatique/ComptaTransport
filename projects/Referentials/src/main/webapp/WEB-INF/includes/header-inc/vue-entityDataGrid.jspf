@@ -9,6 +9,9 @@ Dependencies :
 - header-inc/client-stack.jspf
 --%>
 <script type="text/javascript">
+	// used in EntityDataGrid, because there is no proper Transition@move hook (yet)
+	var debouncedScrollIntoView = debounce((element, options)=>{if(element) element.scrollIntoView(options);}, 50);
+
 	// VueJS component (options API)
 	var EntityDataGrid = {
 		props: {
@@ -40,9 +43,10 @@ Dependencies :
 							sortable: true,  // default is true
 							mandatory: false, // default is false
 							format: {pattern:/\d+/, errorMsg:"Must be an integer"} // if length *strictly* over 0, that will set a limit to it
-							//renderer : built-in (textarea) or "custom-vue-component", default is plain div
-							//editor:    built-in (textarea) or "custom-vue-component", default is simple input
-
+							//renderer : built-in (textarea, none) or a custom VueJS component", default is plain div
+							//editor:    built-in (textarea, none) or a custom VueJS component", default is simple input
+							//... for more info on renderers and editors, see vue-entityAttributeComponents.jspf
+//TODO what if we make "column" children components to parameterize their own parent ?
 						}
 					],
 					inferColumns: true, // default is true
@@ -73,7 +77,7 @@ Dependencies :
 			resourceUri(v){
 				console.debug("resourceUri changed : ", v);
 				this.refreshFullGrid();
-			}
+			},
 		},
 		mounted(){
 			this.refreshFullGrid();
@@ -95,14 +99,15 @@ Dependencies :
 			},
 			refreshGridRow(entity) {
 				let id = entity[this.identifier];
-
-				axios_backend.get(this.resourceUri + "/" + id)
+				let entityUri = this.resourceUri + "/" + id;
+				axios_backend.get(entityUri)
 				.then(response=>{
 					let idx = this.entityList.findIndex(e => (e[this.identifier] == id));
 					if (idx >=0) {
 						let refreshedEntity = response.data; // heavily relying on failfast behaviour !
 						let removedEntity = this.entityList[idx];
 						refreshedEntity["#key"] = removedEntity["#key"];
+						refreshedEntity["#uri"] = entityUri;
 						this.entityList.splice(idx, 1, refreshedEntity);
 					}
 					// more accurate than
@@ -110,10 +115,12 @@ Dependencies :
 					//	entity[pty] = refreshedEntity[pty];
 					//} because of potentially missing properties
 				})
-				.catch(function (error) {
+				.catch(error=>{
 					showAxiosErrorDialog(error);
 				});
 			},
+
+
 			orderData(propertyName, direction){
 				this.entityList.sort((a,b) => {
 					// isNew() should always be unique and on 1st row, whatever the direction
@@ -130,6 +137,19 @@ Dependencies :
 					else
 						return 0; // to keep it stable
 				});
+			},
+			registerMoveEnd(el){
+				el.addEventListener("transitionend", this.hMoveEnd);
+			},
+			unregisterMoveEnd(el){
+				el.removeEventListener("transitionend", this.hMoveEnd);
+			},
+			hMoveEnd(e){
+				if (e.propertyName != "transform") return;
+				if (!this.editingEntity) return;
+
+				debouncedScrollIntoView(this.$refs.scrollAnchor[0], {block:"nearest"});
+				// note: ref="scrollAnchor" sits in a loop, hence the [0]...
 			},
 
 			deleteEntity(entity) {
@@ -167,9 +187,9 @@ Dependencies :
 			createEntity(){
 				let newEntity = deepClone(this.config.defaultNewEntity);
 				newEntity["#key"] = -1; // so isNew(newEntity) becomes true
+				newEntity["#uri"] = null;
 				this.startEditingRow(newEntity);
 				this.entityList.unshift(newEntity);
-
 				this.$nextTick(() => {
 					this.$refs.scrollAnchor[0].scrollIntoView({block:"center"});
 					// note: ref="scrollAnchor" sits in a loop, hence the [0]...
@@ -203,7 +223,7 @@ Dependencies :
 						this.clearEditingRow();
 						this.refreshFullGrid(); // TODO recapture id and refresh that row ? scroll to it ? keep it at 1st row  ?
 					})
-					.catch(function (error) {
+					.catch(error=>{
 						showAxiosErrorDialog(error);
 					});
 				} else {
@@ -213,7 +233,7 @@ Dependencies :
 						this.clearEditingRow();
 						this.refreshGridRow(changedEntity);
 					})
-					.catch(function (error) {
+					.catch(error=>{
 						showAxiosErrorDialog(error);
 					});
 				}
@@ -267,6 +287,7 @@ Dependencies :
 
 				//clear all technical markers
 				delete payloadObj["#key"];
+				delete payloadObj["#uri"];
 
 				//custom payload cleaner
 				if (this.config.payloadProcessor) {
@@ -360,6 +381,7 @@ Dependencies :
 				this._technical_key_seq = 0; // reset counter
 				for (let row of rows){
 					row["#key"] = this._technical_key_seq ++;
+					row["#uri"] = this.resourceUri + "/" + row[this.identifier];
 				}
 				return rows;
 			},
@@ -415,7 +437,12 @@ Dependencies :
 		<thead class="shadow sticky-top">
 			<tr>
 				<th class="btns-first">
-					<button type="button" class="btn bi bi-plus-lg btn-primary" @click="createEntity(entity)"></button>
+					<button type="button" class="btn bi bi-plus-lg btn-primary"
+					  @click="createEntity(entity)" title="Ajouter une ligne"></button>
+					<button type="button" class="btn bi bi-escape btn-secondary"
+					  @click.stop="clearEditingRow()" title="Annuler la modification"
+					  :disabled="editingEntity == null"
+					  v-if="this.config.selectRowAction=='edit'"></button>
 				</th>
 				<th v-for="column in columnList.filter(c=>c.visible)"
 				  class="position-relative" :class="columnClassObj(column)"
@@ -432,20 +459,26 @@ Dependencies :
 
 				</th>
 				<th class="btns-last">
-					<button type="button" class="btn bi bi-arrow-clockwise btn-primary" @click="refreshFullGrid()"></button>
+					<button type="button" class="btn bi bi-arrow-clockwise btn-primary"
+					  @click="refreshFullGrid()" title="Rafraîchir la grille"></button>
 				</th>
 			</tr>
 		</thead>
 		<tbody>
-			<TransitionGroup name="list">
+			<TransitionGroup name="list" @after-enter="registerMoveEnd" @before-leave="unregisterMoveEnd">
 			<tr v-for="entity in entityList" :key="entity['#key']" @click="selectRow(entity)" :class="{'table-active':isRowSelected(entity)}">
 				<td class="btns-first">
 					<template v-if="isEditingRow(entity)" >
-						<button type="button" class="btn bi bi-check-lg btn-success" @click.stop="stopEditingRow()"></button>
-						<button type="button" class="btn bi bi-escape btn-secondary" @click.stop="clearEditingRow()" ref="scrollAnchor"></button>
+						<button type="button" class="btn bi bi-check-lg btn-success"
+						  @click.stop="stopEditingRow()" title="Enregistrer la ligne"
+						  ref="scrollAnchor"></button>
+						<button type="button" class="btn bi bi-escape btn-secondary"
+						  @click.stop="clearEditingRow()" title="Annuler la modification"
+						  v-if="this.config.selectRowAction!='edit'"></button>
 					</template>
 					<template v-else >
-						<button type="button" class="btn bi bi-pencil" @click.stop="startEditingRow(entity)"></button>
+						<button type="button" class="btn bi bi-pencil"
+						  @click.stop="startEditingRow(entity)" title="Modifier la ligne"></button>
 					</template>
 				</td>
 				<td v-for="column in columnList.filter(c=>c.visible)" :class="columnClassObj(column)">
@@ -456,8 +489,12 @@ Dependencies :
 							  style="width:100%"
 							  v-model.trim="editingEntity[column.name]" @input="validateField(editingEntity,column)">
 							</textarea>
+							<div v-else-if="column.editor == 'none'"
+							  class="bi bi-ban text-warning">
+							</div>
 							<component v-else-if="column.editor" :is="column.editor"
-							  v-model.trim="editingEntity[column.name]" @change="validateField(editingEntity,column)">
+							  v-model.trim="editingEntity[column.name]" @change="validateField(editingEntity,column)"
+							  @entities-changed="refreshFullGrid" @entity-changed="refreshGridRow(entity)" >
 							</component>
 							<input v-else
 							  style="width:100%"
@@ -468,8 +505,12 @@ Dependencies :
 							  style="width:100%"
 							  v-model="editingEntity[column.name]">
 							</textarea>
+							<div v-else-if="column.renderer == 'none'"
+							  class="bi bi-ban text-warning">
+							</div>
 							<component v-else-if="column.renderer" :is="column.renderer"
-							  v-model="editingEntity[column.name]">
+							  v-model="editingEntity[column.name]"
+							  @entities-changed="refreshFullGrid" @entity-changed="refreshGridRow(entity)">
 							</component>
 							<input v-else disabled
 							  style="width:100%"
@@ -486,17 +527,25 @@ Dependencies :
 						<span v-if="column.renderer == 'textarea'" style="white-space:pre-wrap">
 							{{ entity[column.name] }}
 						</span>
-						<component v-else-if="column.renderer" :is="column.renderer" v-model="entity[column.name]"></component>
-						<div v-else class="text-truncate">{{ entity[column.name] }}	</div>
+						<div v-else-if="column.renderer == 'none'"
+						  class="bi bi-ban text-warning">
+						</div>
+						<component v-else-if="column.renderer" :is="column.renderer"
+						  v-model="entity[column.name]"
+						  @entities-changed="refreshFullGrid" @entity-changed="refreshGridRow(entity)">
+						</component>
+						<div v-else class="text-truncate" :title="entity[column.name]">{{ entity[column.name] }}	</div>
 					</template>
 				</td>
 				<td class="btns-last">
 					<template v-if="isEditingRow(entity)" >
 						<button v-if="isNew(entity)" type="button" class="btn bi bi-trash3 btn-secondary" disabled></button>
-						<button v-else               type="button" class="btn bi bi-trash3 btn-danger" @click.stop="deleteEntity(entity)"></button>
+						<button v-else               type="button" class="btn bi bi-trash3 btn-danger"
+						  @click.stop="deleteEntity(entity)" title="Supprime la ligne"></button>
 					</template>
 					<template v-else >
-						<button type="button" class="btn bi bi-arrow-clockwise" @click.stop="refreshGridRow(entity)"></button>
+						<button type="button" class="btn bi bi-arrow-clockwise"
+						  @click.stop="refreshGridRow(entity)" title="Rafraîchir la ligne"></button>
 					</template>
 				</td>
 			</tr>

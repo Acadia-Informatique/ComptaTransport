@@ -35,10 +35,10 @@ public class CarrierWS {
 	public Response getOne_WS(@PathParam("name") String name) {
 		Carrier carrier = this.getOne(name);
 		if (carrier != null) {
-			return Response.ok().entity(carrier).build();
+			return Response.ok(carrier).build();
 		} else {
 			return WSUtils.response(Status.NOT_FOUND, servReq,
-			  "Transporteur non-trouvé avec ce nom (Carrier.name).");
+					"Transporteur non-trouvé avec ce nom.");
 		}
 	}
 
@@ -72,7 +72,7 @@ public class CarrierWS {
 		}
 		if ("".equals(carrier.getName())) {
 			return WSUtils.response(Status.BAD_REQUEST, servReq,
-			  "Le nom du Transporteur ne peut pas être vide (Carrier.name)");
+					"Le nom du Transporteur ne peut pas être vide");
 		}
 
 		try {
@@ -80,7 +80,7 @@ public class CarrierWS {
 			return Response.created(UriBuilder.fromUri("./carriers").path(carrier.getName()).build()).build();
 		} catch (jakarta.persistence.EntityExistsException exc) {
 			return WSUtils.response(Status.CONFLICT, servReq,
-					"Le nom du Transporteur (Carrier.name) doit être unique.");
+					"Le nom du Transporteur doit être unique.");
 		}
 	}
 
@@ -96,7 +96,7 @@ public class CarrierWS {
 		// Carrier-specific : key is "name", so it is also provided in JSON payload
 		if ("".equals(name) || !name.equals(carrier.getName())) {
 			return WSUtils.response(Status.BAD_REQUEST, servReq,
-			  "Nom de transporteur (Carrier.name) manquant ou incohérent dans l'URI et le corps du message."
+					"Nom de transporteur manquant ou incohérent dans l'URI et le corps du message."
 			 +" Rappel : le nom ne peut pas être modifié après création.");
 		}
 		try {
@@ -120,7 +120,7 @@ public class CarrierWS {
 			return Response.noContent().build();
 		} catch (jakarta.persistence.EntityNotFoundException exc) {
 			return WSUtils.response(Status.NOT_FOUND, servReq,
-			  "Transporteur peut-être supprimé depuis.");
+					"Transporteur introuvable avec le nom = " + name);
 		}
 	}
 

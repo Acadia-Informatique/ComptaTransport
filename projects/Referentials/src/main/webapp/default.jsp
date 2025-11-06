@@ -15,7 +15,7 @@
 	<H2>Référentiels</H2>
 	<ul>
 		<li><a href="<c:url value="/carriers"/> ">Liste de transporteurs</a></li>
-		<li><a href="<c:url value="/priceGrids" />">Grilles de prix</a></li>
+		<li><a href="<c:url value="/priceGrids" />">Grilles de frais de port</a></li>
 		<li><a href="<c:url value="/customers" />">Clients forfait et autres</a></li>
 	</ul>
 	

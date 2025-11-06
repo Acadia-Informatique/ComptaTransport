@@ -21,12 +21,12 @@ public class WSRuntimeExceptionMapper implements ExceptionMapper<RuntimeExceptio
 		int responseStatus;
 		String responseMessage;
 
-		if (exc instanceof jakarta.persistence.OptimisticLockException) {
+		if (exc instanceof jakarta.persistence.OptimisticLockException) { // safety net : those are ideally caught at WS-level 
 			responseStatus = Response.Status.CONFLICT.getStatusCode();
 			responseMessage = "JPA Optimistic lock error : " + exc.getMessage();
-		} else if (exc instanceof com.acadiainfo.util.DataIntegrityViolationException) {
-			responseStatus = Response.Status.BAD_REQUEST.getStatusCode();
-			responseMessage = "Data integrity violation : " + exc.getMessage();
+		} else if (exc instanceof com.acadiainfo.util.DataIntegrityViolationException) { // safety net : those are ideally caught at WS-level
+			responseStatus = Response.Status.NOT_ACCEPTABLE.getStatusCode();
+			responseMessage = "Data integrity error : " + exc.getMessage();
 		} else if (exc instanceof jakarta.ws.rs.WebApplicationException) {
 			Response webappResponse = ((jakarta.ws.rs.WebApplicationException) exc).getResponse();
 			

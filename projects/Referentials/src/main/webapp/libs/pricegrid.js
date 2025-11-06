@@ -1,10 +1,20 @@
 "use strict";
 
+/**************************
+ * SHIPPING PRICING ENGINE
+ **************************/
+// Note : in this full-Javascript engine, the meaning of PricingSystem and PricingGrid
+// is different from the database application. Each JS PricingGrid represent a single sheet
+// in MS Excel, and a JS PricingSystem represents a collection of mutually dependent JS PricingGrids.
+// For the database application, a whole JS PricingSystem represents only the JSON content
+// of a PRICING_GRID_VERSION.
+
+
 //TODO Proper JS module
 
 /**
  * Typical policies, usable as calculation test cases or to model.
- */
+ *
 const POLICY_PROTOTYPES = [
 	{
 		type: "FixedPrice",
@@ -16,8 +26,8 @@ const POLICY_PROTOTYPES = [
 		rounding: 10,
 		price: 4.4,
 		offset : {
-			attribute: 0,
-			price: 0
+			attribute: 150,
+			price: 36.6
 		}
 	},
 	{
@@ -26,13 +36,12 @@ const POLICY_PROTOTYPES = [
 		delegated_additiveAmount: 3
 	},
 ];
-
-
+*/
 
 class PricingSystem {
-	constructor(name) {
-		this.name = name;
+	constructor() {
 		this.grids = [];
+		//and plenty free space to add metadata !
 	}
 
 	/**
@@ -41,7 +50,7 @@ class PricingSystem {
 	 */
 	static fromJSON(v) {
 		if (typeof v == "string") v = JSON.parse(v);
-		let obj = new PricingSystem(v.name);
+		let obj = new PricingSystem();
 
 		for (const gridv of v.grids){
 			let newGrid = PricingGrid.fromJSON(gridv);
@@ -50,6 +59,20 @@ class PricingSystem {
 
 		return obj;
 	}
+
+	/**
+	 * Create a pure data version.
+	 */
+	static clean(systemObj) {
+		let clone = JSON.parse(JSON.stringify(systemObj));
+
+		for (const gridv of clone.grids){
+			delete gridv["$$key"];
+		}
+
+		return clone;
+	}
+
 
 
 	/**
@@ -82,7 +105,7 @@ class PricingSystem {
 			}
 
 		} else {
-			throw new Error(`Grid "${gridName}" not found in system "${this.name}".`);
+			throw new Error(`Grid "${gridName}" not found in system.`);
 		}
 	}
 
@@ -113,7 +136,7 @@ class PricingSystem {
 		for (const grid of this.grids){
 			for (const cell of grid.gridCells){
 				if (cell?.policy?.delegated_gridName == name){
-					throw new Error(`Grid "${name}" cannot be removed, for it is referenced by cell ${JSON.stringify(cell.coords)} of grid "${grid.name}".`);
+					throw new Error(`"${grid.name}"${JSON.stringify(cell.coords)} -> "${name}"`);
 				}
 			}
 		}

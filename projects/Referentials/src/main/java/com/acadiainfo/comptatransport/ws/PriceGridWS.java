@@ -48,7 +48,7 @@ public class PriceGridWS {
 	public Response getOne_WS(@PathParam("id") Long id) {
 		PriceGrid priceGrid = this.getOne(id);
 		if (priceGrid != null) {
-			return Response.ok().entity(priceGrid).build();
+			return Response.ok(priceGrid).build();
 		} else {
 			return WSUtils.response(Status.NOT_FOUND, servReq,
 			  "Grille Tarifaire non-trouvée avec cet identifiant.");
@@ -80,8 +80,8 @@ public class PriceGridWS {
 			return Response.created(uri).build();
 		} catch (IllegalArgumentException exc) {
 			return WSUtils.response(Status.BAD_REQUEST, servReq, exc.getMessage());
-		} catch (jakarta.persistence.EntityExistsException exc) {
-			return WSUtils.response(Status.CONFLICT, servReq, exc.getMessage());
+		} catch (jakarta.persistence.PersistenceException exc) {
+			return ApplicationConfig.response(exc, servReq, PriceGrid.class);
 		}
 	}
 
@@ -150,9 +150,8 @@ public class PriceGridWS {
 		try {
 			PriceGridsRepository.getInstance(em).deleteById(id);
 			return Response.noContent().build();
-		} catch (jakarta.persistence.EntityNotFoundException exc) {
-			return WSUtils.response(Status.NOT_FOUND, servReq,
-			  "Grille Tarifaire peut-être supprimée depuis.");
+		} catch (jakarta.persistence.PersistenceException exc) {
+			return ApplicationConfig.response(exc, servReq, PriceGrid.class);
 		}
 	}
 
@@ -255,7 +254,7 @@ public class PriceGridWS {
 		PriceGrid priceGrid = ensureParentPricePrid(id);
 		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
 
-		return Response.ok().entity(priceGridVersion).build();
+		return Response.ok(priceGridVersion).build();
 	}
 
 	@DELETE
@@ -264,8 +263,9 @@ public class PriceGridWS {
 		PriceGrid priceGrid = ensureParentPricePrid(id);
 		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
 		
-		em.remove(priceGridVersion);
-		em.flush();
+		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
+		priceGridVersionsRepo.delete(priceGridVersion);
+
 		return Response.noContent().build();
 	}
 
@@ -334,8 +334,8 @@ public class PriceGridWS {
 			return WSUtils.response(Status.BAD_REQUEST, servReq,
 			  "Un numéro de version doit être passé en paramètre de requête (_v_lock)");
 		} else if (!_v_lock.equals(priceGridVersion.get_v_lock())) {
-			WSUtils.response(Status.CONFLICT, servReq,
-					"Version de Grille Tarifaire peut-être modifiée depuis (\"_v_lock\" non-concordant).");
+			return WSUtils.response(Status.CONFLICT, servReq,
+			  "Version de Grille Tarifaire peut-être modifiée depuis (\"_v_lock\" non-concordant).");
 		}
 		
 		try {
@@ -343,10 +343,46 @@ public class PriceGridWS {
 			em.flush(); // to make it fail faster, if needed
 			return Response.noContent().build();
 		} catch (jakarta.persistence.PersistenceException exc) {
-			Throwable cause = com.acadiainfo.util.ExceptionUtils.unwrapToSqlBasedException(exc);
-			throw com.acadiainfo.util.ExceptionUtils.sneakyThrow(cause);
+			return ApplicationConfig.response(exc, servReq, PriceGridVersion.class);
 		}
 	}
-	
+
+	@POST
+	@Path("/{id}/versions/{v_id}/copy")
+	@Produces(value = MediaType.APPLICATION_JSON)
+	public Response versions_copyOne(@PathParam("id") Long id, @PathParam("v_id") Long v_id, @QueryParam("newVersion") String newVersion) {
+		PriceGrid priceGrid = ensureParentPricePrid(id);
+		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
+
+		
+		String newDescription = "COPIE DE " + priceGridVersion.getVersion();
+		if (priceGridVersion.getDescription() != null && !priceGridVersion.getDescription().equals("")) {
+			newDescription += " : \n" + priceGridVersion.getDescription();
+		}
+		if (newDescription.length() > 256) {
+			newDescription = newDescription.substring(0, 250) + "[...]";
+		}
+
+		PriceGridVersion priceGridVersionCopy = new PriceGridVersion();
+		// priceGridVersionCopy.setId();
+		priceGridVersionCopy.setPriceGrid(priceGrid);
+		priceGridVersionCopy.setVersion(newVersion);
+		priceGridVersionCopy.setPublishedDate(null);
+		priceGridVersionCopy.setDescription(newDescription);
+		priceGridVersionCopy.setJsonContent(priceGridVersion.getJsonContent()); // the most important
+		// priceGridVersionCopy.set_v_lock();
+		// priceGridVersionCopy.getAuditingInfo()id.setUser(...; TODO user management
+
+		try {
+			PriceGridVersionsRepository.getInstance(em).insert(priceGridVersionCopy);
+			em.flush();
+
+			java.net.URI uri = UriBuilder.fromUri("./price-grids").path(String.valueOf(priceGrid.getId()))
+					.path("versions").path(String.valueOf(priceGridVersionCopy.getId())).build();
+			return Response.created(uri).build();
+		} catch (jakarta.persistence.PersistenceException exc) {
+			return ApplicationConfig.response(exc, servReq, PriceGridVersion.class);
+		}
+	}
 
 }

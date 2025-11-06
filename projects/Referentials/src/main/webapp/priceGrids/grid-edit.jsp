@@ -12,6 +12,7 @@
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityAttributeComponents.jspf" %>
 
 	<script src="${libsUrl}/pricegrid.js"></script>
+	<script src="${libsUrl}/pricegrid_samples.js"></script>
 
 	<script type="text/javascript">
 		"use strict";
@@ -177,7 +178,7 @@
 
 		/** Save button animation */
 		.bi-floppy2-fill {
-			transition: all 500ms;
+			transition: all 0.3s ease-out;
 		}
 
 		/** List animations */
@@ -212,19 +213,19 @@
 
 			<template v-if="pgv_metadata">
 				<div class="d-flex flex-wrap align-items-center mx-3">
-				
-					<%--	
+
+					<%--
 					<i v-if="needSaving" role="button" @click="apiPutJsonContent"
 					  class="bi bi-floppy2-fill text-danger fs-1 me-2"></i>
 					<i v-else
 					  class="bi bi-floppy2-fill text-success fs-2 me-2"></i>
 					... more obvious, but changed to a single "mutating" element, to allow animation
 					--%>
-					<i class="bi bi-floppy2-fill me-2" 
+					<i class="bi bi-floppy2-fill me-2"
 					  :role="needSaving ? 'button' : null"
 					  @click="needSaving ? apiPutJsonContent() : null"
 					  :class="needSaving ? ['text-danger','fs-1'] : ['text-success','fs-2']"></i>
-					  
+
 					<div class="fs-2 fw-bold me-2" ref="gridLabel">{{pgv_metadata.priceGrid.name}}</div>
 					<div class="fs-4 me-2" ref="versionLabel">{{pgv_metadata.version}}</div>
 					<text-tags v-model="pgv_metadata.priceGrid.tags"></text-tags>
@@ -243,7 +244,7 @@
 				</h2>
 				<div id="collapseOne" class="accordion-collapse collapse show" data-bs-parent="#tool-pane">
 					<div class="accordion-body">
-						<pricingtest-form :ui_state="ui_state"></pricingtest-form>
+						<pricingtest-form :test-priced-obj="testPricedObj" :ui_state="ui_state" ></pricingtest-form>
 					</div>
 				</div>
 			</div>
@@ -303,7 +304,50 @@
 			<pricinggrids-dim-list :ui_state="ui_state"></pricinggrids-dim-list>
 		</div>
 
+
+
+		<!-- Modal dialog template for managing concurrent modification ("Save As" or refresh) -->
+		<div class="modal"  id="conflict-dialog" tabindex="-1">
+			<div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+				<form class="modal-content needs-validation">
+					<div class="modal-header">
+						<h5 class="modal-title">Conflit de mise à jour</h5>
+						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					</div>
+					<div class="modal-body">
+						Une modification concurrente a rendu impossible l'enregistrement de votre Version de Grille :<br>
+						{{ pgv_conflict }}<br>
+						<br>
+						Vous pouvez :
+						<ul>
+							<li>soit <b>Rafraîchir votre page</b> pour voir cette nouvelle version, mais <em>vous perdrez vos propres modifications</em>,</li>
+							<li>soit <b>"Enregistrer Sous" un autre nom de version</b>. Vous basculerez alors sur cette nouvelle version.</em></li>
+						</ul>
+						<div class="input-group has-validation">
+							<div class="col-4">
+								<label class="col-form-label" for="inputName">Nouvelle version</label>
+							</div>
+							<div class="col-8">
+								<input class="form-control" id="inputName" placeholder="Version"
+									v-model.trim="pgv_newVersion" required>
+								<div class="invalid-feedback">
+									L'identifiant de Version doit être unique pour chaque Grille Tarifaire.
+								</div>
+							</div>
+						</div>
+
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abandonner</button>
+						<button type="button" class="btn btn-danger"    data-bs-dismiss="modal" @click.prevent="conflict_giveup">Perdre vos modifications</button>
+						<button type="submit" class="btn btn-success"   data-bs-dismiss="modal" @click.prevent="conflict_solve">Créer une copie</button>
+					</div>
+				</form>
+			</div>
+		</div>
+
 	</div><!-- app end -->
+
 
 
 
@@ -755,9 +799,9 @@
 	<script type="text/x-template" id="PricingTest-Form-template">
 		<form>
 			<div class="d-flex column-gap-3">
-				<div><input type="radio" v-model="ui_state.testPricedObj.market" value="BTB"> BTB</div>
-				<div><input type="radio" v-model="ui_state.testPricedObj.market" value="BTC"> BTC</div>
-				<div><input type="checkbox" v-model="ui_state.testPricedObj.isIntegration" value="true"> Integration</div>
+				<div><input type="radio" v-model="testPricedObj.market" value="BTB"> BTB</div>
+				<div><input type="radio" v-model="testPricedObj.market" value="BTC"> BTC</div>
+				<div><input type="checkbox" v-model="testPricedObj.isIntegration" value="true"> Integration</div>
 			</div>
 			<div class="row mb-3 mb-lg-1">
 				<div class="col-lg-4">
@@ -766,7 +810,7 @@
 				<div class="col-lg-8">
 					<input class="form-control" id="inputPoids" placeholder="Poids (en kg)"
 					  type="number" step="0.1" min="0"
-					  v-model.number="ui_state.testPricedObj.poids">
+					  v-model.number="testPricedObj.poids">
 				</div>
 			</div>
 			<div class="row mb-3 mb-lg-1">
@@ -776,7 +820,7 @@
 				<div class="col-lg-8">
 					<input class="form-control" id="inputPostCode" placeholder="Code postal"
 					  type="text" maxlength="5"
-					  v-model.trim="ui_state.testPricedObj.codePostal">
+					  v-model.trim="testPricedObj.codePostal">
 				</div>
 			</div>
 			<div class="row mb-3 mb-lg-1">
@@ -786,7 +830,7 @@
 				<div class="col-lg-8">
 					<input class="form-control" id="inputCountry"
 					  type="text" list="countryDatalist" autocomplete="on"
-					  v-model="ui_state.testPricedObj.pays">
+					  v-model="testPricedObj.pays">
 					<datalist id="countryDatalist">
 						<option value="Allemagne"></option>
 						<option value="Autriche"></option>
@@ -820,17 +864,17 @@
 			<div class="row mb-3 mb-lg-1">
 				<div class="input-group">
 					<span class="input-group-text">L</span>
-					<input type="text" class="form-control" v-model.number="ui_state.testPricedObj.size_length" placeholder="(cm)"/>
+					<input type="text" class="form-control" v-model.number="testPricedObj.size_length" placeholder="(cm)"/>
 					<span class="input-group-text">l</span>
-					<input type="text" class="form-control" v-model.number="ui_state.testPricedObj.size_width" placeholder="(cm)"/>
+					<input type="text" class="form-control" v-model.number="testPricedObj.size_width" placeholder="(cm)"/>
 					<span class="input-group-text">h</span>
-					<input type="text" class="form-control" v-model.number="ui_state.testPricedObj.size_height" placeholder="(cm)"/>
+					<input type="text" class="form-control" v-model.number="testPricedObj.size_height" placeholder="(cm)"/>
 				</div>
 			</div>
 			<div class="row mb-3 mb-lg-1">
 				<div class="input-group">
 					<span class="input-group-text">Colis</span>
-					<input type="number" class="form-control" step="1" min="0" v-model="ui_state.testPricedObj.size_parcel_count"/>
+					<input type="number" class="form-control" step="1" min="0" v-model="testPricedObj.size_parcel_count"/>
 				</div>
 			</div>
 			<div class="row mb-3 mb-lg-1">
@@ -840,7 +884,7 @@
 				<div class="col-lg-8">
 					<input class="form-control" id="inputtransporteur100"
 					  type="text" list="transporteur100Datalist" autocomplete="on"
-					  v-model="ui_state.testPricedObj.transporteur100">
+					  v-model="testPricedObj.transporteur100">
 					<datalist id="transporteur100Datalist">
 						<option value="Schenker Standard (MES)"></option>
 						<option value="Schenker Premium (MES)"></option>
@@ -918,36 +962,10 @@
 
 	<!-- ========== component logic ============== -->
 	<script type="module">
-
 		let typicalRawCoords = Object.entries(new CommandeALivrer(0, "01000").getPPGRawCoordinates()); //arguably typical ?...
 
 		const numericRawCoords =  typicalRawCoords.filter(([k,v]) => typeof v == "number").map(([k,v]) => k);
 		const stringRawCoords =  typicalRawCoords.filter(([k,v]) =>typeof v == "string").map(([k,v]) => k);
-		const DEFAULT_POLICIES = {
-			"FixedPrice": {
-				type: "FixedPrice",
-				price: null
-			},
-			"PerVolumePrice": {
-				type: "PerVolumePrice",
-				attribute: null,
-				rounding: 10,
-				price: null,
-				/* offset : {
-					attribute:0,
-					price:0
-				} */
-			},
-			"DelegatedPrice": {
-				type: "DelegatedPrice",
-				delegated_gridName: "",
-				delegated_additiveAmount: null
-			},
-		};
-
-		const DEFAULT_PRICINGSYSTEM = new PricingSystem("Compagnie_1");
-		DEFAULT_PRICINGSYSTEM.grids.push(new PricingGrid("Grille_1"));
-
 
 		/* shared state for the page */
 		//const gridBuilderApp_UI = Vue.reactive( ui_state); TODO need explicit call ?!
@@ -955,10 +973,9 @@
 		const gridBuilderApp = Vue.createApp({
 			data() {
 				return {
-					pgv_metadata:null,
 					ui_state: { // TODO utiliser un bus global ?...
-						system: DEFAULT_PRICINGSYSTEM,
-						currentGrid: DEFAULT_PRICINGSYSTEM.grids[0],
+						system: EMPTY_PRICINGSYSTEM,
+						currentGrid: EMPTY_PRICINGSYSTEM.grids[0],
 
 						editingPolicyCell: null,
 						editingPolicyChoice: "clipboardPolicy", //or a real policy type
@@ -972,8 +989,6 @@
 
 						editingDimName: "",
 						editingDimCopy: null,
-
-						testPricedObj: new CommandeALivrer(1 /*kg*/, "77600"),
 
 						confirmCancelDim: function(callback){
 							let continueFunc = ()=>{
@@ -995,8 +1010,19 @@
 
 						}
 					},
+
+					// Integration to database app
+					pgv_metadata: null,
+					// - in case of _v_lock conflict :
+					pgv_conflict: "", // a end-user message explaining the situation
+					pgv_newVersion: "", // new Version name to be created
+
+					
 					localStorage_hasSystem : false, // since cannot make localStorage reactive ;-)
 					needSaving: false, // "dirty" mark on PriceGrids
+
+					// Testing Form
+					testPricedObj: new CommandeALivrer(1 /*kg*/, "77600"),
 				}
 			},
 			watch:{
@@ -1007,12 +1033,6 @@
             		deep: true,
             		immediate: false
 				},
-				needSaving(v){
-					if (v) {console.log("sauvez-moi");}
-else  {console.log("sans façon");}
-					
-				} 
-
         	},
 			mounted(){
 				this.apiGetMetadata();
@@ -1027,17 +1047,23 @@ else  {console.log("sans façon");}
 				});
 			},
 			methods: {
-				loadSystemFromString(data){
+				// read from jsonContent
+				loadSystemFromString(data, needSaving){
 					if (data) {
 						this.ui_state.system = PricingSystem.fromJSON(data);
 						this.ui_state.currentGrid = this.ui_state.system.grids[0];
 					} else {
 						throw new Error("Could not load from empty data");
 					}
-					this.$nextTick(() => {						
-						this.needSaving = false;
+					this.$nextTick(() => { // no effect if no waiting, since ui_state.system is modified right before
+						this.needSaving = needSaving;
 					});
 				},
+				// write to jsonContent
+				buildPayload(){
+					return PricingSystem.clean(this.ui_state.system);
+				},
+
 				apiGetMetadata(){
 					let metadataUri =`price-grids/\${PRICE_GRID_ID}/versions/\${PRICE_GRID_VERSION_ID}`;
 
@@ -1061,7 +1087,21 @@ else  {console.log("sans façon");}
 
 					axios_backend.get(dataUri)
 					.then(response => {
-						this.loadSystemFromString(response.data);
+						if (response.data){
+							this.loadSystemFromString(response.data, false);
+						} else {
+							// newly created Version : response is OK but data is empty
+							confirm_dialog("Édition de Grille", "Cette nouvelle version est vide.\nComment voulez-vous démarrer ?",
+								{label:"Grille vide ", class:"btn-primary", handler:()=>{
+									this.ui_state.system = EMPTY_PRICINGSYSTEM;
+									this.ui_state.currentGrid = EMPTY_PRICINGSYSTEM.grids[0];
+								}},
+								{label:"Exemple de Grille", class:"btn-success", handler:()=>{
+									this.ui_state.system = SAMPLE_PRICINGSYSTEM;
+									this.ui_state.currentGrid = SAMPLE_PRICINGSYSTEM.grids[0];
+								}}
+							);
+						}
 					})
 					.catch(error => {
 						showAxiosErrorDialog(error);
@@ -1071,19 +1111,34 @@ else  {console.log("sans façon");}
 					let _v_lock = this.pgv_metadata._v_lock;
 					let dataUri =`price-grids/\${PRICE_GRID_ID}/versions/\${PRICE_GRID_VERSION_ID}/jsonContent?_v_lock=\${_v_lock}`;
 
-					axios_backend.put(dataUri, this.ui_state.system)
+					let jsonContent = this.buildPayload(this.ui_state.system);
+					axios_backend.put(dataUri, jsonContent)
 					.then(response => {
 						this.apiGetMetadata();
 						this.needSaving = false;
 					})
 					.catch(error => {
-						showAxiosErrorDialog(error);
+						if (error.status == 404){// NOT_FOUND
+							this.pgv_conflict = "Elle a probablement été supprimée entre-temps.";
+							this.pgv_newVersion = this.pgv_metadata.version + " (Restauré)";
+							delete this.pgv_metadata.id; // <- Important : mark used later in conflict_solve()
+							const modal = document.getElementById("conflict-dialog");
+							bootstrap.Modal.getOrCreateInstance(modal).show();
+
+						} else	if (error.status == 409){// CONFLICT
+							this.pgv_conflict = "Elle a été modifiée entre-temps.";
+							this.pgv_newVersion = this.pgv_metadata.version + " (Copie)";
+							const modal = document.getElementById("conflict-dialog");
+							bootstrap.Modal.getOrCreateInstance(modal).show();
+						} else {
+							showAxiosErrorDialog(error);
+						}
 					})
 				},
 				localStorage_saveSystem(useAlert = true){
 					let handler = ()=>{
-						let data = JSON.stringify(this.ui_state.system);
-						localStorage.setItem("save.system", data);
+						let jsonContent = this.buildPayload(this.ui_state.system);
+						localStorage.setItem("save.system", jsonContent);
 						this.localStorage_hasSystem = true;
 					};
 
@@ -1101,7 +1156,7 @@ else  {console.log("sans façon");}
 				localStorage_loadSystem(name, useAlert = true){
 					let handler = ()=>{
 						let data = localStorage.getItem("save.system");
-						this.loadSystemFromString(data);
+						this.loadSystemFromString(data, true);
 					};
 
 					if (useAlert) {
@@ -1129,8 +1184,9 @@ else  {console.log("sans façon");}
 
 				downloadSystemByLink(){
 					console.info("Generating a lengthy download link from PricingSystem...");
-					let data = JSON.stringify(this.ui_state.system);
-					const linkData = new Blob([data], { type: 'application/json' });
+					let jsonContent = this.buildPayload(this.ui_state.system);
+
+					const linkData = new Blob([jsonContent], { type: 'application/json' });
 					const linkHref =  URL.createObjectURL(linkData);
 
 					let el = this.$refs.downloadSystemLink;
@@ -1163,7 +1219,7 @@ else  {console.log("sans façon");}
 					const fileReader = new FileReader();
 					fileReader.onload = ()=>{
 						try {
-							this.loadSystemFromString(fileReader.result);
+							this.loadSystemFromString(fileReader.result, true);
 						} catch(err){
 							alert_dialog("Import de Grille", "Erreur d'import: "+ err);
 						}
@@ -1172,6 +1228,65 @@ else  {console.log("sans façon");}
 						alert_dialog("Import de Grille", "Erreur de lecture du fichier: " + event.target.error);
 					};
 					fileReader.readAsText(file);
+				},
+
+				conflict_solve(){
+					// 1) first, create new metadata entry
+					let axios_custom;
+					if (this.pgv_metadata.id) {
+						/* copy existing */
+						axios_custom = axios_backend.post(`price-grids/\${PRICE_GRID_ID}/versions/\${PRICE_GRID_VERSION_ID}/copy?newVersion=` + this.pgv_newVersion);
+					} else {
+						/* recreate  */
+						let new_pgv_metadata = {
+							description: this.pgv_metadata.description,							
+							version: this.pgv_newVersion,
+						};
+						axios_custom = axios_backend.post(`price-grids/\${PRICE_GRID_ID}/versions`, new_pgv_metadata);
+					}
+
+					axios_custom
+					.then(response=>{
+						if (response.status == 201){
+							// 2) if ok, proceed with json_content
+							let created_location = response?.headers?.location;
+							if (!created_location) throw new Error("Response 201 without proper Location header ?!");
+							let new_pgvid = /.*\/versions\/(\d+)$/g.exec(created_location)[1];
+
+							let dataUri =`price-grids/\${PRICE_GRID_ID}/versions/\${new_pgvid}/jsonContent?_v_lock=1`;
+							let jsonContent = this.buildPayload(this.ui_state.system);
+
+							axios_backend.put(dataUri, jsonContent)
+							.then(response => {
+								// 3) if both ok, switch to the new page
+								let copyParams = new URLSearchParams();
+								copyParams.set("pgid", PRICE_GRID_ID);
+								copyParams.set("pgvid", new_pgvid);
+
+								window.location.search = copyParams;
+							})
+						} else { // unlikely, no special significance.
+							let error = response; // since we don't like ;-)
+ 							error.message = "Statut HTTP attendu = 201 (Created)";
+							error.code = "Error de copie";
+							throw error;
+						}
+					}).catch(error => {
+						if (error.status == 409){// CONFLICT again.
+							alert_dialog("Conflit de mise à jour", "Cet intitulé de version est déjà pris.");
+						} else {
+							showAxiosErrorDialog(error);
+						}
+					});
+				},
+				conflict_giveup(){
+					confirm_dialog("Conflit de mise à jour","Rafraîchir la page vous fera perdre toutes vos modifications courantes."
+					  +"\nEn êtes-vous sûr ?",{
+						label:'Continuer', class: 'btn-danger',
+						handler : ()=>{	window.location.reload(); }
+					}, {
+						label:'Abandonner', class: 'btn-secondary',
+					});
 				}
 
 			},
@@ -1270,22 +1385,21 @@ else  {console.log("sans façon");}
 					}
 
 					const gridName = this.ui_state.currentGrid.name;
-					confirm_dialog("Suppression de Grille",`Vraiment ? Effacer la grille "${gridName}" vous fera perdre toutes les données qu'elle contient !`,{
+					confirm_dialog("Suppression de Grille",`Vraiment ? Effacer la grille "\${gridName}" vous fera perdre toutes les données qu'elle contient !`,{
 						label:'Continuer', class: 'btn-danger', /* autofocus:true,  no reason to make it easy ;-) */
 						handler : ()=>{
 							try {
 								let grid = this.ui_state.system.removeGrid(gridName);
 								if (grid){
-									console.info(`Deleted Grille "${gridName}".`);
 									this.ui_state.currentGrid = this.ui_state.system.grids[0];//fallback to 1st available
 								} else {
-									console.error(`Unexpected problem while deleting Grille "${gridName}".`);
+									console.error("Unexpected problem while deleting grid : " + gridName);
 								}
 
 							} catch(err){
 								//console.info(err); // better check for new unexpected causes...
-								alert_dialog("Suppression de Grille", `Suppression impossible, car cette grille est probablement référencée par d'autres. (${err})`);
-								return false; // veto permet la visu, ici, du la "dialog dans la dialog"
+								alert_dialog("Suppression de Grille", `Suppression impossible, car cette grille est probablement référencée par d'autres (\${err}).`);
+								return false; // veto permet la visu, ici, du "dialog dans la dialog"
 							}
 						}
 					}, {
@@ -1345,7 +1459,7 @@ else  {console.log("sans façon");}
 				},
 				removeDimension(idx){
 					let removedDim = this.ui_state.currentGrid.dimensions[idx];
-					confirm_dialog("Dimension",`Êtes-vous sûr de vouloir supprimer la dimension "${removedDim.name}" ?
+					confirm_dialog("Dimension",`Êtes-vous sûr de vouloir supprimer la dimension "\${removedDim.name}" ?
 									(Vous perdrez alors toutes les cellules correspondantes)`,{
 						label:'Continuer', class: 'btn-primary', autofocus:true,
 						handler : ()=>{
@@ -1374,7 +1488,7 @@ else  {console.log("sans façon");}
 						if (event) this._clearEditing(event);
 
 						let editingDim = this.ui_state.currentGrid.findDimensionByName(name);
-						if (!editingDim) throw new Error(`Dimension "${name}" cannot be found for editing.`);
+						if (!editingDim) throw new Error(`Dimension "\${name}" cannot be found for editing.`);
 
 						this.ui_state.editingDimCopy = deepClone(editingDim);
 						this.ui_state.editingDimName = name;
@@ -1523,7 +1637,7 @@ else  {console.log("sans façon");}
 							{
 								const dupes =  Array.from(new Set(categoryNames.filter((item, i) => categoryNames.indexOf(item) !== i)));
 								if (dupes.length > 0){
-									categoryAlerts.push(`Des catégories portent le même nom : ${dupes}. Les doublons seront fusionnés !`);
+									categoryAlerts.push(`Des catégories portent le même nom : \${dupes}. Les doublons seront fusionnés !`);
 								}
 							}
 
@@ -1531,7 +1645,7 @@ else  {console.log("sans façon");}
 							{
 								const lostCategoryNames = oldCategoryNames.filter(n => !categoryNames.includes(n));
 								if (lostCategoryNames.length > 0){
-									categoryAlerts.push(`Les catégories suivantes ont disparu, les cellules correspondantes seront perdues : ${lostCategoryNames}.`);
+									categoryAlerts.push(`Les catégories suivantes ont disparu, les cellules correspondantes seront perdues : \${lostCategoryNames.join(", ")}.`);
 								}
 							}
 
@@ -1539,7 +1653,7 @@ else  {console.log("sans façon");}
 							for (const cat of categories){
 								const dupes =  Array.from(new Set(cat.enum.filter((item, i) => cat.enum.indexOf(item) !== i)));
 								if (dupes.length > 0){
-									categoryAlerts.push(`La catégorie "${cat.value}" contient les doublons suivants : ${dupes}.`);
+									categoryAlerts.push(`La catégorie "\${cat.value}" contient les doublons suivants : \${dupes}.`);
 								}
 							}
 							// cross-category dupes
@@ -1551,7 +1665,7 @@ else  {console.log("sans façon");}
 									//const dupes = sx.intersection(sy); exists since... 2024. A bit too fresh for me
 									const dupes = Array.from(new Set([...sx].filter(v => sy.has(v))));
 									if (dupes.length > 0){
-										categoryAlerts.push(`Les catégories "${catx.value}" et "${caty.value}" contiennent en commun : ${dupes}.`);
+										categoryAlerts.push(`Les catégories "\${catx.value}" et "\${caty.value}" contiennent en commun : \${dupes}.`);
 									}
 								}
 							}
@@ -1710,7 +1824,7 @@ else  {console.log("sans façon");}
 							<pricinggrids-policyQuick :policy="cell.policy" />
 						</template>
 						<template v-else>
-							<span class="badge text-bg-warning">EMPTY</span>
+							<span class="badge text-bg-warning">N/A</span>
 						</template>
 					</template>
 					<template v-else>
@@ -1852,28 +1966,28 @@ else  {console.log("sans façon");}
 								case "poidsVolumique": {
 									if ((dimension.comparison ?? "eqSup") == "eqSup"){
 										label = nextCategory
-										? `${category.value} - ${nextCategory.value} kg`
-										: `${category.value}+ kg`;
+										? `\${category.value} - \${nextCategory.value} kg`
+										: `\${category.value}+ kg`;
 									} else {// == "strictSup"
 										label = nextCategory
-										? `jusqu'à ${nextCategory.value} kg`
-										: `au-delà de ${category.value} kg`;
+										? `jusqu'à \${nextCategory.value} kg`
+										: `au-delà de \${category.value} kg`;
 									}
 								} break;
 								case "poidsEntier": {
 									label = nextCategory
-									 ? `${category.value} - ${nextCategory.value - 1} kg`
-									 : `${category.value}+ kg`;
+									 ? `\${category.value} - \${nextCategory.value - 1} kg`
+									 : `\${category.value}+ kg`;
 								} break;
 								default: {
 									if ((dimension.comparison ?? "eqSup") == "eqSup"){
 										label = nextCategory
-										? `[${category.value} - ${nextCategory.value}[`
-										: `[${category.value}, +∞[`;
+										? `[\${category.value} - \${nextCategory.value}[`
+										: `[\${category.value}, +∞[`;
 									} else {// == "strictSup"
 										label = nextCategory
-										? `jusqu'à ${nextCategory.value}`
-										: `au-delà de ${category.value}`;
+										? `jusqu'à \${nextCategory.value}`
+										: `au-delà de \${category.value}`;
 									}
 								}
 
@@ -1902,14 +2016,14 @@ else  {console.log("sans façon");}
 
 		var PricingTest_Form = {
 			props: {
+				testPricedObj : Object,
 				ui_state: Object
 			},
 			computed:{
 				testResult(){
 					if (!this.ui_state.currentGrid) return;
 					const gridName = this.ui_state.currentGrid.name;
-					const testPricedObj = this.ui_state.testPricedObj;
-					return this.ui_state.system.applyGrid(gridName, testPricedObj);
+					return this.ui_state.system.applyGrid(gridName, this.testPricedObj);
 					//return {amount:-1, extra_info:""} //TODO prévoir débrayage pour les références circulaires, au niveau GRID.JS
 				}
 			},
@@ -1984,7 +2098,6 @@ else  {console.log("sans façon");}
 
 		gridBuilderApp.mount('#pricinggrids-builder');
 	</script>
-
 </body>
 
 

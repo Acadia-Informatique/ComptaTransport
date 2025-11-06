@@ -131,7 +131,7 @@
 								renderer: "textarea",
 								editor: "textarea",
 								format: {pattern:/^(?:.|\n|\r){0,256}$/, errorMsg:"Longueur max: 256"},
-								description: "Description libre"
+								description: "Commentaire libre"
 							},
 							{
 								name: "_v_lock",

@@ -48,7 +48,7 @@ public abstract class CrudRepositoryImpl<T, K> {
 	 * Access the injected EntityManager, especially in subclasses.
 	 * @return
 	 */
-	protected EntityManager getEntityManager() {
+	protected final EntityManager getEntityManager() {
 		return em;
 	}
 
@@ -59,8 +59,6 @@ public abstract class CrudRepositoryImpl<T, K> {
 	 * @return the "JPA attached" version of arg.
 	 */
 	public T insert(T t) {
-		EntityManager em = this.getEntityManager();
-
 		if (t == null) {
 			throw new IllegalArgumentException(this.getEntityClass().getSimpleName() + " in argument can't be null");
 		}
@@ -70,7 +68,7 @@ public abstract class CrudRepositoryImpl<T, K> {
 			// em.refresh(t); // for database generated fields
 			return t;
 		} catch (jakarta.persistence.PersistenceException exc) {
-			throw explicitPersistenceException(t, exc);
+			throw com.acadiainfo.util.ExceptionUtils.explicitPersistenceException(exc);
 		}
 	}
 
@@ -84,8 +82,6 @@ public abstract class CrudRepositoryImpl<T, K> {
 	 * @throws some jakarta.persistence.PersistenceException and subclasses (for not existing, version conflicts, etc.)
 	 */
 	public T update(T t, boolean ignoreNulls) {
-		EntityManager em = this.getEntityManager();
-
 		K key = this.getEntityKey(t);
 		if (key == null) {
 			throw new IllegalArgumentException(this.getEntityClass().getSimpleName() + " must have a non-null key.");
@@ -110,7 +106,7 @@ public abstract class CrudRepositoryImpl<T, K> {
 				throw new jakarta.persistence.OptimisticLockException(this.getEntityClass().getSimpleName()
 						+ " cannot be updated because it has changed since last read", exc);
 			} catch (jakarta.persistence.PersistenceException exc) {
-				throw explicitPersistenceException(t, exc);
+				throw com.acadiainfo.util.ExceptionUtils.explicitPersistenceException(exc);
 			}
 		} else {
 			throw new jakarta.persistence.EntityNotFoundException(this.getEntityClass().getSimpleName()
@@ -120,34 +116,47 @@ public abstract class CrudRepositoryImpl<T, K> {
 
 
 	/**
-	 * Delete one existing entity by key.
-	 * A less "brutal" version of {@link #deleteById(Object)}: technical versions are compared when available.
+	 * Delete one existing entity, comparing versions when available.
+	 * Declared final, because it is used reused by deleteById.
 	 * @param t - Entity to be removed.
 	 * @throws jakarta.persistence.EntityNotFoundException when not found
 	 * @throws jakarta.persistence.OptimisticLockException for version conflicts
 	 */
-	public void delete(final T t) {
+	public final void delete(final T t) {
 		if (t == null) {
 			throw new IllegalArgumentException("Error deleting null " + this.getEntityClass().getSimpleName());
 		}
+		K key = this.getEntityKey(t);
+		if (key == null) {
+			throw new IllegalArgumentException("Error deleting null-keyed " + this.getEntityClass().getSimpleName());
+		}
 
-		EntityManager em = this.getEntityManager();
-		T t_in_base = this.findById(this.getEntityKey(t));
-		if (t_in_base == null) {
-			throw new jakarta.persistence.EntityNotFoundException(
-					this.getEntityClass().getSimpleName() + " with same key doesn't exist anymore in database");
-		} else if (t instanceof VersionLockable) {			 
-			long lock_in_base = ((VersionLockable) t_in_base).get_v_lock();
-			long lock_in_arg = ((VersionLockable) t).get_v_lock();
-			if (lock_in_arg < lock_in_base) {
-				throw new jakarta.persistence.OptimisticLockException("Incoming version is out-dated.");
-			} else if (lock_in_arg > lock_in_base){
-				throw new jakarta.persistence.OptimisticLockException(
-						"Incoming version higher than existing one (forged ?).");
+		T t_in_base;
+		if (em.contains(t)) {
+			t_in_base = t;
+		} else {
+			t_in_base = this.findById(key);
+			if (t_in_base == null) {
+				throw new jakarta.persistence.EntityNotFoundException(
+						this.getEntityClass().getSimpleName() + " not found with key = " + key);
+			} else if (t instanceof VersionLockable) {
+				long lock_in_base = ((VersionLockable) t_in_base).get_v_lock();
+				long lock_in_arg = ((VersionLockable) t).get_v_lock();
+				if (lock_in_arg < lock_in_base) {
+					throw new jakarta.persistence.OptimisticLockException("Incoming version is out-dated.");
+				} else if (lock_in_arg > lock_in_base) {
+					throw new jakarta.persistence.OptimisticLockException(
+							"Incoming version higher than existing one (forged ?).");
+				}
 			}
 		}
-		em.remove(t_in_base);
-		em.flush();
+
+		try {
+			em.remove(t_in_base);
+			em.flush();
+		} catch (jakarta.persistence.PersistenceException exc) {
+			throw com.acadiainfo.util.ExceptionUtils.explicitPersistenceException(exc);
+		}
 	}
 
 
@@ -162,15 +171,12 @@ public abstract class CrudRepositoryImpl<T, K> {
 			  "Error deleting " + this.getEntityClass().getSimpleName() + " from null key");
 		}
 
-		EntityManager em = this.getEntityManager();
-		T t = em.find(this.getEntityClass(), key);
-		if (t != null) {
-			em.remove(t);
-			em.flush();
-		} else {
+		T t = this.findById(key);
+		if (t == null) {
 			throw new jakarta.persistence.EntityNotFoundException(
-			  this.getEntityClass().getSimpleName() + " not found with key = " + key);
+			  this.getEntityClass().getSimpleName() + " not found with key : " + key);
 		}
+		this.delete(t);
 	}
 
 	/**
@@ -179,7 +185,6 @@ public abstract class CrudRepositoryImpl<T, K> {
 	 * @return found entities 
 	 */
 	public Stream<T> findAll() {
-		EntityManager em = this.getEntityManager();
 		Query query = em.createNamedQuery(this.getEntityClass().getSimpleName() + ".findAll");
 
 		@SuppressWarnings("unchecked")
@@ -190,14 +195,14 @@ public abstract class CrudRepositoryImpl<T, K> {
 
 	/**
 	 * Get one existing by id, or test its existence.
+	 * Declared final, because it is used a lot internally by other methods.
 	 * @param key
 	 * @return found entity or null.
 	 */
-	public T findById(K key) {
+	public final T findById(K key) {
 		if (key == null) {
 			throw new IllegalArgumentException("Entity cannot be found from a null key");
 		}
-		EntityManager em = this.getEntityManager();
 		return em.find(this.getEntityClass(), key);
 	}
 
@@ -219,7 +224,6 @@ public abstract class CrudRepositoryImpl<T, K> {
 	 * @return up-to-date
 	 */
 	public T save(T t) {
-		EntityManager em = this.getEntityManager();
 		t = em.merge(t);
 		em.flush();
 		return t;
@@ -232,7 +236,6 @@ public abstract class CrudRepositoryImpl<T, K> {
 	 */
 	public List<T> saveAll(List<T> list) {
 		List<T> newList = new java.util.ArrayList<T>(list.size());
-		EntityManager em = this.getEntityManager();
 		for (T t : list) {
 			newList.add(em.merge(t));
 		}
@@ -306,49 +309,4 @@ public abstract class CrudRepositoryImpl<T, K> {
 		return false;
 	}
 
-	/** 
-	 * Look into a PersistenceException for a SQL-based cause, as a safety net for insufficient checking.
-	 * The messages at repository level are meant for debugging, and are not properly localized. 
-	 * 
-	 * @param entity to which it happened. Can be null if it doesn't apply.
-	 * @param exc
-	 * @return a "human readable" version of the exc argument (may be another PersistenceException)
-	 */
-	protected jakarta.persistence.PersistenceException explicitPersistenceException(T entity,
-			jakarta.persistence.PersistenceException exc) {
-		// Lazy check for duplicate, since it is costly
-		// (and so unlikely, should only happen for non-generated PK)
-		Throwable cause = com.acadiainfo.util.ExceptionUtils.unwrapToSqlBasedException(exc);
-		if (cause instanceof java.sql.SQLIntegrityConstraintViolationException) {
-			if (entity != null && this.getEntityKey(entity) != null && isDuplicatePKMsg(cause.getMessage())) {
-				K key = this.getEntityKey(entity);
-				T duplicate = this.findById(key);
-				if (duplicate != null) {
-					return new jakarta.persistence.EntityExistsException(
-							this.getEntityClass().getSimpleName() + " with same key already exists : " + key);
-				}
-			} else {
-				return new com.acadiainfo.util.DataIntegrityViolationException(cause);
-			}
-	 // } else if ... TODO add analysis for other common java.sql.* exceptions			
-		} else {
-			// simplify the message and cause chain
-			return new jakarta.persistence.PersistenceException(cause.getMessage());
-		}
-
-		// if nothing applies, return original
-		return exc;
-	}
-
-	/**
-	 * Tells if the db exception is a PK violation message, based on my own database settings,
-	 * and my own PK constraint naming habits. 
-	 * TODO document current database settings (MySQL + UTC timezone + US-EN locale).
-	 * 
-	 * @param message - Some java.sql.SQLIntegrityConstraintViolationException.getMessage()
-	 * @return true if the message "looks ok" (couldn't do better for years ;-)  
-	 */
-	private boolean isDuplicatePKMsg(String message) {
-		return (message != null && message.startsWith("Duplicate entry") && message.endsWith(".PRIMARY'"));
-	}
 }

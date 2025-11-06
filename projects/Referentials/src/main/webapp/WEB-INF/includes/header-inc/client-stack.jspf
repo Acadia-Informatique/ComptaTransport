@@ -17,6 +17,28 @@
 "use strict";
 	// my Q&D data obj clone polyfill, used on VueJS reactive objects
 	window.deepClone = function(v){return JSON.parse(JSON.stringify(v));};
+
+	// From https://codepen.io/ondrabus/pen/WNGaVZN - referenced on https://www.freecodecamp.org/news/javascript-debounce-example/
+	function debounce(func, timeout = 300){
+		let timer;
+		return (...args) => {
+			clearTimeout(timer);
+			timer = setTimeout(() => { func.apply(this, args); }, timeout);
+		};
+	}
+
+	function debounce_leading(func, timeout = 300){
+		let timer;
+		return (...args) => {
+			if (!timer) {
+				func.apply(this, args);
+			}
+			clearTimeout(timer);
+			timer = setTimeout(() => {
+				timer = undefined;
+			}, timeout);
+		};
+	}
 </script>
 
 <% /* ---------- REST API CLient ------------ */ %>
@@ -49,7 +71,7 @@
 	 				return JSON.parse(response);
 	 			} catch (parseError) {
 	 				throw {
-	 					"name" : "AcadiaJsonParsingError",
+	 					"name" : "AcadiaJsonParsingError", // not displayed, used for debugging
 		 				"message" : parseError.message,
 		 				"status" : status,
 		 				"code": parseError.name,
@@ -64,7 +86,7 @@
 				console.error("Cannot show frightening server error page to end user !", response);
 				response
 				response = "Redémarrage du serveur API nécessaire - Veuillez signaler le problème à l'équipe IT.";
-				return response;			
+				return response;
 			} else {
 				return response;
 			}
@@ -95,10 +117,13 @@
 			case 404: /* NOT_FOUND */
 				if (!dialog_message)
 					dialog_message = "La resource demandée n'existe plus. Veuillez réessayer après avoir rafraîchi la page.";
+			case 406: /* NOT_ACCEPTABLE : my own interpretation on database constraint violations */
+				if (!dialog_message)
+					dialog_message = "La requête ne peut être acceptée, certainement à cause d'une contrainte d'intégrité.";
 			case 409: /* CONFLICT */
 				if (!dialog_message)
 					dialog_message = "Conflit de mise à jour.";
-			
+
 				if (error?.response?.data)
 					dialog_message += ` - Détails: \${error?.response?.data}`;
 				break;

@@ -1,7 +1,11 @@
 <%@ page language="java" pageEncoding="UTF-8"%>
 <%--
 VueJS components for rendering and editing some typical entity attributes.
-They are all v-model based.
+
+They are all v-model based, and they are listenened to for VueJS event "entities-changed" and "entity-changed"
+(resp. for full and single row refresh). Please note that emitting those events is not required for
+common rendering (obviously) and editing, since the latter would not trigger a row-level refresh by itself,
+but relies on an explicit "saving" action.
 
 Since as cell editors and renderers they cannot be directly configured,
 you may need to compose them in custom components, or subclass them.
@@ -11,6 +15,14 @@ Components :
 - AuditingInfoRenderer (auditing info obj)
 - AuditingInfoRenderer_IconWithPopover (smaller variant)
 - TextTagsComponent ("text tags" tags as String[], editable)
+
+Special :
+- EntityActionClient - designed as a composable in a custom renderer :
+	- it has no v-model, but uses a "resourceUri" property (e.g. custom renderer can map v-model to "#uri" in EntityDataGrid)
+	- it can trigger a client-defined success callback (finer filter on HTTP status, VueJS events emitting, etc.)
+	  Events like "entities-changed" or "entity-changed" can be emitted from there (since events in VueJS don't bubble up).
+	- it uses QueryParamComponent, as its intended slot child (repeatable). You can also design your own.
+
 
 Dependencies :
 - header-inc/client-stack.jspf
@@ -91,7 +103,7 @@ Dependencies :
 		},
 		template: `
 			<button v-if="modelValue" type="button" class="btn bi bi-info-square"
-			  @click="clickPopover" data-bs-trigger="focus"
+			  @click.stop="clickPopover" data-bs-trigger="focus"
 			  title="Informations d'audit"
 			  data-bs-html="true" :data-bs-content=
 				"(local_dateCreated ? 'Créé le '+ local_dateCreated : '')
@@ -119,6 +131,11 @@ Dependencies :
 				type: Array, // of String
 				required: false,
 				default: []
+			},
+			
+			tagMaxLength: {
+				type: Number,
+				default: 16
 			}
 		},
 		emits: ['update:modelValue'],
@@ -138,6 +155,7 @@ Dependencies :
 				this.isTagPaletteOpen = b;
 			},
 			addTextTag(textTag){
+				textTag = textTag.substring(0, this.tagMaxLength);
 				this.textTagList.push(textTag);
 
 				let deduplicated = new Set(this.textTagList);
@@ -181,7 +199,7 @@ Dependencies :
 	<div>
 		<div v-for="textTag in textTagList"
 		  class="badge rounded-pill me-1 mb-1"
-          :class="tagStyleClass(textTag)">
+		  :class="tagStyleClass(textTag)">
 			{{textTag}}
 			<i v-if="editable" class="bi bi-dash-circle-dotted" @click="removeTextTag(textTag)"></i>
 		</div>
@@ -205,3 +223,104 @@ Dependencies :
 	</div>
 </script>
 
+
+<script type="text/javascript">
+<%--
+/*
+	<restclient resourceUri="/api/customers/15/serve">
+		Une assiette composée de :
+		<ul>
+			<li>Eggs : <qparam type="number" name="eggs"></param></li>
+			<li>Spam : <qparam type="text" name="spam"></param></li>
+		</ul>
+	</restclient>
+
+	const app = createApp({});
+	app.component('restclient', EntityActionClient);
+	app.component('qparam', QueryParamComponent);
+	app.mount('#app');
+*/
+
+--%>
+
+	var EntityActionClient = {
+		props:{
+			resourceUri: String, // (required) Full action URI
+			btnText: String, // Text of the button
+			btnIcon: String, // Bootstrap icon name, e.g. "copy", "trash"
+			needsParams: Boolean, // (optional + no value prop) if present, the client won't fire action HTTP query until it gets some params
+			successCallback: Function // optional (remember to call it dynamically with a colon) - a callback with a "response" arg, can throw an error and emit VueJS events
+		},
+		data(){
+			return {
+				internalQueryParams: {},
+				showParams: false
+			};
+		},
+		provide(){
+			return {
+				queryParams: Vue.computed({get:()=>this.internalQueryParams, set:(v)=>this.internalQueryParams=v})
+			};
+		},
+		computed:{
+			querystring(){
+				let urlParams = new URLSearchParams();
+				Object.keys(this.internalQueryParams).forEach(k => urlParams.set(k,  this.internalQueryParams[k]));
+				return urlParams.toString();
+			},
+			isReadyForAction(){
+				return (!this.needsParams || Object.keys(this.internalQueryParams).length > 0)
+			},
+			btnReadyClass(){
+				return this.isReadyForAction ? "btn-secondary" : "btn-outline-secondary"
+			}
+		},
+		methods:{
+			tryAction(){
+				if (this.isReadyForAction){
+					this.doAction();
+				} else {
+					this.showParams = true;
+				}
+			},
+			doAction(){
+				axios_backend.post(this.resourceUri + "?" + this.querystring) // no payload (yet), but POST is recommended for "not idempotency"
+				.then(response=>{
+					if (this.successCallback){
+						this.successCallback(response);
+					}
+				})
+				.catch(error=>{
+					showAxiosErrorDialog(error);
+				})
+				.finally (()=>{
+					this.internalQueryParams={}; //maybe keep it ?... not sure
+					this.showParams = false;
+				});
+			}
+
+		},
+		template: "#EntityActionClient-Component-template"
+	};
+
+
+	var QueryParamComponent = {
+		inject: ['queryParams'],
+		props: ['name'],
+		template: `<input v-model="queryParams[name]"/>`
+	};
+
+</script>
+
+
+<script type="text/x-template" id="EntityActionClient-Component-template">
+	<div>
+		<button type="button" @click="tryAction"
+		  class="btn bi" :class="['bi-'+ btnIcon, btnReadyClass]" >
+			<span class="ms-1">{{btnText}}</span>
+		</button>
+		<div v-if="showParams">
+			<slot></slot>
+		</div>
+	</div>
+</script>
