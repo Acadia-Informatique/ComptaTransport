@@ -139,11 +139,12 @@
 							},
 							{
 								name: "auditingInfo",
-								label: "",
+								label: "ℹ️",
 								width: "50px",
 								sortable: false,
 								editable: false,
-								renderer: "renderer-auditing-info"
+								renderer: "renderer-auditing-info",
+								description: "Informations d'audit"
 							},
 						],
 						inferColumns: true,

@@ -53,7 +53,7 @@ public class CarrierWS {
 		return WSUtils.entityJsonStreamingOutput(carriers);
 	}
 
-	public Stream<Carrier> getAll(@QueryParam("tag") Set<String> tags) {
+	public Stream<Carrier> getAll(Set<String> tags) {
 		Stream<Carrier> carriers = CarriersRepository.getInstance(em).findAll();
 
 		if (tags != null && !tags.isEmpty()) {

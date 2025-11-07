@@ -84,7 +84,7 @@
 								insertable: true,
 								updatable: false,
 								mandatory: true,
-								format: {pattern:/^\w{1,32}$/, errorMsg:"Entre 1 et 32 lettres et chiffres"},
+								format: {pattern:/^[\w/-]{1,32}$/, errorMsg:"Jusqu'à 32 lettres et chiffres"},
 								description:"Identifiant du transporteur"
 							},
 							{
@@ -142,11 +142,12 @@
 							},
 							{
 								name: "auditingInfo",
-								label: "(audit)",
+								label: "ℹ️",
 								width: "50px",
 								sortable: false,
 								editable: false,
-								renderer: "renderer-auditing-info"
+								renderer: "renderer-auditing-info",
+								description: "Informations d'audit"
 							},
 						],
 						inferColumns: true,

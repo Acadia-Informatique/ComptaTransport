@@ -89,10 +89,10 @@ public class PriceGridWS {
 		PriceGridsRepository priceGridsRepo = PriceGridsRepository.getInstance(em);
 		
 		if (priceGrid == null) {
-			throw new IllegalArgumentException("Le corps du message n'a pas pu interprété comme une Grille Tarifaire (PriceGrid)");
+			throw new IllegalArgumentException("Le corps du message n'a pas pu interprété comme une Grille Tarifaire.");
 		}
 		if ("".equals(priceGrid.getName())) {
-			throw new IllegalArgumentException("Le nom de la Grille Tarifaire ne peut pas être vide (PriceGrid.name)");
+			throw new IllegalArgumentException("Le nom de la Grille Tarifaire ne peut pas être vide.");
 		}
 				
 		// Unusual : id is not supposed to be provided
