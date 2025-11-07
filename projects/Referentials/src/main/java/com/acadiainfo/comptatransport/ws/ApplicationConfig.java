@@ -24,6 +24,7 @@ public class ApplicationConfig extends Application {
 		ENTITY_CLASS_MAP.put(Carrier.class, "Transporteur");
 		ENTITY_CLASS_MAP.put(PriceGrid.class, "Grille Tarifaire");
 		ENTITY_CLASS_MAP.put(PriceGridVersion.class, "Version de Grille Tarifaire");
+		ENTITY_CLASS_MAP.put(Customer.class, "Client");
 	}
 
 	public static Response response(jakarta.persistence.PersistenceException exc, HttpServletRequest servletRequest,
@@ -84,7 +85,9 @@ public class ApplicationConfig extends Application {
 		case "PRICE_GRID.PRICE_GRID_NAME_UNIQUE":
 			return "Nom";
 		case "PRICE_GRID_VERSION.PRICE_GRID_VERSION_UNIQUE":
-			return "\"Grille + Version\"";
+			return "[Grille + Version]";
+		case "CUSTOMER.CUSTOMER_ERP_REF_UNIQUE":
+			return "Référence ERP";
 		default:
 			return constraintName; // as a fallback
 		}

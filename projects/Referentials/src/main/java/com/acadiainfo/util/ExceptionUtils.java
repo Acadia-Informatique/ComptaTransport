@@ -24,8 +24,13 @@ public class ExceptionUtils {
 	 */
 	public static jakarta.persistence.PersistenceException explicitPersistenceException(
 			jakarta.persistence.PersistenceException exc) {
-		// Lazy check for duplicate, since it is costly
-		// (and so unlikely, should only happen for non-generated PK)
+
+		if (exc instanceof com.acadiainfo.util.DataIntegrityViolationException
+		  || exc instanceof jakarta.persistence.EntityNotFoundException
+		  || exc instanceof jakarta.persistence.EntityExistsException) {
+			return exc; // those are explicit enough
+		}
+
 		Throwable cause = com.acadiainfo.util.ExceptionUtils.unwrapToSqlBasedException(exc);
 		if (cause instanceof java.sql.SQLIntegrityConstraintViolationException) {
 			java.sql.SQLIntegrityConstraintViolationException sqlCause = (java.sql.SQLIntegrityConstraintViolationException) cause;
