@@ -65,7 +65,9 @@
 	<div id="app" class="container-fluid">
 		<div class="row">
 			<div class="col-12 col-lg-5 custom-lg-scrollcolumn">
-				<entity-data-grid id="pricegrid-grid" resource-name="Grilles tarifaires de port" resource-uri="price-grids" identifier="id" :config="pricegridGridConfig"></entity-data-grid>
+				<entity-data-grid id="pricegrid-grid"
+				  resource-name="Grilles tarifaires de port" resource-uri="price-grids" identifier="id"
+				  :config="pricegridGridConfig" class="table-hover"></entity-data-grid>
 			</div>
 			<div class="col-12 col-lg-7 custom-lg-scrollcolumn">
 				<template v-if="selectedPriceGridId">

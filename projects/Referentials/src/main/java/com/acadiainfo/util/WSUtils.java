@@ -1,12 +1,13 @@
 package com.acadiainfo.util;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.stream.Stream;
 
-import com.acadiainfo.comptatransport.domain.PriceGrid;
-
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.ws.rs.core.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.StreamingOutput;
 
 public class WSUtils {
 	/**
@@ -61,5 +62,64 @@ public class WSUtils {
 		};
 		return stream;
 	}
+
+	/**
+	 * Transform a "human" local date indication to a proper LocalDateTime to be used in database queries.
+	 * The complete list of available formats is currently :
+	 * - "now" : current date time accurate to the second
+	 * - "dd/mm/yyyy" and "dd/mm/yyyy hh:mi:ss": commonly used formats in France
+	 * - "yyyy-mm-dd'T'hh:mi:ss": ISO8601 without timezone 
+	 * - "yyyy", "yyyy-mm, "yyyy-mm-dd": ISO8601-derived for years, months, dates, ... 
+	 *   they are interpreted as the 1st day of the time span, starting as midnight. 
+	 * 
+	 * @param paramDate - a convenient value for filtering by date 
+	 * @return the corresponding LocalDateTime
+	 * @throws an IllegalArgumentException when no date can be deduced
+	 */
+	public static LocalDateTime parseParamDate(String paramDate) {
+		if (paramDate == null) {
+			throw new IllegalArgumentException("Cannot parse null parameter to date.");
+		}
+		paramDate = paramDate.trim();
+		if (paramDate.equals("")) {
+			throw new IllegalArgumentException("Cannot parse empty parameter to date.");
+		}
+		
+		if (paramDate.equals("now")) {
+			return LocalDateTime.now();
+		} else if (localDatePattern.matcher(paramDate).matches()) {
+			return java.time.LocalDateTime.parse(paramDate + " 00:00:00", frenchLocalDTFormatter);
+		} else if (localDateTimePattern.matcher(paramDate).matches()) {
+			return java.time.LocalDateTime.parse(paramDate + ":00", frenchLocalDTFormatter);
+		} else if (localDateTimeSecPattern.matcher(paramDate).matches()) {
+			return java.time.LocalDateTime.parse(paramDate, frenchLocalDTFormatter);
+		} else {
+			String extendedTimeValue;
+			if (yearPattern.matcher(paramDate).matches()) {
+				extendedTimeValue = paramDate + "-01-01T00:00:00";
+			} else if (monthPattern.matcher(paramDate).matches()) {
+				extendedTimeValue = paramDate + "-01T00:00:00";
+			} else if (dayPattern.matcher(paramDate).matches()) {
+				extendedTimeValue = paramDate + "T00:00:00";
+			} else {
+				extendedTimeValue = paramDate; // let the smart thing do its best
+			}
+
+			return java.time.LocalDateTime.parse(extendedTimeValue);
+		}
+	}
+
+	private static final java.time.format.DateTimeFormatter frenchLocalDTFormatter = java.time.format.DateTimeFormatter
+	    .ofPattern("dd/MM/uuuu HH:mm:ss");
+	private static final java.util.regex.Pattern localDatePattern = java.util.regex.Pattern
+	    .compile("^\\d{2}/\\d{2}/\\d{4}");
+	private static final java.util.regex.Pattern localDateTimePattern = java.util.regex.Pattern
+	    .compile("^\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}$");
+	private static final java.util.regex.Pattern localDateTimeSecPattern = java.util.regex.Pattern
+	    .compile("^\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2}$");
+
+	private static final java.util.regex.Pattern yearPattern = java.util.regex.Pattern.compile("^\\d{4}$");
+	private static final java.util.regex.Pattern monthPattern = java.util.regex.Pattern.compile("^\\d{4}-\\d{2}$");
+	private static final java.util.regex.Pattern dayPattern = java.util.regex.Pattern.compile("^\\d{4}-\\d{2}-\\d{2}$");
 
 }

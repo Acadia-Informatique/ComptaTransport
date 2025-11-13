@@ -4,10 +4,11 @@ import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
-import com.acadiainfo.comptatransport.data.CarriersRepository;
 import com.acadiainfo.comptatransport.data.CustomersRepository;
-import com.acadiainfo.comptatransport.domain.Carrier;
+import com.acadiainfo.comptatransport.data.PriceGridsRepository;
 import com.acadiainfo.comptatransport.domain.Customer;
+import com.acadiainfo.comptatransport.domain.CustomerShipPreferences;
+import com.acadiainfo.comptatransport.domain.PriceGrid;
 import com.acadiainfo.util.WSUtils;
 
 import jakarta.ejb.Stateless;
@@ -17,7 +18,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
-import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
@@ -31,6 +31,7 @@ import jakarta.ws.rs.core.Response.Status;
 import jakarta.ws.rs.core.StreamingOutput;
 import jakarta.ws.rs.core.UriBuilder;
 
+
 @Stateless
 @Path("/customers")
 public class CustomerWS {
@@ -41,7 +42,6 @@ public class CustomerWS {
 
 	@PersistenceContext(unitName = "ComptaTransportPU")
 	private EntityManager em;
-
 
 	@GET
 	@Path("/{id}")
@@ -113,12 +113,19 @@ public class CustomerWS {
 		if (customer.getLabel() == null || customer.getLabel().equals("")) {
 			throw new IllegalArgumentException("Le libellé du Client ne peut pas être vide.");
 		}
+		if (customer.getShipPreferences() != null) {
+			if (!customer.getShipPreferences().isEmpty()) {
+				throw new IllegalArgumentException("Les Préférences Transport du Client ne doivent pas être incluses."
+				  +"\n Utilisez le verb PATCH pour cela.");
+			}
+		}
+
 
 		// Unusual : id is not supposed to be provided
 		if (customer.getId() != null) {
 			if (customersRepo.find(customer) != null) {
 				throw new jakarta.persistence.EntityExistsException("Un Client possède déjà le même identifiant."
-						+ " Il est recommandé de ne pas l'inclure dans le corps du message.");
+				  + " Il est recommandé de ne pas l'inclure dans le corps du message.");
 			}
 		}
 
@@ -129,10 +136,20 @@ public class CustomerWS {
 		return customersRepo.insert(customer);
 	}
 
+	/**
+	 * This one has a a "Update" semantics for all properties, except for "ShipPreferences" where it is more "PATCH" (add & update only, never delete)
+	 * @param id
+	 * @param customer_payload
+	 * @return
+	 */
 	@PUT
 	@Path("/{id}")
 	@Consumes(value = MediaType.APPLICATION_JSON)
-	public Response update_WS(@PathParam("id") Long id, Customer customer_payload) {
+	public Response update_WS(@PathParam("id") Long id, String customer_payloadstr) {
+		logger.info(customer_payloadstr);
+		jakarta.json.bind.Jsonb jsonb = jakarta.json.bind.JsonbBuilder.create();
+		Customer customer_payload = jsonb.fromJson(customer_payloadstr, Customer.class);
+
 		CustomersRepository customersRepo = CustomersRepository.getInstance(em);
 
 		// payload check
@@ -147,6 +164,13 @@ public class CustomerWS {
 		if (customer_payload.getLabel() == null || customer_payload.getLabel().equals("")) {
 			return WSUtils.response(Status.BAD_REQUEST, servReq, "Le libellé du Client ne peut pas être vide.");
 		}
+		/*
+		 * if (customer_payload.getShipPreferences() != null) { if
+		 * (!customer_payload.getShipPreferences().isEmpty()) { return
+		 * WSUtils.response(Status.BAD_REQUEST, servReq,
+		 * "Les Préférences Transport du Client ne doivent pas être incluses." +
+		 * "\n Utilisez le verb PATCH pour cela."); } }
+		 */
 
 		// constraint check
 		Customer otherCustomer = customersRepo.findByErpReference(customer_payload.getErpReference());
@@ -156,13 +180,50 @@ public class CustomerWS {
 
 		try {
 			customer_payload.setId(id);
+			// customer_payload.setShipPreferences(... neutralized specifically in repo
 			Customer customer = customersRepo.update(customer_payload, false);
+
+			// specific handling of ShipPreferences, with a PATCH semantics
+			if (customer_payload.getShipPreferences() != null) {
+				PriceGridsRepository priceGridsRepo = PriceGridsRepository.getInstance(em);
+
+				for (CustomerShipPreferences preference_in_payload : customer_payload.getShipPreferences()) {
+					// resolve Customer consistency in payload
+					if (preference_in_payload.getCustomer() != null
+					  && preference_in_payload.getCustomer().getId() != null
+					  && !customer.getId().equals(preference_in_payload.getCustomer().getId())) {
+						return WSUtils.response(Status.BAD_REQUEST, servReq, "Les Préférences de Transport ne doivent pas spécifier un identifiant Client différent !");
+					}
+					preference_in_payload.setCustomer(customer);
+
+					// Try and find corresponding record in database :
+					CustomerShipPreferences preference_in_base = customer.getShipPreferences().stream()
+					    .filter(pref -> pref.getCustomer().getId().equals(preference_in_payload.getCustomer().getId()))
+					    .filter(pref -> pref.getApplicationDate().equals(preference_in_payload.getApplicationDate()))
+					    .findAny().orElse(null);
+
+					if (preference_in_base == null) {
+						// a) either Create new ShipPreferences
+						preference_in_payload.setCustomer(customer);
+						em.persist(preference_in_payload);
+						// customer.getShipPreferences().add(preference_in_payload); bidi mapping
+
+					} else {
+						// b) or Update existing ShipPreferences
+						patchShipPreference(preference_in_base, preference_in_payload, priceGridsRepo);
+					}
+				}
+			}
+			em.flush();
+
 			return Response.noContent().entity(customer).build(); // no_content with a content ;-)
 		} catch (jakarta.persistence.OptimisticLockException exc) {
 			return WSUtils.response(Status.CONFLICT, servReq,
 					"Client peut-être modifié depuis (\"_v_lock\" non-concordant).");
 		} catch (jakarta.persistence.EntityNotFoundException exc) {
 			return WSUtils.response(Status.NOT_FOUND, servReq, "Client peut-être supprimé depuis.");
+		} catch (jakarta.persistence.PersistenceException exc) {
+			return ApplicationConfig.response(exc, servReq, Customer.class);
 		}
 	}
 
@@ -176,235 +237,37 @@ public class CustomerWS {
 			return ApplicationConfig.response(exc, servReq, Customer.class);
 		}
 	}
-//
-//	/* ================================================================== */
-//	/* WS on Versions of a grid */
-//
-//	/**
-//	 * (utility for versions)
-//	 * @param id
-//	 * @return parent PriceGrid, throws {@link NotFoundException} if none found
-//	 */
-//	private PriceGrid ensureParentPricePrid(Long id) {
-//		PriceGrid priceGrid = this.getOne(id);
-//		if (priceGrid == null) {
-//			throw new NotFoundException("Aucune Grille Tarifaire avec cet id");
-//		}
-//		return priceGrid;
-//	}
-//
-//	/**
-//	 *  (utility for versions)
-//	 * @param v_id
-//	 * @param priceGrid
-//	 * @return PriceGridVersion, throws {@link NotFoundException} if none consistent found
-//	 */
-//	private PriceGridVersion ensureConsistentGridVersion(Long v_id, PriceGrid priceGrid) {
-//		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
-//		PriceGridVersion priceGridVersion = priceGridVersionsRepo.findById(v_id);
-//
-//		if (priceGridVersion == null) {
-//			throw new NotFoundException("Version de Grille Tarifaire peut-être supprimée depuis.");
-//		}
-//		if (!priceGrid.getId().equals(priceGridVersion.getPriceGrid().getId())) {
-//			throw new NotFoundException("Version de Grille Tarifaire incohérente avec la Grille.");
-//		}
-//		return priceGridVersion;
-//	}
-//
-//	/**
-//	 * Get all versions of a PriceGrid
-//	 * @param pgid - Parent PriceGrid id
-//	 * @return
-//	 */
-//	@GET
-//	@Path("/{id}/versions")
-//	@Produces(MediaType.APPLICATION_JSON)
-//	public StreamingOutput versions_getAll_WS(@PathParam("id") Long id) {
-//		PriceGrid priceGrid = ensureParentPricePrid(id);
-//
-//		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
-//		Stream<PriceGridVersion> versions = priceGridVersionsRepo.findAllOfOnePriceGrid(id);
-//		return WSUtils.entityJsonStreamingOutput(versions);
-//	}
-//
-//
-//	@POST
-//	@Path("/{id}/versions")
-//	@Consumes(value = MediaType.APPLICATION_JSON)
-//	public Response versions_add_WS(@PathParam("id") Long id, PriceGridVersion priceGridVersion) {
-//		PriceGrid priceGrid = ensureParentPricePrid(id);
-//
-//		try {
-//			if (priceGridVersion == null) {
-//				throw new IllegalArgumentException("Le corps du message n'a pas pu interprété comme une Version de Grille Tarifaire (PriceGridVersion)");
-//			}
-//			if (priceGridVersion.getVersion() == null || priceGridVersion.getVersion().equals("")) {
-//				throw new IllegalArgumentException("La Version de Grille Tarifaire doit être renseignée (PriceGridVersion.version)");
-//			}
-//			if (priceGridVersion.getId() != null) {
-//				throw new IllegalArgumentException("L'identifiant de Version de Grille Tarifaire ne doit pas être incluse dans le corps du message.");
-//			}
-//			if (priceGridVersion.getPriceGrid() != null) {
-//				throw new IllegalArgumentException("Le corps de la requête ne doit pas comporter de Grille (\"priceGrid\").");
-//			}
-//
-//			PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
-//			PriceGridVersion duplicatePriceGridVersion = priceGridVersionsRepo
-//			  .findVersionOfOnePriceGrid(id, priceGridVersion.getVersion());
-//			if (duplicatePriceGridVersion != null) {
-//				return WSUtils.response(Status.CONFLICT, servReq,
-//				  "La Version doit rester unique pour chaque Grille Tarifaire.");
-//			}
-//
-//			priceGridVersion.setPriceGrid(priceGrid);
-//			em.persist(priceGridVersion);
-//			em.flush();
-//
-//			java.net.URI uri = UriBuilder.fromUri("./price-grids").path(String.valueOf(priceGrid.getId()))
-//					.path("versions").path(String.valueOf(priceGridVersion.getId())).build();
-//			return Response.created(uri).build();
-//		} catch (IllegalArgumentException exc) {
-//			return WSUtils.response(Status.BAD_REQUEST, servReq, exc.getMessage());
-//		}
-//	}
-//
-//	@GET
-//	@Path("/{id}/versions/{v_id}")
-//	@Produces(MediaType.APPLICATION_JSON)
-//	public Response versions_getOne_WS(@PathParam("id") Long id, @PathParam("v_id") Long v_id) {
-//		PriceGrid priceGrid = ensureParentPricePrid(id);
-//		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
-//
-//		return Response.ok(priceGridVersion).build();
-//	}
-//
-//	@DELETE
-//	@Path("/{id}/versions/{v_id}")
-//	public Response versions_delete_WS(@PathParam("id") Long id, @PathParam("v_id") Long v_id) {
-//		PriceGrid priceGrid = ensureParentPricePrid(id);
-//		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
-//		
-//		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
-//		priceGridVersionsRepo.delete(priceGridVersion);
-//
-//		return Response.noContent().build();
-//	}
-//
-//	@PUT
-//	@Path("/{id}/versions/{v_id}")
-//	@Consumes(value = MediaType.APPLICATION_JSON)
-//	public Response versions_update_WS(@PathParam("id") Long id, @PathParam("v_id") Long v_id, PriceGridVersion priceGridVersion_payload) {
-//		PriceGrid priceGrid = ensureParentPricePrid(id);
-//		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
-//		
-//		// payload check		
-//		if (priceGridVersion_payload.getId() != null && !priceGridVersion_payload.getId().equals(v_id)) {
-//			return WSUtils.response(Status.BAD_REQUEST, servReq,
-//			  "Identifiant incohérent dans l'URI et le corps du message."
-//			 +" Il est possible (et recommandé) de ne pas l'inclure dans le corps du message.");
-//		}
-//		if (priceGridVersion_payload.getPriceGrid() != null) {
-//			return WSUtils.response(Status.BAD_REQUEST, servReq,
-//			  "Le corps de la requête ne doit pas comporter de Grille (\"priceGrid\"). Il est impossible de réattacher une Version à une autre Grille.");
-//		}
-//
-//		// constraint check
-//		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
-//		PriceGridVersion duplicatePriceGridVersion = priceGridVersionsRepo
-//		  .findVersionOfOnePriceGrid(id, priceGridVersion.getVersion());
-//		if (!duplicatePriceGridVersion.getId().equals(v_id)) {
-//			return WSUtils.response(Status.CONFLICT, servReq,
-//			  "La Version doit rester unique pour chaque Grille Tarifaire.");
-//		}
-//
-//		try {
-//			priceGridVersion_payload.setId(v_id);
-//			priceGridVersion_payload.setPriceGrid(priceGrid);
-//
-//			priceGridVersionsRepo.update(priceGridVersion_payload, false);
-//			return Response.noContent().build();
-//		} catch (jakarta.persistence.OptimisticLockException exc) {
-//			return WSUtils.response(Status.CONFLICT, servReq,
-//			  "Grille Tarifaire peut-être modifiée depuis (\"_v_lock\" non-concordant).");			
-//		} catch (jakarta.persistence.EntityNotFoundException exc) {
-//			return WSUtils.response(Status.NOT_FOUND, servReq,
-//			  "Grille Tarifaire peut-être supprimée depuis.");
-//		}
-//	}
-//
-//	@GET
-//	@Path("/{id}/versions/{v_id}/jsonContent")
-//	@Produces(value = MediaType.APPLICATION_JSON)
-//	public String versions_getJsonContent(@PathParam("id") Long id, @PathParam("v_id") Long v_id) {
-//		PriceGrid priceGrid = ensureParentPricePrid(id);
-//		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
-//		return priceGridVersion.getJsonContent();
-//	}
-//
-//	@PUT
-//	@Path("/{id}/versions/{v_id}/jsonContent")
-//	@Consumes(value = MediaType.APPLICATION_JSON)
-//	@jakarta.ejb.TransactionAttribute(jakarta.ejb.TransactionAttributeType.REQUIRES_NEW)
-//	public Response versions_setJsonContent(@PathParam("id") Long id, @PathParam("v_id") Long v_id,
-//			@QueryParam("_v_lock") Long _v_lock, String jsonContent) {
-//		//BTW, we won't check the payload for JSON conformance
-//		PriceGrid priceGrid = ensureParentPricePrid(id);
-//		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
-//
-//		if (_v_lock == null) {
-//			return WSUtils.response(Status.BAD_REQUEST, servReq,
-//			  "Un numéro de version doit être passé en paramètre de requête (_v_lock)");
-//		} else if (!_v_lock.equals(priceGridVersion.get_v_lock())) {
-//			return WSUtils.response(Status.CONFLICT, servReq,
-//			  "Version de Grille Tarifaire peut-être modifiée depuis (\"_v_lock\" non-concordant).");
-//		}
-//		
-//		try {
-//			priceGridVersion.setJsonContent(jsonContent);
-//			em.flush(); // to make it fail faster, if needed
-//			return Response.noContent().build();
-//		} catch (jakarta.persistence.PersistenceException exc) {
-//			return ApplicationConfig.response(exc, servReq, PriceGridVersion.class);
-//		}
-//	}
-//
-//	@POST
-//	@Path("/{id}/versions/{v_id}/copy")
-//	@Produces(value = MediaType.APPLICATION_JSON)
-//	public Response versions_copyOne(@PathParam("id") Long id, @PathParam("v_id") Long v_id, @QueryParam("newVersion") String newVersion) {
-//		PriceGrid priceGrid = ensureParentPricePrid(id);
-//		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
-//
-//		
-//		String newDescription = "COPIE DE " + priceGridVersion.getVersion();
-//		if (priceGridVersion.getDescription() != null && !priceGridVersion.getDescription().equals("")) {
-//			newDescription += " : \n" + priceGridVersion.getDescription();
-//		}
-//		if (newDescription.length() > 256) {
-//			newDescription = newDescription.substring(0, 250) + "[...]";
-//		}
-//
-//		PriceGridVersion priceGridVersionCopy = new PriceGridVersion();
-//		// priceGridVersionCopy.setId();
-//		priceGridVersionCopy.setPriceGrid(priceGrid);
-//		priceGridVersionCopy.setVersion(newVersion);
-//		priceGridVersionCopy.setPublishedDate(null);
-//		priceGridVersionCopy.setDescription(newDescription);
-//		priceGridVersionCopy.setJsonContent(priceGridVersion.getJsonContent()); // the most important
-//		// priceGridVersionCopy.set_v_lock();
-//		// priceGridVersionCopy.getAuditingInfo()id.setUser(...; TODO user management
-//
-//		try {
-//			PriceGridVersionsRepository.getInstance(em).insert(priceGridVersionCopy);
-//			em.flush();
-//
-//			java.net.URI uri = UriBuilder.fromUri("./price-grids").path(String.valueOf(priceGrid.getId()))
-//					.path("versions").path(String.valueOf(priceGridVersionCopy.getId())).build();
-//			return Response.created(uri).build();
-//		} catch (jakarta.persistence.PersistenceException exc) {
-//			return ApplicationConfig.response(exc, servReq, PriceGridVersion.class);
-//		}
-//	}
+
+
+	private static void patchShipPreference(CustomerShipPreferences target, CustomerShipPreferences source,
+	    PriceGridsRepository priceGridsRepo) {
+
+		//id and customer : out of scope
+		target.setApplicationDate(source.getApplicationDate());
+		target.setOverrideCarriers(source.getOverrideCarriers());
+		target.setCarrierTagsWhitelist(source.getCarrierTagsWhitelist());
+		target.setCarrierTagsBlacklist(source.getCarrierTagsBlacklist());
+
+
+		if (source.getOverridePriceGrid() != null) {
+			PriceGrid overridePriceGrid = null;
+			Long pgid = source.getOverridePriceGrid().getId();
+			if (overridePriceGrid == null && pgid != null) {
+				overridePriceGrid = priceGridsRepo.findById(pgid);
+			}
+
+			String pgname = source.getOverridePriceGrid().getName();
+			if (overridePriceGrid == null && pgid != null) {
+				overridePriceGrid = priceGridsRepo.findByName(pgname);
+			}
+
+			if (overridePriceGrid == null) {
+				throw new IllegalArgumentException("Dans Préférence Transport du Client, la Grille Tarifaire n'a été trouvée ni par l'id, ni par le nom fourni");
+			}
+			target.setOverridePriceGrid(overridePriceGrid);
+		} else {
+			target.setOverridePriceGrid(null);
+		}
+	}
 
 }

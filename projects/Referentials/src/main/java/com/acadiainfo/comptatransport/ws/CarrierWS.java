@@ -9,6 +9,7 @@ import com.acadiainfo.comptatransport.domain.Carrier;
 import com.acadiainfo.util.WSUtils;
 
 import jakarta.ejb.Stateless;
+import jakarta.json.*;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.servlet.http.HttpServletRequest;
@@ -104,7 +105,7 @@ public class CarrierWS {
 			return Response.noContent().entity(carrier).build();
 		} catch (jakarta.persistence.OptimisticLockException exc) {
 			return WSUtils.response(Status.CONFLICT, servReq,
-			  "Transporteur peut-être modifié depuis (\"_v_lock\" non-concordant).");			
+			  "Transporteur peut-être modifié depuis (\"_v_lock\" non-concordant).");
 		} catch (jakarta.persistence.EntityNotFoundException exc) {
 			return WSUtils.response(Status.NOT_FOUND, servReq,
 			  "Transporteur peut-être supprimé depuis.");
@@ -123,5 +124,32 @@ public class CarrierWS {
 					"Transporteur introuvable avec le nom = " + name);
 		}
 	}
+
+	@GET
+	@Path("/*/tags")
+	@Produces(value = MediaType.APPLICATION_JSON)
+	public JsonObject getCollectedTags() {
+		 JsonBuilderFactory factory = Json.createBuilderFactory(null);
+		 JsonObject value = Json.createObjectBuilder()
+		     .add("firstName", "John")
+		     .add("lastName", "Smith")
+		     .add("age", 25)
+		     .add("address", factory.createObjectBuilder()
+		         .add("streetAddress", "21 2nd Street")
+		         .add("city", "New York")
+		         .add("state", "NY")
+		         .add("postalCode", "10021"))
+		     .add("phoneNumber", factory.createArrayBuilder()
+		         .add(factory.createObjectBuilder()
+		             .add("type", "home")
+		             .add("number", "212 555-1234"))
+		         .add(factory.createObjectBuilder()
+		             .add("type", "fax")
+		             .add("number", "646 555-4567")))
+		     .build();
+		 return value;
+			// TODO extract tags from existing
+	}
+
 
 }

@@ -1,6 +1,7 @@
 package com.acadiainfo.comptatransport.data;
 
 
+import java.time.LocalDateTime;
 import java.util.stream.Stream;
 
 import com.acadiainfo.comptatransport.domain.PriceGridVersion;
@@ -57,6 +58,25 @@ public class PriceGridVersionsRepository extends CrudRepositoryImpl<PriceGridVer
 
 		return versions;
 	}
+	
+	/**
+	 * Same as {@link #findAllOfOnePriceGrid(Long)}, only with an applicable date.
+	 * @param id - parent PriceGrid id
+	 * @param dtPublishedAt 
+	 * @return reversed-ordered by publishedDate 
+	 */
+	public Stream<PriceGridVersion> findAllPublishedOfOnePriceGrid(Long id, LocalDateTime dtPublishedAt) {
+		Query query = this.getEntityManager()
+		    .createQuery(
+		        "SELECT pgv FROM PriceGridVersion pgv WHERE pgv.priceGrid.id=:id AND pgv.publishedDate <= :dtPublishedAt ORDER BY pgv.publishedDate desc");
+		query.setParameter("id", id);
+		query.setParameter("dtPublishedAt", dtPublishedAt);
+
+		@SuppressWarnings("unchecked")
+		Stream<PriceGridVersion> resultStream = query.getResultStream();
+		return resultStream;
+	}
+	
 
 	/**
 	 * Used for preemptive check on UNIQUE constraint.

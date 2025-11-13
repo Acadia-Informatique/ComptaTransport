@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Table sticky</title>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+	<style>
+		table {
+			width:100%
+		}
+		table thead {
+		  	position: sticky;
+			top: 0; /* Don't forget this, required for the stickiness */
+			box-shadow: 0px 10px 16px 0px rgba(0, 0, 0, 0.4);
+			z-index:3;
+			background-color: pink;
+		}
+
+
+		table td.stick {
+		  	position: sticky;
+			left: 0; /* Don't forget this, required for the stickiness */
+			box-shadow: 0px 10px 16px 0px rgba(0, 0, 0, 0.4);
+			z-index:3;
+			background-color: cyan;
+		}
+	</style>
+</head>
+<body>
+	<h1>Test table sticky</h1>
+
+	<table>
+		<thead>
+			<tr>
+				<th colspan="3">attribs</th>
+				<th colspan="5">years</th>
+			</tr>
+			<tr>
+				<th>A</th>
+				<th>B</th>
+				<th>C</th>
+				<th>2022</th>
+				<th>2023</th>
+				<th>2024</th>
+				<th>2025</th>
+				<th>2026</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td class="stick">axxxxxxxxxxxxxxxxxx</td>
+				<td class="stick">bxxxxxxxxxxxxxxxxx</td>
+				<td class="stick">cxxxxxxxxxxxxxxxxx</td>
+				<td>1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</td>
+				<td>2xxxxxxxxxxxxxxxxxxxxxxx</td>
+				<td>3xxxxxxxxxxxxxxxxxxxxxx</td>
+				<td>2xxxxxxxxxxxxxxxxxxxxxxxxxx</td>
+				<td>1xxxxxxxxxxxxxxxxxxxxxxxxxxxx</td>
+			</tr>
+			<tr>
+				<td class="stick" colspan="3">xx</td>
+				<td>1</td>
+				<td>2</td>
+				<td>3</td>
+				<td>2</td>
+				<td>1</td>
+			</tr>
+			<tr>
+				<td class="stick">a</td>
+				<td class="stick">b</td>
+				<td class="stick">c</td>
+				<td>1</td>
+				<td>2</td>
+				<td>3</td>
+				<td>2</td>
+				<td>1</td>
+			</tr>
+			<tr>
+				<td class="stick">a</td>
+				<td class="stick">b</td>
+				<td class="stick">c</td>
+				<td>1</td>
+				<td>2</td>
+				<td>3</td>
+				<td>2</td>
+				<td>1</td>
+			</tr>
+			<tr>
+				<td class="stick">a</td>
+				<td class="stick">b</td>
+				<td class="stick">c</td>
+				<td>1</td>
+				<td>2</td>
+				<td>3</td>
+				<td>2</td>
+				<td>1</td>
+			</tr>
+			<tr>
+				<td class="stick">a</td>
+				<td class="stick">b</td>
+				<td class="stick">c</td>
+				<td>1</td>
+				<td>2</td>
+				<td>3</td>
+				<td>2</td>
+				<td>1</td>
+			</tr>
+			<tr>
+				<td class="stick">a</td>
+				<td class="stick">b</td>
+				<td class="stick">c</td>
+				<td>1</td>
+				<td>2</td>
+				<td>3</td>
+				<td>2</td>
+				<td>1</td>
+			</tr>
+			<tr>
+				<td class="stick">a</td>
+				<td class="stick">b</td>
+				<td class="stick">c</td>
+				<td>1</td>
+				<td>2</td>
+				<td>3</td>
+				<td>2</td>
+				<td>1</td>
+			</tr>
+			<tr>
+				<td class="stick">a</td>
+				<td class="stick">b</td>
+				<td class="stick">c</td>
+				<td>1</td>
+				<td>2</td>
+				<td>3</td>
+				<td>2</td>
+				<td>1</td>
+			</tr>
+			<tr>
+				<td class="stick">a</td>
+				<td class="stick">b</td>
+				<td class="stick">c</td>
+				<td>1</td>
+				<td>2</td>
+				<td>3</td>
+				<td>2</td>
+				<td>1</td>
+			</tr>
+		</tbody>
+	</table>
+</body>
+</html>

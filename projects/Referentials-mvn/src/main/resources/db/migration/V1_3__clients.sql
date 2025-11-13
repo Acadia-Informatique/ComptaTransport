@@ -17,17 +17,38 @@ CREATE TABLE `CUSTOMER` (
 -- ComptaTransport.CUSTOMER_SHIP_PREFERENCES definition
 
 CREATE TABLE `CUSTOMER_SHIP_PREFERENCES` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `customer_id` bigint unsigned NOT NULL,
-  `application_date` datetime DEFAULT NULL COMMENT 'Nul si non-validées, peut être dans le futur. Indique les conditions applicables à un instant donné.',
+  `application_date` datetime NOT NULL COMMENT 'Indique les conditions applicables à un instant donné.',
   `override_price_grid` bigint unsigned DEFAULT NULL COMMENT '(optionel) La grille tarifaire particulière à ce client',
   `override_carriers` varchar(256) DEFAULT NULL COMMENT '"semicolon-separated string", FK virtuelle vers CARRIER. A priori le client n''utilisera QUE ces transporteurs.',
   `carrier_tags_whitelist` varchar(256) DEFAULT NULL COMMENT '(optionel) "semicolon-separated string", CARRIER.tags préférés du client',
   `carrier_tags_blacklist` varchar(256) DEFAULT NULL COMMENT '(optionel) "semicolon-separated string", CARRIER.tags que le client veut éviter',
-	`_v_lock` bigint unsigned NOT NULL DEFAULT '0' COMMENT '(technical: JPA @Version)',
+	-- no modification : `_v_lock` bigint unsigned NOT NULL DEFAULT '0' COMMENT '(technical: JPA @Version)',
 	`_date_created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '(audit)',
 	`_date_modified` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '(audit)',
-  PRIMARY KEY (`customer_id`),
-  UNIQUE KEY `CUSTOMER_SHIP_PREFERENCES_UNIQUE_IDX` (`customer_id`,`application_date`) USING BTREE,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `CUSTOMER_SHIP_PREFERENCES_UNIQUE` (`customer_id`,`application_date`) USING BTREE,
+  KEY `CUSTOMER_SHIP_PREFERENCES_PRICE_GRID_FK` (`override_price_grid`),
+  CONSTRAINT `CUSTOMER_SHIP_PREFERENCES_CUSTOMER_FK` FOREIGN KEY (`customer_id`) REFERENCES `CUSTOMER` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `CUSTOMER_SHIP_PREFERENCES_PRICE_GRID_FK` FOREIGN KEY (`override_price_grid`) REFERENCES `PRICE_GRID` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Préférences du client en matière de transport';
+
+
+
+-- ComptaTransport.CUSTOMER_SHIP_PREFERENCES definition
+
+CREATE TABLE `CUSTOMER_SHIP_PREFERENCES` (
+  `customer_id` bigint unsigned NOT NULL,
+  `application_date` datetime NOT NULL COMMENT 'Indique les conditions applicables à un instant donné.',
+  `override_price_grid` bigint unsigned DEFAULT NULL COMMENT '(optionel) La grille tarifaire particulière à ce client',
+  `override_carriers` varchar(256) DEFAULT NULL COMMENT '"semicolon-separated string", FK virtuelle vers CARRIER. A priori le client n''utilisera QUE ces transporteurs.',
+  `carrier_tags_whitelist` varchar(256) DEFAULT NULL COMMENT '(optionel) "semicolon-separated string", CARRIER.tags préférés du client',
+  `carrier_tags_blacklist` varchar(256) DEFAULT NULL COMMENT '(optionel) "semicolon-separated string", CARRIER.tags que le client veut éviter',
+	-- no modification lock on this one: `_v_lock` bigint unsigned NOT NULL DEFAULT '0' COMMENT '(technical: JPA @Version)',
+  `_date_created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '(audit)',
+  `_date_modified` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '(audit)',
+  PRIMARY KEY (`customer_id`,`application_date`),
   KEY `CUSTOMER_SHIP_PREFERENCES_PRICE_GRID_FK` (`override_price_grid`),
   CONSTRAINT `CUSTOMER_SHIP_PREFERENCES_CUSTOMER_FK` FOREIGN KEY (`customer_id`) REFERENCES `CUSTOMER` (`id`) ON DELETE CASCADE,
   CONSTRAINT `CUSTOMER_SHIP_PREFERENCES_PRICE_GRID_FK` FOREIGN KEY (`override_price_grid`) REFERENCES `PRICE_GRID` (`id`)

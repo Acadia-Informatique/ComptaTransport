@@ -73,7 +73,7 @@ Dependencies :
 			convertUTC2BrowserLocal(dtUTC){
 				if (dtUTC == null || dtUTC == "") return null;
 				if (/^(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})(\.\d+)?Z\[UTC\]$/.test(dtUTC)) {
-					dtUTC = dtUTC.slice(0, -("[UTC]".length)); //changed to a JS supported "simplified ISO8061"
+					dtUTC = dtUTC.slice(0, -("[UTC]".length)); //changed to a JS supported "simplified ISO8601"
 					return new Date(Date.parse(dtUTC)).toLocaleString();
 				} else {
 					return `((Illisible: \${dtUTC}))`;
@@ -111,7 +111,7 @@ Dependencies :
 				+(local_dateModified ? 'Modifié le '+ local_dateModified : '')"></button>
 			<em v-else>(nouveau)</em>`// TODO mettre utilisateur (si nouveau, utilis. en cours) quand dispo
 	};
-
+	
 	var TextTagsComponent = {
 		props: {
 			modelValue: {
@@ -132,7 +132,7 @@ Dependencies :
 				required: false,
 				default: []
 			},
-			
+
 			tagMaxLength: {
 				type: Number,
 				default: 16
@@ -158,7 +158,7 @@ Dependencies :
 				textTag = textTag.substring(0, this.tagMaxLength);
 				this.textTagList.push(textTag);
 
-				let deduplicated = new Set(this.textTagList);
+		 		let deduplicated = new Set(this.textTagList);
 				deduplicated = Array.from(deduplicated).sort();
 				this.textTagList = deduplicated;
 			},

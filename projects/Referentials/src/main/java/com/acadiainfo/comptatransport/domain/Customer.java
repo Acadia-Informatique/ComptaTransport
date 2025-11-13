@@ -3,6 +3,7 @@ package com.acadiainfo.comptatransport.domain;
 import java.util.Set;
 import java.util.TreeSet;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -10,6 +11,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.NamedQuery;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
@@ -40,6 +42,14 @@ public class Customer implements Auditable, VersionLockable {
 	/** Tags can be used for technical filtering (e.g. "Grand Compte") or further description. */
 	@Column(name = "tags")
 	private Set<String> tags = new TreeSet<String>();
+	
+	/** All the preferences recorded on this Customer */
+    @OneToMany(
+        mappedBy = "customer",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true
+    )
+	private Set<CustomerShipPreferences> shipPreferences = new TreeSet<CustomerShipPreferences>();
 	
 	/**
 	 * JPA Optimistic lock
@@ -90,6 +100,14 @@ public class Customer implements Auditable, VersionLockable {
 
 	public void setTags(Set<String> tags) {
 		this.tags = tags;
+	}
+
+	public Set<CustomerShipPreferences> getShipPreferences() {
+		return shipPreferences;
+	}
+
+	public void setShipPreferences(Set<CustomerShipPreferences> shipPreferences) {
+		this.shipPreferences = shipPreferences;
 	}
 
 	@Override

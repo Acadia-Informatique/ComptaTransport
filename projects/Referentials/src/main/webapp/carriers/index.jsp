@@ -57,7 +57,8 @@
 	<%@ include file="/WEB-INF/includes/body-inc/bs-confirmDialog.jspf" %>
 
 	<div id="app">
-		<entity-data-grid id="carrier-grid" resource-name="Liste de Transporteurs" resource-uri="carriers" identifier="name" :config="carrierGridConfig"></entity-data-grid>
+		<entity-data-grid id="carrier-grid" resource-name="Liste de Transporteurs" resource-uri="carriers" identifier="name"
+		  :config="carrierGridConfig" class="table-hover" ></entity-data-grid>
 	</div>
 
 	<!-- =========================================================== -->

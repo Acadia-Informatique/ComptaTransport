@@ -198,14 +198,25 @@ public class PriceGridWS {
 	@GET
 	@Path("/{id}/versions")
 	@Produces(MediaType.APPLICATION_JSON)
-	public StreamingOutput versions_getAll_WS(@PathParam("id") Long id) {
+	public StreamingOutput versions_getAll_WS(@PathParam("id") Long id, @QueryParam("publishedAt") String publishedAt) {
 		PriceGrid priceGrid = ensureParentPricePrid(id);
 
 		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
-		Stream<PriceGridVersion> versions = priceGridVersionsRepo.findAllOfOnePriceGrid(id);
+		Stream<PriceGridVersion> versions;
+		if (publishedAt != null) {
+			try {
+				java.time.LocalDateTime dtPublishedAt = WSUtils.parseParamDate(publishedAt);
+				versions = priceGridVersionsRepo.findAllPublishedOfOnePriceGrid(id, dtPublishedAt);
+
+			} catch (java.time.format.DateTimeParseException exc) {
+				throw new IllegalArgumentException("Erreur d'analyse du paramètre \"publishedAt\" = " + publishedAt
+				    + "\", détail: " + exc.getMessage());
+			}
+		} else {
+			versions = priceGridVersionsRepo.findAllOfOnePriceGrid(id);
+		}
 		return WSUtils.entityJsonStreamingOutput(versions);
 	}
-
 
 	@POST
 	@Path("/{id}/versions")

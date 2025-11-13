@@ -11,6 +11,10 @@ Dependencies :
 <script type="text/javascript">
 	// used in EntityDataGrid, because there is no proper Transition@move hook (yet)
 	var debouncedScrollIntoView = debounce((element, options)=>{if(element) element.scrollIntoView(options);}, 50);
+	// used in EntityDataGrid, to make "reorder" event handling slightly less costly
+	var debouncedEmitListChanged = debounce((component)=>{component.$emit("reorder", component.entityList);}, 500);
+
+
 
 	// VueJS component (options API)
 	var EntityDataGrid = {
@@ -56,10 +60,12 @@ Dependencies :
 				}
 			}
 		},
+		emits:["reorder", "editing"], // "reorder" in a broader meaning : "any shallow change in list" (order, number of items)
 		data(){
 			return {
 				columnList: [],
 				entityList: [],
+				filteredEntityList:[],
 				editingEntity: null,
 				editingValidation: new Map(),
 				selectedEntity: null,
@@ -88,6 +94,7 @@ Dependencies :
 				.then(response => {
 					this.columnList = this._buildColumnList(response.data);
 					this.entityList = this._buildRowList(response.data);
+					this.reorderEntityList();
 				})
 				.catch(error => {
 					this.columnList = this._buildColumnList();
@@ -109,6 +116,7 @@ Dependencies :
 						refreshedEntity["#key"] = removedEntity["#key"];
 						refreshedEntity["#uri"] = entityUri;
 						this.entityList.splice(idx, 1, refreshedEntity);
+						//NOT : this.reorderEntityList(); since listed ids not changed
 					}
 					// more accurate than
 					//for (pty in refreshedEntity) {
@@ -120,8 +128,7 @@ Dependencies :
 				});
 			},
 
-
-			orderData(propertyName, direction){
+			sortByAttr(propertyName, direction){
 				this.entityList.sort((a,b) => {
 					// isNew() should always be unique and on 1st row, whatever the direction
 					if (this.isNew(a)) return -1;
@@ -137,7 +144,29 @@ Dependencies :
 					else
 						return 0; // to keep it stable
 				});
+				this.reorderEntityList();
 			},
+
+			/* can be called for externally set order/filter */
+			reorderEntityList(extIds){
+				console.debug("reorderEntityList");
+				if (typeof extIds === "undefined") extIds = null;
+				/* TODO find a proper protocol for external ordering / filtering
+				//externally imposed order
+				if (extIds != null) {
+					for (let i = 0, i < extIds.length ; i++){
+						this.entityList
+					}
+
+				} else {
+					//TODO reset filter marks
+					this.filteredEntityList = this.entityList;
+				}
+				 */
+				 this.filteredEntityList = this.entityList;
+				debouncedEmitListChanged(this);
+			},
+
 			registerMoveEnd(el){
 				el.addEventListener("transitionend", this.hMoveEnd);
 			},
@@ -162,6 +191,7 @@ Dependencies :
 						let idx = this.entityList.findIndex(e => (e[this.identifier] == id));
 						if (idx >=0) {
 							this.entityList.splice(idx, 1);
+							this.reorderEntityList();
 						}
 						//this.refreshFullGrid() more up-to-date, but loses current sort/scroll pos
 					})
@@ -190,6 +220,7 @@ Dependencies :
 				newEntity["#uri"] = null;
 				this.startEditingRow(newEntity);
 				this.entityList.unshift(newEntity);
+				this.reorderEntityList();
 				this.$nextTick(() => {
 					this.$refs.scrollAnchor[0].scrollIntoView({block:"center"});
 					// note: ref="scrollAnchor" sits in a loop, hence the [0]...
@@ -207,6 +238,7 @@ Dependencies :
 			startEditingRow(entity){
 				this.clearEditingRow();
 				this.editingEntity = deepClone(entity);
+				this.$emit("editing", this.editingEntity);
 			},
 			stopEditingRow(){
 				let payload = this._buildPayload(this.editingEntity);
@@ -244,10 +276,12 @@ Dependencies :
 					let idx = this.entityList.findIndex(e => this.isNew(e));
 					if (idx >=0) {
 						this.entityList.splice(idx, 1);
+						this.reorderEntityList();
 					} //... at least there should be only 1
 				}
 				this.editingEntity = null;
 				this.editingValidation.clear();
+				this.$emit("editing", this.editingEntity); // == null ;-)
 
 				this.selectedEntity = null; //not necessarily related but...
 			},
@@ -285,9 +319,12 @@ Dependencies :
 			_buildPayload(entityObj) {
 				let payloadObj = deepClone(entityObj);
 
-				//clear all technical markers
-				delete payloadObj["#key"];
-				delete payloadObj["#uri"];
+				//clear all technical markers (#key, #uri, etc.)
+				for (let attr in payloadObj) {
+					if (attr.startsWith("#")) {
+						delete payloadObj[attr];	
+					}
+				}
 
 				//custom payload cleaner
 				if (this.config.payloadProcessor) {
@@ -424,12 +461,12 @@ Dependencies :
 </script>
 
 <script type="text/x-template" id="entityDataList-template">
-	<table class="table table-bordered table-hover table-sm gridTable caption-top" style="table-layout: fixed">
+	<table class="table table-bordered table-sm caption-top" style="table-layout: fixed">
 		<caption class="fs-3 ms-2">{{ resourceName }}</caption>
 		<colgroup>
 			<col style="width:55px"/><%-- class="btns-first" --%>
 			<template v-for="column in columnList.filter(c=>c.visible)">
-				<col v-if="column.widthCSS" :style="'width:' + column.widthCSS" />
+				<col v-if="column.widthCSS" :style="'width:' + column.widthCSS" /><%-- needs table-layout: fixed --%>
 				<col v-else />
 			</template>
 			<col style="width:55px" /><%-- class="btns-last" --%>
@@ -437,52 +474,59 @@ Dependencies :
 		<thead class="shadow sticky-top">
 			<tr>
 				<th class="btns-first">
-					<button type="button" class="btn bi bi-plus-lg btn-primary"
-					  @click="createEntity(entity)" title="Ajouter une ligne"></button>
-					<button type="button" class="btn bi bi-escape btn-secondary"
-					  @click.stop="clearEditingRow()" title="Annuler la modification"
-					  :disabled="editingEntity == null"
-					  v-if="this.config.selectRowAction=='edit'"></button>
+					<div>
+						<button type="button" class="btn bi bi-plus-lg btn-primary"
+						  @click="createEntity(entity)" title="Ajouter une ligne"></button>
+						<button type="button" class="btn bi bi-escape btn-secondary"
+						  @click.stop="clearEditingRow()" title="Annuler la modification"
+						  :disabled="editingEntity == null"
+						  v-if="this.config.selectRowAction=='edit'"></button>
+					</div>
 				</th>
 				<th v-for="column in columnList.filter(c=>c.visible)"
 				  class="position-relative" :class="columnClassObj(column)"
 				  data-bs-toggle="tooltip" :title="column.description" ref="columnTooltip">
-					{{ column.label }}
+					<div>
+						{{ column.label }}
 
-					<i v-if="column.descriptionIcon"
-					  class="position-absolute top-0 end-0 mt-1 me-1 bi" :class="'bi-'+column.descriptionIcon"></i>
+						<i v-if="column.descriptionIcon"
+						class="position-absolute top-0 end-0 mt-1 me-1 bi" :class="'bi-'+column.descriptionIcon"></i>
 
-					<div v-if="column.sortable" class="sort-buttons">
-						<a role="button" class="bi bi-caret-down-fill" @click="orderData(column.name, +1)"></a>
-						<a role="button" class="bi bi-caret-up-fill" @click="orderData(column.name, -1)"></a>
+						<div v-if="column.sortable" class="sort-buttons">
+							<a role="button" class="bi bi-caret-down-fill" @click="sortByAttr(column.name, +1)"></a>
+							<a role="button" class="bi bi-caret-up-fill" @click="sortByAttr(column.name, -1)"></a>
+						</div>
+
 					</div>
-
 				</th>
 				<th class="btns-last">
-					<button type="button" class="btn bi bi-arrow-clockwise btn-primary"
-					  @click="refreshFullGrid()" title="Rafraîchir la grille"></button>
+					<div>
+						<button type="button" class="btn bi bi-arrow-clockwise btn-primary"
+						@click="refreshFullGrid()" title="Rafraîchir la grille"></button>
+					</div>
 				</th>
 			</tr>
 		</thead>
 		<tbody>
 			<TransitionGroup name="list" @after-enter="registerMoveEnd" @before-leave="unregisterMoveEnd">
-			<tr v-for="entity in entityList" :key="entity['#key']" @click="selectRow(entity)" :class="{'table-active':isRowSelected(entity)}">
+			<tr v-for="entity in filteredEntityList" :key="entity['#key']" @click="selectRow(entity)"
+			  :class="{'table-active':isRowSelected(entity), 'row-editing': isEditingRow(entity)}">
 				<td class="btns-first">
-					<template v-if="isEditingRow(entity)" >
+					<div v-if="isEditingRow(entity)" >
 						<button type="button" class="btn bi bi-check-lg btn-success"
 						  @click.stop="stopEditingRow()" title="Enregistrer la ligne"
 						  ref="scrollAnchor"></button>
 						<button type="button" class="btn bi bi-escape btn-secondary"
 						  @click.stop="clearEditingRow()" title="Annuler la modification"
 						  v-if="this.config.selectRowAction!='edit'"></button>
-					</template>
-					<template v-else >
+					</div>
+					<div v-else >
 						<button type="button" class="btn bi bi-pencil"
 						  @click.stop="startEditingRow(entity)" title="Modifier la ligne"></button>
-					</template>
+					</div>
 				</td>
 				<td v-for="column in columnList.filter(c=>c.visible)" :class="columnClassObj(column)">
-					<template v-if="isEditingRow(entity)" >
+					<div v-if="isEditingRow(entity)" >
 
 						<template v-if="(isNew(entity) && column.insertable) || (!isNew(entity) && column.updatable)">
 							<textarea v-if="column.editor == 'textarea'"
@@ -522,8 +566,8 @@ Dependencies :
 								<li v-for="msg in editingValidation.get(column.name)">{{msg}}</li>
 							</ul>
 						</div>
-					</template>
-					<template v-else >
+					</div>
+					<div v-else >
 						<span v-if="column.renderer == 'textarea'" style="white-space:pre-wrap">
 							{{ entity[column.name] }}
 						</span>
@@ -535,18 +579,18 @@ Dependencies :
 						  @entities-changed="refreshFullGrid" @entity-changed="refreshGridRow(entity)">
 						</component>
 						<div v-else class="text-truncate" :title="entity[column.name]">{{ entity[column.name] }}	</div>
-					</template>
+					</div>
 				</td>
 				<td class="btns-last">
-					<template v-if="isEditingRow(entity)" >
+					<div v-if="isEditingRow(entity)" >
 						<button v-if="isNew(entity)" type="button" class="btn bi bi-trash3 btn-secondary" disabled></button>
 						<button v-else               type="button" class="btn bi bi-trash3 btn-danger"
 						  @click.stop="deleteEntity(entity)" title="Supprime la ligne"></button>
-					</template>
-					<template v-else >
+					</div>
+					<div v-else >
 						<button type="button" class="btn bi bi-arrow-clockwise"
 						  @click.stop="refreshGridRow(entity)" title="Rafraîchir la ligne"></button>
-					</template>
+					</div>
 				</td>
 			</tr>
 			</TransitionGroup>

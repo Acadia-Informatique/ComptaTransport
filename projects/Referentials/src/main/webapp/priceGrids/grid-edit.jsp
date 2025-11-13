@@ -1017,7 +1017,7 @@
 					pgv_conflict: "", // a end-user message explaining the situation
 					pgv_newVersion: "", // new Version name to be created
 
-					
+
 					localStorage_hasSystem : false, // since cannot make localStorage reactive ;-)
 					needSaving: false, // "dirty" mark on PriceGrids
 
@@ -1199,7 +1199,7 @@
 					let dateTag = ((dtUTC) => { /* expected data format by JaxRS : "2025-10-30T10:24:43Z[UTC]" */
 						if (dtUTC == null || dtUTC == "") return "";
 						if (/^(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})(\.\d+)?Z\[UTC\]$/.test(dtUTC)) {
-							dtUTC = dtUTC.slice(0, -("[UTC]".length)); //changed to a JS supported "simplified ISO8061"
+							dtUTC = dtUTC.slice(0, -("[UTC]".length)); //changed to a JS supported "simplified ISO8601"
 							let date = new Date(Date.parse(dtUTC));
 							return date.toISOString().replaceAll(/[^\d]/g, "").slice(0,12);
 						} else {
@@ -1239,7 +1239,7 @@
 					} else {
 						/* recreate  */
 						let new_pgv_metadata = {
-							description: this.pgv_metadata.description,							
+							description: this.pgv_metadata.description,
 							version: this.pgv_newVersion,
 						};
 						axios_custom = axios_backend.post(`price-grids/\${PRICE_GRID_ID}/versions`, new_pgv_metadata);

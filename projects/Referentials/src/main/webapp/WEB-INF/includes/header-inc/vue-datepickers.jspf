@@ -1,0 +1,89 @@
+<%@ page language="java" pageEncoding="UTF-8"%>
+<%--
+VueJS components for rendering and editing dates.
+
+Add some (local) date / time related functions to the global scope,
+in the Datepicker global object.
+
+
+See vue-entityAttributeComponents.jspf for more details, since the same conditions more or less apply here.
+
+Dependencies :
+- header-inc/client-stack.jspf
+--%>
+
+<script type="text/javascript">
+const Datepicker = {
+	/* ISO8601, precise to the seconds */
+	now(){
+		return new Date().toISOString().substring(0, 19); //YYYY-MM-DD'T'hh:mm:ss
+	},
+	currentDate(){
+		return new Date().toISOString().substring(0, 10) + "T00:00:00"; //YYYY-MM-DD
+	},
+	currentMonth(){
+		return new Date().toISOString().substring(0, 7) + "-01T00:00:00"; //YYYY-MM
+	},
+};
+
+
+var Datepicker_Month = {
+	props: ['modelValue', 'modelModifiers'],
+	//	modelValue: String ISO8601 (if null -> start with current month),
+	//	modelModifiers: capture and ignore
+	// },
+	emits: ['update:modelValue'],
+	computed: {
+		monthValue: {
+			get() {
+				return this.modelValue.substring(0, 7);
+			},
+			set(v) {
+				v = this._normalize(v, 0);
+				this.$forceUpdate();
+				this.$emit('update:modelValue', v + "-01T00:00:00.0");
+			}
+		}
+	},
+	methods:{
+
+		/* private static */ _normalize(dateString, offset) {
+			let match = /(?<year>\d{4})-(?<month>\d{2})/.exec(dateString);
+			if (match) {
+				let year = parseInt(match.groups.year, 10);
+				let month = parseInt(match.groups.month, 10) - 1; // month as number range : 0 - 11
+
+				let totalMonth = 12 * year + month + offset;
+				if (totalMonth < 0) throw new Error("Not supported : negative years");
+
+				year = Math.floor(totalMonth / 12);
+				month = totalMonth % 12;
+
+				return year.toString().padStart(4, "0")
+				  + "-"
+				  + (month + 1).toString().padStart(2, "0");
+			} else {//or throw error ?....
+				return Datepicker.currentMonth();
+			}
+		},
+		addMonth(offset){
+			this.monthValue = this._normalize(this.monthValue, offset);
+		}
+	},
+	template: "#Datepicker-Month-template"
+};
+</script>
+
+
+<script type="text/x-template" id="Datepicker-Month-template">
+	<div class="d-flex">
+		<button type="button" @click="addMonth(-1)"
+		  class="btn bi bi-caret-left-fill px-0">
+		</button>
+		<input type="text" v-model.lazy="monthValue" length="7" style="width:4.2em"></input>
+		<button type="button" @click="addMonth(+1)"
+		  class="btn bi bi-caret-right-fill px-0">
+		</button>
+
+	</div>
+</script>

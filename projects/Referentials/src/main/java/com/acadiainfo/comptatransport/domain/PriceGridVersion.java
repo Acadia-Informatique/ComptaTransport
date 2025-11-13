@@ -43,7 +43,7 @@ public class PriceGridVersion implements Auditable, VersionLockable {
 	private String description;
 
 	/** Publication date, may be in the future for planned publish */
-	@Column(name = "published_date")
+	@Column(name = "published_date", nullable = true)
 	private LocalDateTime publishedDate;
 
 	@Lob

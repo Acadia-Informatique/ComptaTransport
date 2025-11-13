@@ -1,7 +1,6 @@
 package com.acadiainfo.util.persistence;
 
 import java.lang.reflect.InvocationTargetException;
-import java.util.List;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
@@ -218,31 +217,6 @@ public abstract class CrudRepositoryImpl<T, K> {
 		return this.findById(this.getEntityKey(entity));
 	}
 
-	/**
-	 * Save back one JPA entity (from database ideally, not deserialized).
-	 * @param t - Entity to save
-	 * @return up-to-date
-	 */
-	public T save(T t) {
-		t = em.merge(t);
-		em.flush();
-		return t;
-	}
-
-	/**
-	 * Batch version of {@link #save(Object)}.
-	 * @param list - Entities to save
-	 * @return new ArrayList of merged entities.
-	 */
-	public List<T> saveAll(List<T> list) {
-		List<T> newList = new java.util.ArrayList<T>(list.size());
-		for (T t : list) {
-			newList.add(em.merge(t));
-		}
-		em.flush();
-		return newList;
-	}
-
 	/*-------- instance-level utils ------- */
 
 	/**
@@ -294,7 +268,9 @@ public abstract class CrudRepositoryImpl<T, K> {
 						&& getterC.getParameterCount() == 0 && getterC.getReturnType().equals(propertyType)) {
 					logger.finest("getter/setter couple found for :" + propertyName);
 					Object value = getterC.invoke(patch);
-					setterC.invoke(original, value);
+					if (!ignoreNulls || value != null) {
+						setterC.invoke(original, value);
+					}
 				}
 			}
 		}

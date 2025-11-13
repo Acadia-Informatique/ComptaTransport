@@ -22,8 +22,7 @@
 	
 	<H2>Contrôles</H2>
 	<ul>
-		<li><a href="/carriers/">Liste de transporteurs</a></li>
-		<li><a href="/priceGrid/">Grilles de prix</a></li>
+		<li>à faire...</li>
 	</ul>	
 </body>
 </html>

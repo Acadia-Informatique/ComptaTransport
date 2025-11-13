@@ -32,6 +32,15 @@ public class CustomersRepository extends CrudRepositoryImpl<Customer, Long> {
 	}
 
 	/**
+	 * Excluding "Customer.shipPreferences" to preserve them in a "normal" update.
+	 * They are never removed, so for WS we would add them with a special PATCH service.
+	 */
+	@Override
+	protected boolean excludeFromPatchBean(String propertyName) {
+		return "ShipPreferences".equals(propertyName);
+	}
+
+	/**
 	 * Used for preemptive check on UNIQUE constraint.
 	 * @param erpReference
 	 * @return
