@@ -17,30 +17,29 @@ public class WSRuntimeExceptionMapper implements ExceptionMapper<RuntimeExceptio
 	@Override
 	public Response toResponse(RuntimeException exc) {
 		logger.finer("Intercepted exception : " + exc.getClass() + " - message=" + exc.getMessage());
-		
+
 		int responseStatus;
 		String responseMessage;
 
-		if (exc instanceof jakarta.persistence.OptimisticLockException) { // safety net : those are ideally caught at WS-level 
+		if (exc instanceof jakarta.persistence.OptimisticLockException) { // safety net : those are ideally caught at WS-level
 			responseStatus = Response.Status.CONFLICT.getStatusCode();
 			responseMessage = "JPA Optimistic lock error : " + exc.getMessage();
 		} else if (exc instanceof com.acadiainfo.util.DataIntegrityViolationException) { // safety net : those are ideally caught at WS-level
 			responseStatus = Response.Status.NOT_ACCEPTABLE.getStatusCode();
 			responseMessage = "Data integrity error : " + exc.getMessage();
-		} else if (exc instanceof jakarta.ws.rs.WebApplicationException) {
-			Response webappResponse = ((jakarta.ws.rs.WebApplicationException) exc).getResponse();
-			
-			responseStatus = webappResponse.getStatus(); 
+		} else if (exc instanceof jakarta.ws.rs.WebApplicationException wbexc) {
+			Response webappResponse = wbexc.getResponse();
+			responseStatus = webappResponse.getStatus();
 			responseMessage = exc.getMessage(); // webappResponse.getEntity is changed with <error-pages> in web.xml
 		} else {
-			Throwable t  = (exc instanceof jakarta.ejb.EJBException)
-			  ? ExceptionUtils.unwrapEjbException((jakarta.ejb.EJBException) exc) 
+			Throwable t  = (exc instanceof jakarta.ejb.EJBException ejbexc)
+			  ? ExceptionUtils.unwrapEjbException(ejbexc)
 			  : exc;
-			
+
 			responseStatus = Response.Status.INTERNAL_SERVER_ERROR.getStatusCode();
 			responseMessage = t.getMessage();
 		}
-		
+
 		return Response.status(responseStatus)
 		  .entity(responseMessage)
 		  .type(MediaType.TEXT_PLAIN_TYPE.withCharset("UTF-8"))

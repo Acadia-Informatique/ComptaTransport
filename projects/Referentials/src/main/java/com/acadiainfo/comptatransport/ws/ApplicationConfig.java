@@ -44,18 +44,16 @@ public class ApplicationConfig extends Application {
 		} else if (exc instanceof jakarta.persistence.EntityExistsException) {
 			return com.acadiainfo.util.WSUtils.response(Status.CONFLICT, servletRequest,
 			  getEntityLabel(entityClass, locale) + " n'a pu être créé en doublon.\n"
-			  + exc.getMessage());				
-		} else if (exc instanceof com.acadiainfo.util.UniqueConstraintViolationException) {
-			com.acadiainfo.util.UniqueConstraintViolationException customExc = (com.acadiainfo.util.UniqueConstraintViolationException) exc;
+			  + exc.getMessage());
+		} else if (exc instanceof com.acadiainfo.util.UniqueConstraintViolationException customExc) {
 			return com.acadiainfo.util.WSUtils.response(Status.CONFLICT, servletRequest,
 			  getEntityLabel(entityClass, locale) + " ne peut avoir la même valeur '"
 			  + customExc.getDuplicateValue() + "' de "
 			  + getUniqueAttributeLabel(customExc.getConstraintName(), locale));
-		} else if (exc instanceof com.acadiainfo.util.ForeignKeyViolationException) {
-			com.acadiainfo.util.ForeignKeyViolationException customExc = (com.acadiainfo.util.ForeignKeyViolationException) exc;
+		} else if (exc instanceof com.acadiainfo.util.ForeignKeyViolationException customExc) {
 			return com.acadiainfo.util.WSUtils.response(Status.NOT_ACCEPTABLE, servletRequest,
 			  getEntityLabel(entityClass, locale) + " possède encore des "
-			  + getDependentEntityLabel(customExc.getConstraintName(), locale));					
+			  + getDependentEntityLabel(customExc.getConstraintName(), locale));
 		}
 		throw exc;
 	}
@@ -95,7 +93,7 @@ public class ApplicationConfig extends Application {
 			return constraintName; // as a fallback
 		}
 	}
-	
+
 
 	/**
 	 * Get "pretty names" for WS messages.
@@ -115,8 +113,8 @@ public class ApplicationConfig extends Application {
 		default:
 			return constraintName; // as a fallback
 		}
-	}	
-	
+	}
+
 
 
 }

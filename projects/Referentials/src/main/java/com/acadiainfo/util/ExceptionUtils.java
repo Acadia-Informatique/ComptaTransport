@@ -15,10 +15,10 @@ public class ExceptionUtils {
 		throw (E) e;
 	}
 
-	/** 
+	/**
 	 * Look into a PersistenceException for a SQL-based cause, as a safety net for insufficient checking.
-	 * The messages at repository level are meant for debugging, and are not properly localized. 
-	 * 
+	 * The messages at repository level are meant for debugging, and are not properly localized.
+	 *
 	 * @param exc - the Exception to be analyzed
 	 * @return a "human readable" version of the exc argument (may be another PersistenceException)
 	 */
@@ -32,11 +32,9 @@ public class ExceptionUtils {
 		}
 
 		Throwable cause = com.acadiainfo.util.ExceptionUtils.unwrapToSqlBasedException(exc);
-		if (cause instanceof java.sql.SQLIntegrityConstraintViolationException) {
-			java.sql.SQLIntegrityConstraintViolationException sqlCause = (java.sql.SQLIntegrityConstraintViolationException) cause;
-
+		if (cause instanceof java.sql.SQLIntegrityConstraintViolationException sqlCause) {
 			jakarta.persistence.PersistenceException explicited = null;
-			
+
 			if (explicited == null) {
 				explicited = translateConstraintViolation_UNIQUE(sqlCause);
 			}
@@ -50,7 +48,7 @@ public class ExceptionUtils {
 				explicited = new com.acadiainfo.util.DataIntegrityViolationException(sqlCause);
 			}
 			// } else if ... TODO add analysis for other common java.sql.* exceptions
-			
+
 			return explicited;
 		} else {
 			// simplify the message and cause chain
@@ -59,7 +57,7 @@ public class ExceptionUtils {
 	}
 
 	/**
-	 * Unwrap a PersistenceException to a "human readable" version, database-originated exception.  
+	 * Unwrap a PersistenceException to a "human readable" version, database-originated exception.
 	 * @param exc
 	 * @return a "root cause" if found, or the original exc arg if unwrapping failed
 	 */
@@ -77,7 +75,7 @@ public class ExceptionUtils {
 	/**
 	 * If only Jakarta EE could wrap all funny exceptions from their
 	 * the JDBC-drivers and JPA providers... (and I don't want them in my compile classpath).
-	 * 
+	 *
 	 * TODO document current database settings (MySQL + ConnectJ driver) + JPA provider (EclipseLink)
 	 * TODO complement and adjust to other possible deployment settings
 	 * @param t
@@ -99,7 +97,7 @@ public class ExceptionUtils {
 	 * ***************** SQL error message analysis, based on my own database
 	 * settings, and my own PK constraint naming habits (couldn't do better for
 	 * years ;-)
-	 * 
+	 *
 	 * TODO document current database settings (MySQL + UTC timezone + US-EN
 	 * locale).
 	 */
@@ -108,7 +106,7 @@ public class ExceptionUtils {
 	private static final Pattern UNIQUE_pattern = Pattern.compile("^.*Duplicate entry '(.*)' for key '(.*)'$");
 
 	/**
-	 * Look for a Primary Key violation message. 
+	 * Look for a Primary Key violation message.
 	 */
 	private static jakarta.persistence.EntityExistsException translateConstraintViolation_PK(Throwable t) {
 		String message = t.getMessage();
@@ -123,7 +121,7 @@ public class ExceptionUtils {
 	}
 
 	/**
-	 * Look for a Foreign Key violation message. 
+	 * Look for a Foreign Key violation message.
 	 */
 	private static com.acadiainfo.util.ForeignKeyViolationException translateConstraintViolation_FK(Throwable t) {
 		String message = t.getMessage();
@@ -138,7 +136,7 @@ public class ExceptionUtils {
 	}
 
 	/**
-	 * Look for a UNIQUE constraint violation message. 
+	 * Look for a UNIQUE constraint violation message.
 	 */
 	private static UniqueConstraintViolationException translateConstraintViolation_UNIQUE(Throwable t) {
 		String message = t.getMessage();
@@ -155,7 +153,7 @@ public class ExceptionUtils {
 
 	/************************************************************************************************
 	 * Inter-EJB method calls can make exception handling complicate...
-	 * Thanks to the good old days of "distributed objects". 
+	 * Thanks to the good old days of "distributed objects".
 	 * @param exc
 	 * @return
 	 */
