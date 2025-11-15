@@ -4,6 +4,7 @@ VueJS + Axios simple data admin grid.
 
 Components :
 - EntityDataGrid
+- EntitySelector : built atop EntityDataGrid, to provide a modal selector
 
 Dependencies :
 - header-inc/client-stack.jspf
@@ -32,6 +33,11 @@ Dependencies :
 				required: false,
 				default: "id"
 			},
+			readonly: {
+				type: Boolean,
+				required: false,
+				default: false
+			},
 			config : {
 				type: Object,
 				required: false,
@@ -47,8 +53,8 @@ Dependencies :
 							sortable: true,  // default is true
 							mandatory: false, // default is false
 							format: {pattern:/\d+/, errorMsg:"Must be an integer"} // if length *strictly* over 0, that will set a limit to it
-							//renderer : built-in (textarea, none) or a custom VueJS component", default is plain div
-							//editor:    built-in (textarea, none) or a custom VueJS component", default is simple input
+							//renderer : built-in (textarea, none) or a custom VueJS component", default is plain div ("editable=false" set on them at instanciation)
+							//editor:    built-in (textarea, none) or a custom VueJS component", default is simple input ("editable=true" set on them at instanciation)
 							//... for more info on renderers and editors, see vue-entityAttributeComponents.jspf
 //TODO what if we make "column" children components to parameterize their own parent ?
 						}
@@ -230,12 +236,14 @@ Dependencies :
 				return entity['#key'] == -1;
 			},
 			isEditingRow(entity){
+				if (this.readonly) return false; // as a safeguard
 				if (this.isNew(entity))
 					return this.isNew(this.editingEntity);
 				else
 					return entity["#key"] == (this.editingEntity ? this.editingEntity["#key"] : null);
 			},
 			startEditingRow(entity){
+				if (this.readonly) return; // as a safeguard
 				this.clearEditingRow();
 				this.editingEntity = deepClone(entity);
 				this.$emit("editing", this.editingEntity);
@@ -285,6 +293,11 @@ Dependencies :
 
 				this.selectedEntity = null; //not necessarily related but...
 			},
+			/** typically used from outside */
+			selectRowById(id){
+				let entity = this.entityList.find(e => e[this.identifier] == id);
+				this.selectRow(entity);
+			},
 			selectRow(entity){
 				switch(this.config.selectRowAction) {
 				case 'none':
@@ -322,7 +335,7 @@ Dependencies :
 				//clear all technical markers (#key, #uri, etc.)
 				for (let attr in payloadObj) {
 					if (attr.startsWith("#")) {
-						delete payloadObj[attr];	
+						delete payloadObj[attr];
 					}
 				}
 
@@ -464,7 +477,7 @@ Dependencies :
 	<table class="table table-bordered table-sm caption-top" style="table-layout: fixed">
 		<caption class="fs-3 ms-2">{{ resourceName }}</caption>
 		<colgroup>
-			<col style="width:55px"/><%-- class="btns-first" --%>
+			<col v-if="!readonly" style="width:55px"/><%-- class="btns-first" --%>
 			<template v-for="column in columnList.filter(c=>c.visible)">
 				<col v-if="column.widthCSS" :style="'width:' + column.widthCSS" /><%-- needs table-layout: fixed --%>
 				<col v-else />
@@ -473,7 +486,7 @@ Dependencies :
 		</colgroup>
 		<thead class="shadow sticky-top">
 			<tr>
-				<th class="btns-first">
+				<th v-if="!readonly" class="btns-first">
 					<div>
 						<button type="button" class="btn bi bi-plus-lg btn-primary"
 						  @click="createEntity(entity)" title="Ajouter une ligne"></button>
@@ -511,7 +524,7 @@ Dependencies :
 			<TransitionGroup name="list" @after-enter="registerMoveEnd" @before-leave="unregisterMoveEnd">
 			<tr v-for="entity in filteredEntityList" :key="entity['#key']" @click="selectRow(entity)"
 			  :class="{'table-active':isRowSelected(entity), 'row-editing': isEditingRow(entity)}">
-				<td class="btns-first">
+				<td v-if="!readonly" class="btns-first">
 					<div v-if="isEditingRow(entity)" >
 						<button type="button" class="btn bi bi-check-lg btn-success"
 						  @click.stop="stopEditingRow()" title="Enregistrer la ligne"
@@ -537,7 +550,7 @@ Dependencies :
 							  class="bi bi-ban text-warning">
 							</div>
 							<component v-else-if="column.editor" :is="column.editor"
-							  v-model.trim="editingEntity[column.name]" @change="validateField(editingEntity,column)"
+							  v-model.trim="editingEntity[column.name]" :editable="true" @change="validateField(editingEntity,column)"
 							  @entities-changed="refreshFullGrid" @entity-changed="refreshGridRow(entity)" >
 							</component>
 							<input v-else
@@ -553,7 +566,7 @@ Dependencies :
 							  class="bi bi-ban text-warning">
 							</div>
 							<component v-else-if="column.renderer" :is="column.renderer"
-							  v-model="editingEntity[column.name]"
+							  v-model="editingEntity[column.name]" :editable="false"
 							  @entities-changed="refreshFullGrid" @entity-changed="refreshGridRow(entity)">
 							</component>
 							<input v-else disabled
@@ -575,7 +588,7 @@ Dependencies :
 						  class="bi bi-ban text-warning">
 						</div>
 						<component v-else-if="column.renderer" :is="column.renderer"
-						  v-model="entity[column.name]"
+						  v-model="entity[column.name]" :editable="false"
 						  @entities-changed="refreshFullGrid" @entity-changed="refreshGridRow(entity)">
 						</component>
 						<div v-else class="text-truncate" :title="entity[column.name]">{{ entity[column.name] }}	</div>
@@ -596,4 +609,110 @@ Dependencies :
 			</TransitionGroup>
 		</tbody>
 	</table>
+</script>
+
+
+<%-- TODO implements multiple selection (ex. for Customer.overrideCarriers) --%>
+<script type="text/javascript">
+	var EntitySelector = {
+		extends: EntityDataGrid,
+		props: {
+			modelValue: {
+			},
+			modelModifiers:{
+				//capture and ignore
+			},
+			labelPty:{
+				type: String,
+				//required: true,
+				default: "id"
+			}
+		},
+		emits: ['update:modelValue'],
+		components:{
+			"embedded-data-grid" : EntityDataGrid
+		},
+		data:{
+			innerConfig: {}
+			//note: this.selectedEntity is completely irrelevant, we will use embedded's one directly
+		},
+		watch: {
+			// modelValue: not managed after modal dialog is open
+			config:{
+				handler(v){
+					this.innerConfig = {
+						columns: v.columns,
+						inferColumns: false,
+						selectRowAction : (entity)=>{
+							if (typeof v.selectRowAction == "function") v.selectRowAction(entity);
+							// empty func to ensure selection is not disabled
+						}
+					}
+				},
+				immediate: true
+			}
+		},
+		methods:{
+			openModal(){
+				var selectedId =  this.modelValue ? this.modelValue[this.identifier] : -1;
+				bootstrap.Modal.getOrCreateInstance(this.$refs.entitySelectorDialog).show();
+				this.$refs.embedded.selectRowById(selectedId);
+
+				//this.$nextTick(()=>
+
+				//		this.$forceUpdate();
+			},
+			validateEmpty(){
+				this.$emit('update:modelValue', null);
+
+			},
+			validateSelection(){
+				this.$emit('update:modelValue', this.$refs.embedded.selectedEntity);
+
+			}
+		},
+		template: "#entitySelector-template"
+	};
+</script>
+<script type="text/x-template" id="entitySelector-template">
+	<div class="d-flex">
+		<input readonly :value="modelValue ? modelValue[labelPty] : '-'" class="w-100 flex-grow-1 flex-shrink-1"/>
+		<button v-if="!readonly" class="flex-grow-0 flex-shrink-0 btn btn-secondary bi bi-table" @click="openModal" />
+	</div>
+	<div v-for="x in 1" ref="columnTooltip"></div><!-- dummy tooltip -->
+	<div class="modal modal-lg" id="entitySelector-dialog" data-bs-backdrop="static" tabindex="-1" ref="entitySelectorDialog">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title">Sélectionnez une valeur</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<embedded-data-grid readonly ref="embedded"
+						:resource-name="resourceName" :resource-uri="resourceUri" :identifier="identifier"
+						:config="innerConfig" class="table-hover" />
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary mx-2" data-bs-dismiss="modal">Abandonner</button>
+					<button type="button" class="btn btn-primary" data-bs-dismiss="modal" @click="validateEmpty" >Aucun</button>
+					<button type="button" class="btn btn-primary" data-bs-dismiss="modal" @click="validateSelection">Valider</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+
+<%--
+	<table class="table table-bordered table-sm caption-top" style="table-layout: fixed">
+		<caption class="fs-3 ms-2">{{ resourceName }}</caption>
+		<colgroup>
+			<col style="width:55px"/><%-- class="btns-first" -%>
+			<template v-for="column in columnList.filter(c=>c.visible)">
+				<col v-if="column.widthCSS" :style="'width:' + column.widthCSS" /><%-- needs table-layout: fixed -%>
+				<col v-else />
+			</template>
+			<col style="width:55px" /><%-- class="btns-last" -%>
+		</colgroup>
+		<thead cla
+--%>
 </script>

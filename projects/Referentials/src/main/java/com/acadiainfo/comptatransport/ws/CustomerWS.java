@@ -12,6 +12,9 @@ import com.acadiainfo.comptatransport.domain.PriceGrid;
 import com.acadiainfo.util.WSUtils;
 
 import jakarta.ejb.Stateless;
+import jakarta.json.Json;
+import jakarta.json.JsonArrayBuilder;
+import jakarta.json.JsonBuilderFactory;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.servlet.http.HttpServletRequest;
@@ -91,6 +94,7 @@ public class CustomerWS {
 	@Consumes(value = MediaType.APPLICATION_JSON)
 	public Response add_WS(Customer customer) {
 		try {
+			/* invalidate tags cache */ TAGS_JSON_timestamp = 0L;
 			customer = this.add(customer);
 			java.net.URI uri = UriBuilder.fromUri("./customers").path(String.valueOf(customer.getId())).build();
 			return Response.created(uri).build();
@@ -179,6 +183,7 @@ public class CustomerWS {
 		}
 
 		try {
+			/* invalidate tags cache */ TAGS_JSON_timestamp = 0L;
 			customer_payload.setId(id);
 			// customer_payload.setShipPreferences(... neutralized specifically in repo
 			Customer customer = customersRepo.update(customer_payload, false);
@@ -231,6 +236,7 @@ public class CustomerWS {
 	@Path("/{id}")
 	public Response delete_WS(@PathParam("id") Long id) {
 		try {
+			/* invalidate tags cache */ TAGS_JSON_timestamp = 0L;
 			CustomersRepository.getInstance(em).deleteById(id);
 			return Response.noContent().build();
 		} catch (jakarta.persistence.PersistenceException exc) {
@@ -268,6 +274,66 @@ public class CustomerWS {
 		} else {
 			target.setOverridePriceGrid(null);
 		}
+	}
+
+	/**
+	 * Tag listing service, with static cache.
+	 */
+	private static String TAGS_JSON = "";
+	private static volatile long TAGS_JSON_timestamp = 0L;
+	private static final long TAGS_JSON_ttl = 60000L; /* 1 min */
+
+	private static final java.util.List<String> VIP_TAGS, SYS_TAGS;
+	static {
+		VIP_TAGS = new java.util.ArrayList<String>();
+		VIP_TAGS.add("Grand Compte");
+		SYS_TAGS = new java.util.ArrayList<String>();
+		SYS_TAGS.add("B2C");
+	}
+
+	@GET
+	@Path("/*/tags")
+	@Produces(value = MediaType.APPLICATION_JSON)
+	public String getCollectedTags() {
+
+		/* rebuild cache if stale (concurrent build is allowed) */
+		if (System.currentTimeMillis() - TAGS_JSON_timestamp > TAGS_JSON_ttl) {
+			logger.fine("Build TAGS_JSON cache");
+
+			// collect custom tags already set
+			Set<String> collectedTags = java.util.Collections.synchronizedSet(new java.util.TreeSet<String>());
+			this.getAll(null).forEach(t -> collectedTags.addAll(t.getTags()));
+			collectedTags.removeAll(VIP_TAGS);
+			collectedTags.removeAll(SYS_TAGS);
+
+			// build Json String to cache
+			JsonBuilderFactory factory = Json.createBuilderFactory(null);
+			JsonArrayBuilder vipTagsB = factory.createArrayBuilder();
+			for (String tag : VIP_TAGS) {
+				vipTagsB.add(tag);
+			}
+			JsonArrayBuilder systemTagsB = factory.createArrayBuilder();
+			for (String tag : SYS_TAGS) {
+				systemTagsB.add(tag);
+			}
+			JsonArrayBuilder collectedTagsB = factory.createArrayBuilder();
+			for (String tag : collectedTags) {
+				collectedTagsB.add(tag);
+			}
+			String newValue = Json.createObjectBuilder().add("vip", vipTagsB).add("system", systemTagsB)
+			    .add("collected", collectedTagsB)
+			    .build().toString();
+
+			synchronized (this.getClass()) {
+				TAGS_JSON = newValue;
+				TAGS_JSON_timestamp = System.currentTimeMillis();
+			}
+		}
+
+		synchronized (this.getClass()) {
+			return TAGS_JSON;
+		}
+
 	}
 
 }

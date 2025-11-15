@@ -77,6 +77,7 @@ public class CarrierWS {
 		}
 
 		try {
+			/* invalidate tags cache */ TAGS_JSON_timestamp = 0L;
 			carrier = this.add(carrier);
 			return Response.created(UriBuilder.fromUri("./carriers").path(carrier.getName()).build()).build();
 		} catch (jakarta.persistence.EntityExistsException exc) {
@@ -101,6 +102,7 @@ public class CarrierWS {
 			 +" Rappel : le nom ne peut pas être modifié après création.");
 		}
 		try {
+			/* invalidate tags cache */ TAGS_JSON_timestamp = 0L;
 			carrier = CarriersRepository.getInstance(em).update(carrier, false);
 			return Response.noContent().entity(carrier).build();
 		} catch (jakarta.persistence.OptimisticLockException exc) {
@@ -117,6 +119,7 @@ public class CarrierWS {
 	@Path("/{name}")
 	public Response delete_WS(@PathParam("name") String name) {
 		try {
+			/* invalidate tags cache */ TAGS_JSON_timestamp = 0L;
 			CarriersRepository.getInstance(em).deleteById(name);
 			return Response.noContent().build();
 		} catch (jakarta.persistence.EntityNotFoundException exc) {
@@ -125,30 +128,60 @@ public class CarrierWS {
 		}
 	}
 
+	/**
+	 * Tag listing service, with static cache.
+	 */
+	private static String TAGS_JSON = "";
+	private static volatile long TAGS_JSON_timestamp = 0L;
+	private static final long TAGS_JSON_ttl = 60000L; /* 1 min */
+
+	private static final java.util.List<String> SYSTEM_TAGS;
+	static {
+		SYSTEM_TAGS = new java.util.ArrayList<String>();
+		SYSTEM_TAGS.add("Sans frais");
+		SYSTEM_TAGS.add("Virtuel");
+	}
+
+
 	@GET
 	@Path("/*/tags")
 	@Produces(value = MediaType.APPLICATION_JSON)
-	public JsonObject getCollectedTags() {
-		 JsonBuilderFactory factory = Json.createBuilderFactory(null);
-		 JsonObject value = Json.createObjectBuilder()
-		     .add("firstName", "John")
-		     .add("lastName", "Smith")
-		     .add("age", 25)
-		     .add("address", factory.createObjectBuilder()
-		         .add("streetAddress", "21 2nd Street")
-		         .add("city", "New York")
-		         .add("state", "NY")
-		         .add("postalCode", "10021"))
-		     .add("phoneNumber", factory.createArrayBuilder()
-		         .add(factory.createObjectBuilder()
-		             .add("type", "home")
-		             .add("number", "212 555-1234"))
-		         .add(factory.createObjectBuilder()
-		             .add("type", "fax")
-		             .add("number", "646 555-4567")))
-		     .build();
-		 return value;
-			// TODO extract tags from existing
+	public String getCollectedTags() {
+
+		/* rebuild cache if stale (concurrent build is allowed) */
+		if (System.currentTimeMillis() - TAGS_JSON_timestamp > TAGS_JSON_ttl) {
+			logger.fine("Build TAGS_JSON cache");
+
+			// collect custom tags already set
+			Set<String> collectedTags = java.util.Collections.synchronizedSet(new java.util.TreeSet<String>());
+			this.getAll(null).forEach(t -> collectedTags.addAll(t.getTags()));
+			collectedTags.removeAll(SYSTEM_TAGS);
+
+			// build Json String to cache
+			JsonBuilderFactory factory = Json.createBuilderFactory(null);
+			JsonArrayBuilder systemTagsB = factory.createArrayBuilder();
+			for (String tag : SYSTEM_TAGS) {
+				systemTagsB.add(tag);
+			}
+			JsonArrayBuilder collectedTagsB = factory.createArrayBuilder();
+			for (String tag : collectedTags) {
+				collectedTagsB.add(tag);
+			}
+			String newValue = Json.createObjectBuilder()
+			   .add("system", systemTagsB)
+			   .add("collected", collectedTagsB)
+			   .build().toString();
+
+			synchronized(this.getClass()) {
+				TAGS_JSON = newValue;
+				TAGS_JSON_timestamp = System.currentTimeMillis();
+			}
+		}
+
+		synchronized(this.getClass()) {
+			return TAGS_JSON;
+		}
+
 	}
 
 

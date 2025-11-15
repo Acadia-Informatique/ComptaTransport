@@ -12,9 +12,10 @@ you may need to compose them in custom components, or subclass them.
 
 Components :
 - MoneyInput
+- IconWithPopover (the value is displayed IN the popover, but icons are hints)
 - AuditingInfoRenderer (auditing info obj)
 - AuditingInfoRenderer_IconWithPopover (smaller variant)
-- TextTagsComponent ("text tags" tags as String[], editable)
+(- TextTagsComponent is its own file "vue-entityTextTagsComponents)
 
 Special :
 - EntityActionClient - designed as a composable in a custom renderer :
@@ -41,10 +42,14 @@ Dependencies :
 			}
 		},
 		emits: ['update:modelValue'],
-		created(){
-			if (this.decimals)
-				this.decimalsInt = parseInt(this.decimals,10);
-			this.rounding = Math.pow(10, this.decimalsInt);
+		watch: {
+			decimals: {
+				handler(v){
+					if (v) this.decimalsInt = parseInt(v,10);
+					this.rounding = Math.pow(10, this.decimalsInt);
+				},
+				immediate: true
+			}
 		},
 		computed: {
 			value: {
@@ -60,6 +65,49 @@ Dependencies :
 			}
 		},
 		template: `<input type="number" :step="1/rounding" v-model.lazy.number="value" class="money-input"/>`
+	};
+
+	var IconWithPopover = {
+		props: {
+			modelValue: {
+			},
+			icon:{
+				type: String,
+				required: true
+			},
+			iconEmpty:{
+				type: String,
+				required: false
+			}
+		},
+		computed:{
+			computedString(){
+				if (Vue.toRaw(this.modelValue) instanceof Array) {
+					let result ="";
+					for (let item of this.modelValue) {
+						result += "<li>" + item +"</li>";
+					}
+					return "<ul>" + result + "</ul>";
+				} else {
+					return "" + this.modelValue;
+				}
+			}
+		},
+		methods:{
+			clickPopover(e){
+				var popover = bootstrap.Popover.getInstance(e.target);
+				if (popover) popover.dispose();
+				popover = bootstrap.Popover.getOrCreateInstance(e.target);
+				popover.toggle();
+			}
+		},
+		template: `
+			<button v-if="modelValue" type="button" class="btn bi" :class="'bi-' + icon"
+			  @click.stop="clickPopover" data-bs-trigger="focus"
+			  title="Informations d'audit"
+			  data-bs-html="true" :data-bs-content="computedString"></button>
+			<i v-else-if="iconEmpty" class="btn bi" :class="'bi-' + iconEmpty" />
+			<span v-else>&nbsp;&mdash;&nbsp;</span>`
 	};
 
 	var AuditingInfoRenderer = {
@@ -111,137 +159,6 @@ Dependencies :
 				+(local_dateModified ? 'Modifié le '+ local_dateModified : '')"></button>
 			<em v-else>(nouveau)</em>`// TODO mettre utilisateur (si nouveau, utilis. en cours) quand dispo
 	};
-	
-	var TextTagsComponent = {
-		props: {
-			modelValue: {
-				type: Array, // of String
-				required: true
-			},
-			modelModifiers: { //capture and ignore this.modelModifiers
-				default: () => ({})
-			},
-
-			editable: {
-				type: Boolean,
-				default: false
-			},
-
-			selectables: {
-				type: Array, // of String
-				required: false,
-				default: []
-			},
-
-			tagMaxLength: {
-				type: Number,
-				default: 16
-			}
-		},
-		emits: ['update:modelValue'],
-		data() {
-			return {
-				areSelectablesShown: false,
-			}
-		},
-		computed: {
-			textTagList: {
-				get() {return this.modelValue},
-				set(value) {this.$emit('update:modelValue', value)}
-			}
-		},
-		methods:{
-			showTagPalette(b){
-				this.isTagPaletteOpen = b;
-			},
-			addTextTag(textTag){
-				textTag = textTag.substring(0, this.tagMaxLength);
-				this.textTagList.push(textTag);
-
-		 		let deduplicated = new Set(this.textTagList);
-				deduplicated = Array.from(deduplicated).sort();
-				this.textTagList = deduplicated;
-			},
-			removeTextTag(textTag){
-				this.textTagList = this.textTagList.filter(t => t !== textTag);
-			},
-			tagStyleClass(textTag){
-				if (this.selectables.includes(textTag)){
-					return "text-bg-warning";
-				} else {
-					return "text-bg-info";
-				}
-			},
-			showSelectables(){
-				this.areSelectablesShown = true;
-			},
-			addOriginalTextTag(){
-				let originalTagElement = this.$refs.originalTagElement ; // = event.target for VueJS
-				//originalTagElement.blur(); not necessarily useful
-
-				let originalTagValue = originalTagElement.innerText.trim();
-				if (originalTagValue == ""){
-					originalTagElement.innerText = "???"; // as a viewing help
-					this.showSelectables(); // as another kind of help
-				} else { //if nothing added, maybe need help
-					this.addTextTag(originalTagValue);
-					originalTagElement.innerText = ""; // clearing
-				}
-			},
-
-		},
-		template: '#TextTags-Component-template'
-	};
-</script>
-
-
-<script type="text/x-template" id="TextTags-Component-template">
-	<div>
-		<div v-for="textTag in textTagList"
-		  class="badge rounded-pill me-1 mb-1"
-		  :class="tagStyleClass(textTag)">
-			{{textTag}}
-			<i v-if="editable" class="bi bi-dash-circle-dotted" @click="removeTextTag(textTag)"></i>
-		</div>
-
-		<div v-if="editable" class="tag-palette">
-			<hr v-if="areSelectablesShown" />
-			<div class="badge rounded-pill text-bg-primary me-1 mb-1">
-				<span ref="originalTagElement" class="pe-2"
-				  contenteditable spellcheck="false" @keyup.enter="addOriginalTextTag"></span>
-				<i class="bi bi-plus-circle-dotted" @click="addOriginalTextTag"></i>
-			</div>
-			<template v-if="areSelectablesShown">
-				<div v-for="textTag in selectables"
-				  class="badge rounded-pill me-1 mb-1"
-				  :class="tagStyleClass(textTag)">
-					{{textTag}}
-					<i v-if="editable" class="bi bi-plus-circle-dotted" @click="addTextTag(textTag)"></i>
-				</div>
-			</template>
-		</div>
-	</div>
-</script>
-
-
-<script type="text/javascript">
-<%--
-/*
-	<restclient resourceUri="/api/customers/15/serve">
-		Une assiette composée de :
-		<ul>
-			<li>Eggs : <qparam type="number" name="eggs"></param></li>
-			<li>Spam : <qparam type="text" name="spam"></param></li>
-		</ul>
-	</restclient>
-
-	const app = createApp({});
-	app.component('restclient', EntityActionClient);
-	app.component('qparam', QueryParamComponent);
-	app.mount('#app');
-*/
-
---%>
 
 	var EntityActionClient = {
 		props:{

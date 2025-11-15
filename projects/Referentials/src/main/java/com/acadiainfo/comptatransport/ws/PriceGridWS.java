@@ -1,5 +1,6 @@
 package com.acadiainfo.comptatransport.ws;
 
+import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
@@ -10,6 +11,9 @@ import com.acadiainfo.comptatransport.domain.PriceGridVersion;
 import com.acadiainfo.util.WSUtils;
 
 import jakarta.ejb.Stateless;
+import jakarta.json.Json;
+import jakarta.json.JsonArrayBuilder;
+import jakarta.json.JsonBuilderFactory;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.servlet.http.HttpServletRequest;
@@ -61,13 +65,18 @@ public class PriceGridWS {
 
 	@GET
 	@Produces(value = MediaType.APPLICATION_JSON)
-	public StreamingOutput getAll_WS() {
-		Stream<PriceGrid> priceGrids = getAll();
+	public StreamingOutput getAll_WS(@QueryParam("tag") Set<String> tags) {
+		Stream<PriceGrid> priceGrids = getAll(tags);
 		return WSUtils.entityJsonStreamingOutput(priceGrids);
 	}
 
-	public Stream<PriceGrid> getAll() {
+	public Stream<PriceGrid> getAll(Set<String> tags) {
 		Stream<PriceGrid> priceGrids = PriceGridsRepository.getInstance(em).findAll();
+
+		if (tags != null && !tags.isEmpty()) {
+			logger.finer("tags detected : " + tags);
+			priceGrids = priceGrids.filter(c -> c.getTags().containsAll(tags));
+		}
 		return priceGrids;
 	}
 
@@ -75,6 +84,7 @@ public class PriceGridWS {
 	@Consumes(value = MediaType.APPLICATION_JSON)
 	public Response add_WS(PriceGrid priceGrid) {
 		try {
+			/* invalidate tags cache */ TAGS_JSON_timestamp = 0L;
 			priceGrid = this.add(priceGrid);
 			java.net.URI uri = UriBuilder.fromUri("./price-grids").path(String.valueOf(priceGrid.getId())).build();
 			return Response.created(uri).build();
@@ -85,16 +95,16 @@ public class PriceGridWS {
 		}
 	}
 
-	public PriceGrid add(PriceGrid priceGrid) {		
+	public PriceGrid add(PriceGrid priceGrid) {
 		PriceGridsRepository priceGridsRepo = PriceGridsRepository.getInstance(em);
-		
+
 		if (priceGrid == null) {
 			throw new IllegalArgumentException("Le corps du message n'a pas pu interprété comme une Grille Tarifaire.");
 		}
 		if ("".equals(priceGrid.getName())) {
 			throw new IllegalArgumentException("Le nom de la Grille Tarifaire ne peut pas être vide.");
 		}
-				
+
 		// Unusual : id is not supposed to be provided
 		if (priceGrid.getId() != null) {
 			if (priceGridsRepo.find(priceGrid) != null){
@@ -102,11 +112,11 @@ public class PriceGridWS {
 				  +" Il est recommandé de ne pas l'inclure dans le corps du message.");
 			}
 		}
-		
+
 		if (priceGridsRepo.findByName(priceGrid.getName()) != null) {
 			throw new jakarta.persistence.EntityExistsException("Une autre Grille Tarifaire possède déjà le même nom.");
 		}
-		
+
 		return priceGridsRepo.insert(priceGrid);
 	}
 
@@ -131,12 +141,13 @@ public class PriceGridWS {
 		}
 
 		try {
+			/* invalidate tags cache */ TAGS_JSON_timestamp = 0L;
 			priceGrid_payload.setId(id);
 			PriceGrid priceGrid = priceGridsRepo.update(priceGrid_payload, false);
 			return Response.noContent().entity(priceGrid).build(); // no_content with a content ;-)
 		} catch (jakarta.persistence.OptimisticLockException exc) {
 			return WSUtils.response(Status.CONFLICT, servReq,
-			  "Grille Tarifaire peut-être modifiée depuis (\"_v_lock\" non-concordant).");			
+			  "Grille Tarifaire peut-être modifiée depuis (\"_v_lock\" non-concordant).");
 		} catch (jakarta.persistence.EntityNotFoundException exc) {
 			return WSUtils.response(Status.NOT_FOUND, servReq,
 			  "Grille Tarifaire peut-être supprimée depuis.");
@@ -148,6 +159,7 @@ public class PriceGridWS {
 	@Path("/{id}")
 	public Response delete_WS(@PathParam("id") Long id) {
 		try {
+			/* invalidate tags cache */ TAGS_JSON_timestamp = 0L;
 			PriceGridsRepository.getInstance(em).deleteById(id);
 			return Response.noContent().build();
 		} catch (jakarta.persistence.PersistenceException exc) {
@@ -199,7 +211,7 @@ public class PriceGridWS {
 	@Path("/{id}/versions")
 	@Produces(MediaType.APPLICATION_JSON)
 	public StreamingOutput versions_getAll_WS(@PathParam("id") Long id, @QueryParam("publishedAt") String publishedAt) {
-		PriceGrid priceGrid = ensureParentPricePrid(id);
+		/* PriceGrid priceGrid = */ ensureParentPricePrid(id);
 
 		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
 		Stream<PriceGridVersion> versions;
@@ -273,7 +285,7 @@ public class PriceGridWS {
 	public Response versions_delete_WS(@PathParam("id") Long id, @PathParam("v_id") Long v_id) {
 		PriceGrid priceGrid = ensureParentPricePrid(id);
 		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
-		
+
 		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
 		priceGridVersionsRepo.delete(priceGridVersion);
 
@@ -286,8 +298,8 @@ public class PriceGridWS {
 	public Response versions_update_WS(@PathParam("id") Long id, @PathParam("v_id") Long v_id, PriceGridVersion priceGridVersion_payload) {
 		PriceGrid priceGrid = ensureParentPricePrid(id);
 		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
-		
-		// payload check		
+
+		// payload check
 		if (priceGridVersion_payload.getId() != null && !priceGridVersion_payload.getId().equals(v_id)) {
 			return WSUtils.response(Status.BAD_REQUEST, servReq,
 			  "Identifiant incohérent dans l'URI et le corps du message."
@@ -315,7 +327,7 @@ public class PriceGridWS {
 			return Response.noContent().build();
 		} catch (jakarta.persistence.OptimisticLockException exc) {
 			return WSUtils.response(Status.CONFLICT, servReq,
-			  "Grille Tarifaire peut-être modifiée depuis (\"_v_lock\" non-concordant).");			
+			  "Grille Tarifaire peut-être modifiée depuis (\"_v_lock\" non-concordant).");
 		} catch (jakarta.persistence.EntityNotFoundException exc) {
 			return WSUtils.response(Status.NOT_FOUND, servReq,
 			  "Grille Tarifaire peut-être supprimée depuis.");
@@ -348,7 +360,7 @@ public class PriceGridWS {
 			return WSUtils.response(Status.CONFLICT, servReq,
 			  "Version de Grille Tarifaire peut-être modifiée depuis (\"_v_lock\" non-concordant).");
 		}
-		
+
 		try {
 			priceGridVersion.setJsonContent(jsonContent);
 			em.flush(); // to make it fail faster, if needed
@@ -365,7 +377,7 @@ public class PriceGridWS {
 		PriceGrid priceGrid = ensureParentPricePrid(id);
 		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
 
-		
+
 		String newDescription = "COPIE DE " + priceGridVersion.getVersion();
 		if (priceGridVersion.getDescription() != null && !priceGridVersion.getDescription().equals("")) {
 			newDescription += " : \n" + priceGridVersion.getDescription();
@@ -396,4 +408,66 @@ public class PriceGridWS {
 		}
 	}
 
+	/**
+	 * Tag listing service, with static cache.
+	 */
+	private static String TAGS_JSON = "";
+	private static volatile long TAGS_JSON_timestamp = 0L;
+	private static final long TAGS_JSON_ttl = 60000L; /* 1 min */
+
+	private static final java.util.List<String> INTERNAL_TAGS, EXTERNAL_TAGS;
+	static {
+		INTERNAL_TAGS = new java.util.ArrayList<String>();
+		INTERNAL_TAGS.add("Standard ACADIA");
+		INTERNAL_TAGS.add("Tarif Spécial");
+		EXTERNAL_TAGS = new java.util.ArrayList<String>();
+		EXTERNAL_TAGS.add("Transporteur");
+	}
+
+	@GET
+	@Path("/*/tags")
+	@Produces(value = MediaType.APPLICATION_JSON)
+	public String getCollectedTags() {
+
+		/* rebuild cache if stale (concurrent build is allowed) */
+		if (System.currentTimeMillis() - TAGS_JSON_timestamp > TAGS_JSON_ttl) {
+			logger.fine("Build TAGS_JSON cache");
+
+			// collect custom tags already set
+			Set<String> collectedTags = java.util.Collections.synchronizedSet(new java.util.TreeSet<String>());
+			this.getAll(null).forEach(t -> collectedTags.addAll(t.getTags()));
+			collectedTags.removeAll(INTERNAL_TAGS);
+			collectedTags.removeAll(EXTERNAL_TAGS);
+
+			// build Json String to cache
+			JsonBuilderFactory factory = Json.createBuilderFactory(null);
+			JsonArrayBuilder internalTagsB = factory.createArrayBuilder();
+			for (String tag : INTERNAL_TAGS) {
+				internalTagsB.add(tag);
+			}
+			JsonArrayBuilder externalTagsB = factory.createArrayBuilder();
+			for (String tag : EXTERNAL_TAGS) {
+				externalTagsB.add(tag);
+			}
+			JsonArrayBuilder collectedTagsB = factory.createArrayBuilder();
+			for (String tag : collectedTags) {
+				collectedTagsB.add(tag);
+			}
+			String newValue = Json.createObjectBuilder()
+			    .add("internal", internalTagsB)
+				.add("external", externalTagsB)
+				.add("collected", collectedTagsB)
+			    .build().toString();
+
+			synchronized (this.getClass()) {
+				TAGS_JSON = newValue;
+				TAGS_JSON_timestamp = System.currentTimeMillis();
+			}
+		}
+
+		synchronized (this.getClass()) {
+			return TAGS_JSON;
+		}
+
+	}
 }

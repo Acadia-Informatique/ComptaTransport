@@ -1,0 +1,253 @@
+<%@ page language="java" pageEncoding="UTF-8"%>
+<%--
+VueJS components for rendering and editing text tags, for each Entity.
+
+Important note : For the entity-specialized versions,
+SHARING their "selectables" is absolutely necessary for performance,
+esp. when used as renderer/editor in grid cells.
+They are to be injected as reactive empty Maps, each with a different key.
+
+TODO split per entity ?...
+
+Components :
+- The basic one :
+	- TextTagsComponent ("text tags" tags as String[], editable)
+- and entity-specific versions :
+	- CarrierTextTags ("selectable" injected as "sharedCarrierTextTags")
+	- PricegridTextTags ("selectable" injected as "sharedPricegridTextTags")
+	- CustomerTextTags ("selectable" injected as "sharedCustomerTextTags")
+
+Dependencies :
+- header-inc/client-stack.jspf
+--%>
+
+<script type="text/javascript">
+var TextTagsComponent = {
+	props: {
+		modelValue: {
+			type: Array, // of String
+			required: true
+		},
+		modelModifiers: { //capture and ignore this.modelModifiers
+			default: () => ({})
+		},
+
+		editable: {
+			type: Boolean,
+			default: false
+		},
+
+		selectables: {
+			type: Object, //Object-As-Map of "CSS class - Array of tags"
+			required: false,
+			default: []
+		},
+		updateSelectables: { //if true, add original tags to selectables as you create them (useful for reactive/shared)
+			type: Boolean,
+			required: false,
+			default: false
+		},
+		onlySelectables: { //if true, disable original tags
+			type: Boolean,
+			required: false,
+			default: false
+		},
+		tagMaxLength: {
+			type: Number,
+			default: 16
+		}
+	},
+	emits: ['update:modelValue'],
+	data() {
+		return {
+			areSelectablesShown: false,
+			tagStyleClassMap: new Map() // this cache is effectively rendered as the real "selectables"
+		}
+	},
+	watch: {
+		selectables:{
+			handler(v){
+				for (let cssClass in v){
+					for (let tag of v[cssClass]){
+						this.tagStyleClassMap.set(tag, cssClass);
+					}
+				}
+			},
+			immediate: true
+		}
+	},
+	computed: {
+		textTagList: {
+			get() {return this.modelValue},
+			set(value) {this.$emit('update:modelValue', value)}
+		}
+	},
+	methods:{
+		showTagPalette(b){
+			this.isTagPaletteOpen = b;
+		},
+		addTextTag(textTag){
+			textTag = textTag.substring(0, this.tagMaxLength);
+			this.textTagList.push(textTag);
+
+	 		let deduplicated = new Set(this.textTagList);
+			deduplicated = Array.from(deduplicated).sort();
+			this.textTagList = deduplicated;
+		},
+		removeTextTag(textTag){
+			this.textTagList = this.textTagList.filter(t => t !== textTag);
+		},
+		tagStyleClass(textTag){
+			let cachedStyleClass = this.tagStyleClassMap.get(textTag);
+			if (!cachedStyleClass){
+				cachedStyleClass = "text-bg-info"; // default for new and never recorded in database
+				this.tagStyleClassMap.set(textTag, cachedStyleClass); // Note : this effectively adds new original tags to the "selectable" palette
+
+				if (this.updateSelectables) {
+					if (!this.selectables[cachedStyleClass]){
+						this.selectables[cachedStyleClass]= [];
+					}
+					this.selectables[cachedStyleClass].push(textTag);
+				}
+			}
+			return cachedStyleClass;
+		},
+		showSelectables(){
+			this.areSelectablesShown = true;
+		},
+		addOriginalTextTag(){
+			if (this.onlySelectables) {
+				//disallowed, so only show "palette"
+				this.showSelectables(); return;
+			}
+
+			let originalTagElement = this.$refs.originalTagElement ; // = event.target for VueJS
+			//originalTagElement.blur(); not necessarily useful
+
+			let originalTagValue = originalTagElement.innerText.trim();
+			if (originalTagValue == ""){
+				originalTagElement.innerText = "???"; // as a viewing help
+				this.showSelectables(); // as another kind of help
+			} else { //if nothing added, maybe need help
+				this.addTextTag(originalTagValue);
+				originalTagElement.innerText = ""; // clearing
+			}
+		},
+
+	},
+	template: '#TextTags-Component-template'
+};
+</script>
+
+
+<script type="text/x-template" id="TextTags-Component-template">
+<div>
+	<div v-for="textTag in textTagList"
+	  class="badge rounded-pill me-1 mb-1"
+	  :class="tagStyleClass(textTag)">
+		{{textTag}}
+		<i v-if="editable" class="bi bi-dash-circle-dotted" @click="removeTextTag(textTag)"></i>
+	</div>
+
+	<div v-if="editable" class="tag-palette">
+		<hr v-if="areSelectablesShown" />
+		<div class="badge rounded-pill text-bg-info me-1 mb-1">
+			<span v-if="!onlySelectables"
+			  ref="originalTagElement" class="pe-2"
+			  contenteditable spellcheck="false" @keyup.enter="addOriginalTextTag"></span>
+			<i class="bi bi-plus-circle-dotted" @click="addOriginalTextTag"></i>
+		</div>
+		<template v-if="areSelectablesShown">
+			<div v-for="textTag in tagStyleClassMap.keys()"
+			  class="badge rounded-pill me-1 mb-1"
+			  :class="tagStyleClass(textTag)">
+				{{textTag}}
+				<i v-if="editable" class="bi bi-plus-circle-dotted" @click="addTextTag(textTag)"></i>
+			</div>
+		</template>
+	</div>
+</div>
+</script>
+
+
+
+<%-- ============================================================
+ENTITY-SPECIFIC VERSIONS
+They can be used directly as Grid cell renderer/editors.
+--%>
+<script type="text/javascript">
+	let _AbstractEntityTextTags = {
+		inject: ["selectables"],
+		props: ['modelValue', 'editable'],
+		emits: ['update:modelValue'],
+		components: {
+			"text-tags-component" : TextTagsComponent
+		},
+		computed: {
+			editValue: {
+				get() {return this.modelValue},
+				set(value) {this.$emit('update:modelValue', value)}
+			},
+		},
+		template: `<text-tags-component :editable="editable" v-model="editValue" :selectables="selectables" updateSelectables />`
+	};
+
+	var CarrierTextTags = {
+		extends: _AbstractEntityTextTags,
+		inject: {
+			"selectables": { from: "sharedCarrierTextTags"}
+		},
+
+		/* public static, for initialize */
+		initSharedTags(selectables){
+			axios_backend.get("carriers/*/tags")
+			.then(response => {
+				selectables["text-bg-warning"] = response.data["system"];
+				selectables["text-bg-primary"] = response.data["collected"];
+			})
+			.catch(error=>{
+				selectables["#WS-init-error"] = error;
+			});
+		}
+	};
+
+	var PricegridTextTags = {
+		extends: _AbstractEntityTextTags,
+		inject: {
+			"selectables": { from: "sharedPricegridTextTags"}
+		},
+
+		/* public static, for initialize */
+		initSharedTags(selectables){
+			axios_backend.get("price-grids/*/tags")
+			.then(response => {
+				selectables["text-bg-success"] = response.data["internal"];
+				selectables["text-bg-danger"] = response.data["external"];
+				selectables["text-bg-primary"] = response.data["collected"];
+			})
+			.catch(error=>{
+				selectables["#WS-init-error"] = error;
+			});
+		}
+	};
+
+	var CustomerTextTags = {
+		extends: _AbstractEntityTextTags,
+		inject: {
+			"selectables": { from: "sharedCustomerTextTags"}
+		},
+
+		/* public static, for initialize */
+		initSharedTags(selectables){
+			axios_backend.get("customers/*/tags")
+			.then(response => {
+				selectables["text-bg-danger"] = response.data["vip"];
+				selectables["text-bg-warning"] = response.data["system"];
+				selectables["text-bg-primary"] = response.data["collected"];
+			})
+			.catch(error=>{
+				selectables["#WS-init-error"] = error;
+			});
+		}
+	};
+</script>
