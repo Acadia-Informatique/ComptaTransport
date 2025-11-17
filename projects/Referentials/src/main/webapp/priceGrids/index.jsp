@@ -12,6 +12,7 @@
 
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityDataGrid.jspf" %>
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityAttributeComponents.jspf" %>
+	<%@ include file="/WEB-INF/includes/header-inc/vue-entityTextTagsComponents.jspf" %>
 
 	<style>
 		/* Custom styles for large devices (≥992px) */
@@ -89,8 +90,9 @@
 		const app = Vue.createApp({
 			provide(){
 				return {
-					pgid : Vue.computed(()=> this.selectedPriceGridId)
-				}
+					pgid : Vue.computed(()=> this.selectedPriceGridId),
+					sharedPricegridTextTags: this.selectableTags,
+				};
 			},
 			data(){
 				return {
@@ -120,7 +122,7 @@
 								name: "tags",
 								label: "Tags",
 								renderer: "renderer-pricegrid-tags",
-								editor: "editor-pricegrid-tags",
+								editor: "renderer-pricegrid-tags",
 								descriptionIcon : "exclamation-diamond",
 								description: "Qualification technique complémentaire"
 							},
@@ -197,7 +199,7 @@
 							{
 								name: "id",
 								label: "Éditer",
-								width: "150px",						
+								width: "150px",
 								renderer: "pricegrid-edit-launcher",
 								editor: "none"
 							},
@@ -229,41 +231,18 @@
 							delete entity.priceGrid;
 						}
 					},
-
+					selectableTags: {},
 				};
+			},
+			created(){
+				PricegridTextTags.initSharedTags(this.selectableTags);
 			}
-
-
 		});
 
 
 		// specific cell renders/editors as VueJS components
-		var systemTags = ["interne", "transporteur"];
 
-		var EditorPriceGridTags = {
-			props: ['modelValue'],
-			emits: ['update:modelValue'],
-			computed: {
-				editValue: {
-					get() {return this.modelValue},
-					set(value) {this.$emit('update:modelValue', value)}
-				}
-			},
-			data(){
-				return {
-					systemTags
-				}
-			},
-			template: `<text-tags-component :editable="true" v-model="editValue" :selectables="systemTags"/>`
-		};
-		var RendererPriceGridTags = {
-			extends: EditorPriceGridTags,
-			template: `<text-tags-component :editable="false" v-model="editValue" :selectables="systemTags"/>`
-		};
-
-		app.component("text-tags-component", TextTagsComponent);
-		app.component("editor-pricegrid-tags", EditorPriceGridTags);
-		app.component("renderer-pricegrid-tags", RendererPriceGridTags);
+		app.component("renderer-pricegrid-tags", PricegridTextTags);
 
 		app.component("renderer-auditing-info", AuditingInfoRenderer_IconWithPopover);
 

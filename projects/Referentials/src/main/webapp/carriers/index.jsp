@@ -12,6 +12,7 @@
 
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityDataGrid.jspf" %>
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityAttributeComponents.jspf" %>
+	<%@ include file="/WEB-INF/includes/header-inc/vue-entityTextTagsComponents.jspf" %>
 
 	<style>
 
@@ -114,7 +115,7 @@
 								name: "tags",
 								label: "Tags",
 								renderer: "renderer-carrier-tags",
-								editor: "editor-carrier-tags",
+								editor: "renderer-carrier-tags",
 								descriptionIcon : "exclamation-diamond",
 								description: "Description complémentaire, notamment utilisé par le module Clients forfaits"
 							},
@@ -154,44 +155,21 @@
 						inferColumns: true,
 						confirmDelete: true,
 						selectRowAction: "edit"
-					}
+					},
+					selectableTags : {}
 				};
+			},
+			provide(){
+				return {"sharedCarrierTextTags": this.selectableTags };
+			},
+			created(){
+				CarrierTextTags.initSharedTags(this.selectableTags)
 			}
-
-
 		});
 
-
 		// specific cell renders/editors as VueJS components
-		var systemTags = ["zero-fee", "virtual"];
-
-		var EditorCarrierTags = {
-			props: ['modelValue'],
-			emits: ['update:modelValue'],
-			computed: {
-				editValue: {
-					get() {return this.modelValue},
-					set(value) {this.$emit('update:modelValue', value)}
-				}
-			},
-			data(){
-				return {
-					systemTags
-				}
-			},
-			template: `<text-tags-component :editable="true" v-model="editValue" :selectables="systemTags"/>`
-		};
-		var RendererCarrierTags = {
-			extends: EditorCarrierTags,
-			template: `<text-tags-component :editable="false" v-model="editValue" :selectables="systemTags"/>`
-		};
-
-		app.component("text-tags-component", TextTagsComponent);
-		app.component("editor-carrier-tags", EditorCarrierTags);
-		app.component("renderer-carrier-tags", RendererCarrierTags);
-
+		app.component("renderer-carrier-tags", CarrierTextTags);
 		app.component("renderer-auditing-info", AuditingInfoRenderer_IconWithPopover);
-
 
 		app.component("entity-data-grid", EntityDataGrid);
 		app.mount('#app');

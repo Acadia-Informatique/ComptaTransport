@@ -6,7 +6,9 @@ Add some (local) date / time related functions to the global scope,
 in the Datepicker global object.
 
 
-See vue-entityAttributeComponents.jspf for more details, since the same conditions more or less apply here.
+For components, see vue-entityAttributeComponents.jspf for more details, since the same conditions more or less apply here.
+- Datedisplay_Month / Datepicker_Month
+
 
 Dependencies :
 - header-inc/client-stack.jspf
@@ -14,18 +16,45 @@ Dependencies :
 
 <script type="text/javascript">
 const Datepicker = {
-	/* ISO8601, precise to the seconds */
+	/* to be sent in API, ISO8601 string precise to the seconds */
 	now(){
-		return new Date().toISOString().substring(0, 19); //YYYY-MM-DD'T'hh:mm:ss
+		return Datepicker.format(new Date());
 	},
 	currentDate(){
-		return new Date().toISOString().substring(0, 10) + "T00:00:00"; //YYYY-MM-DD
+		return Datepicker.formatAsDate(new Date()) + "T00:00:00";
 	},
 	currentMonth(){
-		return new Date().toISOString().substring(0, 7) + "-01T00:00:00"; //YYYY-MM
+		return Datepicker.formatAsMonth(new Date()) + "-01T00:00:00";
 	},
+
+	/* for display */
+	format(date){
+		if (date instanceof Date){
+			date = date.toISOString();
+		}
+		return date.substring(0, 19); //YYYY-MM-DD'T'hh:mm:ss
+	},
+	formatAsDate(date){
+		if (date instanceof Date){
+			date = date.toISOString();
+		}
+		return date.substring(0, 10); //YYYY-MM-DD
+	},
+	formatAsMonth(date){
+		if (date instanceof Date){
+			date = date.toISOString();
+		}
+		return date.substring(0, 7); //YYYY-MM
+	}
 };
 
+var Datedisplay_Month = {
+	props:['value'],
+	methods:{
+		format: Datepicker.formatAsMonth
+	},
+	template:"{{format(value)}}"
+};
 
 var Datepicker_Month = {
 	props: ['modelValue', 'modelModifiers'],

@@ -10,6 +10,7 @@
 	<%@include file="/WEB-INF/includes/header-inc/client-stack.jspf"%>
 
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityAttributeComponents.jspf" %>
+	<%@ include file="/WEB-INF/includes/header-inc/vue-entityTextTagsComponents.jspf" %>
 
 	<script src="${libsUrl}/pricegrid.js"></script>
 	<script src="${libsUrl}/pricegrid_samples.js"></script>
@@ -228,7 +229,7 @@
 
 					<div class="fs-2 fw-bold me-2" ref="gridLabel">{{pgv_metadata.priceGrid.name}}</div>
 					<div class="fs-4 me-2" ref="versionLabel">{{pgv_metadata.version}}</div>
-					<text-tags v-model="pgv_metadata.priceGrid.tags"></text-tags>
+					<pricegrid-text-tags v-model="pgv_metadata.priceGrid.tags"></pricegrid-text-tags>
 				</div>
 
 				<audit-info class="small text-nowrap" v-model="pgv_metadata.auditingInfo"></audit-info>
@@ -1017,6 +1018,7 @@
 					pgv_conflict: "", // a end-user message explaining the situation
 					pgv_newVersion: "", // new Version name to be created
 
+					selectableTags: {},
 
 					localStorage_hasSystem : false, // since cannot make localStorage reactive ;-)
 					needSaving: false, // "dirty" mark on PriceGrids
@@ -1034,6 +1036,14 @@
             		immediate: false
 				},
         	},
+			created(){
+				PricegridTextTags.initSharedTags(this.selectableTags)
+			},
+			provide(){
+				return {
+					sharedPricegridTextTags: this.selectableTags,
+				};
+			},
 			mounted(){
 				this.apiGetMetadata();
 				this.apiGetJsonContent();
@@ -2076,7 +2086,7 @@
 
 
 		gridBuilderApp.component("audit-info", AuditingInfoRenderer);
-		gridBuilderApp.component("text-tags", TextTagsComponent);
+		gridBuilderApp.component("pricegrid-text-tags", PricegridTextTags);
 
 		gridBuilderApp.component("money-input", MoneyInput);
 		gridBuilderApp.component("splitting-input", SplittingInput);
