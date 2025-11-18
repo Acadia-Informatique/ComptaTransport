@@ -41,7 +41,7 @@
 			<tr><td>Request URL</td>   <td><%= request.getRequestURL()%></td></tr>
 			<tr><td>Query string</td>  <td><%= request.getQueryString()%></td></tr>
 			
-			<tr><td>Exception</td>     <td><%= exception.getMessage()%></td></tr>
+			<tr><td>Exception</td>     <td><%= exception != null ? exception.getMessage() : "???" %></td></tr>
 			<tr><td>Server time</td>   <td><%= DateFormat.getDateTimeInstance().format(new Date(System.currentTimeMillis()))  %></td></tr>
 			
 		</tbody>
