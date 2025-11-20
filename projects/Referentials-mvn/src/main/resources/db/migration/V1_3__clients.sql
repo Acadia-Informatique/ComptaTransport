@@ -5,6 +5,7 @@ CREATE TABLE `CUSTOMER` (
   `erp_reference` varchar(16) NOT NULL COMMENT 'de X3, ex.: "C03372"',
   `label` varchar(64) NOT NULL COMMENT 'Pour lisibilité. Idéalement, utiliser le nom dans  l''ERP. Unicité non-garantie.',
   `tags` varchar(256) DEFAULT NULL COMMENT '"semicolon-separated string", qualification tech ou qualifications diverses',
+  `salesrep` varchar(32) DEFAULT NULL COMMENT 'Responsable du compte client',
   `description` varchar(256) DEFAULT NULL COMMENT 'libre, pour doc.',
 	`_v_lock` bigint unsigned NOT NULL DEFAULT '0' COMMENT '(technical: JPA @Version)',
 	`_date_created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '(audit)',

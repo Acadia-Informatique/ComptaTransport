@@ -12,6 +12,14 @@
 <script src="${webJarsUrl}/bootstrap/5.3.8/js/bootstrap.min.js"></script>
 <script src="${webJarsUrl}/vue/3.5.22/dist/vue.global.js"></script>
 
+<style>
+	/** Bootstrap global overrides */
+	html {
+	  font-size: 0.8em;
+	}
+</style>
+
+
 <% /* ---------- Some utils ------------ */ %>
 <script type="text/javascript">
 "use strict";

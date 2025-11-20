@@ -42,7 +42,12 @@ public class Customer implements Auditable, VersionLockable {
 	/** Tags can be used for technical filtering (e.g. "Grand Compte") or further description. */
 	@Column(name = "tags")
 	private Set<String> tags = new TreeSet<String>();
-	
+
+	/** Sales representative for this customer.
+	 * TODO use relationship to User ?... */
+	@Column(name = "salesrep")
+	private String salesrep;
+
 	/** All the preferences recorded on this Customer */
     @OneToMany(
         mappedBy = "customer",
@@ -50,14 +55,14 @@ public class Customer implements Auditable, VersionLockable {
         orphanRemoval = true
     )
 	private Set<CustomerShipPreferences> shipPreferences = new TreeSet<CustomerShipPreferences>();
-	
+
 	/**
 	 * JPA Optimistic lock
 	 */
 	@Version
 	@Column(name = "_v_lock")
 	private long _v_lock;
-	
+
 
 	@Embedded
 	private AuditingInfo auditingInfo;
@@ -100,6 +105,14 @@ public class Customer implements Auditable, VersionLockable {
 
 	public void setTags(Set<String> tags) {
 		this.tags = tags;
+	}
+
+	public String getSalesrep() {
+		return salesrep;
+	}
+
+	public void setSalesrep(String salesrep) {
+		this.salesrep = salesrep;
 	}
 
 	public Set<CustomerShipPreferences> getShipPreferences() {

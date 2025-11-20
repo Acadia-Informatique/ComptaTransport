@@ -14,11 +14,6 @@
 	<%@ include file="/WEB-INF/includes/header-inc/vue-datepickers.jspf" %>
 
 	<style>
-		/** Bootstrap global overrides */
-		html {
-		  font-size: 0.8em;
-		}
-
 		/** Table readability */
 		th.price,
 		td.price {

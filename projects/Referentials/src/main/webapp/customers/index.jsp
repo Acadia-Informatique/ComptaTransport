@@ -429,6 +429,12 @@
 								description: "Description complémentaire, notamment utilisé pour le Contrôle Quotidien du Transport"
 							},
 							{
+								name: "salesrep",
+								label: "Commercial",
+								//TODO editor: selector on SalesRep User...
+								description: "Responsable du Compte client"
+							},
+							{
 								name: "description",
 								label: "Description",
 
