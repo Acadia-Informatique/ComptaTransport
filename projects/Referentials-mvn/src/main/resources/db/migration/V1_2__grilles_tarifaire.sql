@@ -17,14 +17,14 @@ CREATE TABLE `PRICE_GRID` (
 
 CREATE TABLE `PRICE_GRID_VERSION` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `price_grid_id` bigint unsigned NOT NULL,  
+  `price_grid_id` bigint unsigned NOT NULL,
   `version` varchar(64) NOT NULL COMMENT 'Numéro de version "utilisateur", souvent la date de création',
   `description` varchar(256) DEFAULT NULL COMMENT 'Description libre',
   `published_date` datetime DEFAULT NULL COMMENT 'Nul si non-publiéee, peut être dans le futur. \r\nIndique la version applicable à un instant donné.',
-  `json_content` MEDIUMTEXT COMMENT 'Le vrai contenu de la grille, au format défini par le moteur "price-grid.js"',
+  `json_content` MEDIUMTEXT COMMENT 'Le vrai contenu de la grille, au format défini par le moteur "pricegrid.js"',
 	`_v_lock` bigint unsigned NOT NULL DEFAULT '0' COMMENT '(technical: JPA @Version)',
 	`_date_created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '(audit)',
-	`_date_modified` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '(audit)',  
+	`_date_modified` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '(audit)',
   PRIMARY KEY (`id`),
   UNIQUE KEY `PRICE_GRID_VERSION_UNIQUE` (`price_grid_id`,`version`),
   CONSTRAINT `PRICE_GRID_VERSION_PRICE_GRID_FK` FOREIGN KEY (`price_grid_id`) REFERENCES `PRICE_GRID` (`id`)

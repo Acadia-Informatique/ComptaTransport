@@ -44,20 +44,23 @@ class PricingSystem {
 		//and plenty free space to add metadata !
 	}
 
+	static fromJSON(v) {
+		let obj = new PricingSystem();
+		obj.fromJSON(v);
+		return obj;
+	}
+	
 	/**
 	 * Hydration.
 	 * @param {*} v - JSON string or its parsed object
 	 */
-	static fromJSON(v) {
+	fromJSON(v) {
 		if (typeof v == "string") v = JSON.parse(v);
-		let obj = new PricingSystem();
-
+		
 		for (const gridv of v.grids){
 			let newGrid = PricingGrid.fromJSON(gridv);
-			obj.grids.push(newGrid);
+			this.grids.push(newGrid);
 		}
-
-		return obj;
 	}
 
 	/**

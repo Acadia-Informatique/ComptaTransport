@@ -12,6 +12,7 @@
 
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityDataGrid.jspf" %>
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityAttributeComponents.jspf" %>
+	<%@ include file="/WEB-INF/includes/header-inc/vue-datepickers.jspf" %>
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityTextTagsComponents.jspf" %>
 
 	<style>
@@ -48,14 +49,6 @@
 		.list-leave-active {
 			position: absolute;
 		}
-
-
-
-		.p-datepicker-calendar-container {
-			background-color: pink;
-
-		}
-
 	</style>
 
 </head>
@@ -192,8 +185,8 @@
 							{
 								name: "publishedDate",
 								label: "Publié le",
-								//renderer: TODO date picker
-								//editor: TODO date picker, publishing tool ?
+								renderer: "date-picker-datetime",
+								editor: "date-picker-datetime",
 								description: "Date de publication (libre, peut être dans le futur)"
 							},
 							{
@@ -242,6 +235,7 @@
 
 		// specific cell renders/editors as VueJS components
 
+		app.component("date-picker-datetime", Datepicker_Datetime);
 		app.component("renderer-pricegrid-tags", PricegridTextTags);
 
 		app.component("renderer-auditing-info", AuditingInfoRenderer_IconWithPopover);

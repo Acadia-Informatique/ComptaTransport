@@ -349,7 +349,7 @@
 					if (customer.tags.includes("Grand Compte")) {
 						reasons.push(`Client "Grand Compte"`);
 					}
-				/*	let shipPreferences = customer["#currPref"];
+					let shipPreferences = customer["#currPref"];
 					if (shipPreferences?.overrideCarriers?.length > 0){
 						let areAllCarriersFree = shipPreferences.overrideCarriers
 						.map(name => this.selectableCarriers.get(name))
@@ -359,7 +359,7 @@
 							reasons.push(`Transports gratuits uniquement`);
 						}
 					}
-*/
+					
 					return (reasons.length > 0) ? reasons : null;
 				},
 

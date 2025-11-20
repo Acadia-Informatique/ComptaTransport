@@ -39,7 +39,6 @@ public class PriceGridsRepository extends CrudRepositoryImpl<PriceGrid, Long> {
 	 */
 	@SuppressWarnings("unchecked")
 	public PriceGrid findByName(String name) {
-		EntityManager em = this.getEntityManager();
 		Query query = em.createQuery("SELECT pg FROM PriceGrid pg WHERE pg.name = :name");
 		query.setParameter("name", name);
 

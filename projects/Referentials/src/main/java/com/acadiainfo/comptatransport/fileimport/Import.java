@@ -23,6 +23,9 @@ public class Import {
 	@Column(name = "type")
 	private String type;
 
+	@Column(name = "row_count")
+	private int rowCount;
+
 	@Column(name = "_date_started", updatable = false, insertable = false)
 	@jakarta.persistence.Convert(converter = com.acadiainfo.util.persistence.AuditTimestampConverter.class)
 	private Long dateStarted;
@@ -53,6 +56,14 @@ public class Import {
 
 	public void setType(String type) {
 		this.type = type;
+	}
+
+	public int getRowCount() {
+		return rowCount;
+	}
+
+	public void setRowCount(int rowCount) {
+		this.rowCount = rowCount;
 	}
 
 	public void setDateStarted(Long dateStarted) {

@@ -29,7 +29,7 @@ import jakarta.persistence.Table;
 @Table(schema = "ComptaTransport", name = "I_TRANSPORT_VENDU")
 public class TransportSalesDetails {
 	public enum ProductType {
-		MAIN, B2C, OPT1, OPT2
+		MAIN, B2C, OPTS, UNK
 	};
 
 	/** Tech. PK */
@@ -62,9 +62,9 @@ public class TransportSalesDetails {
 			"Frais Commande Drop"
 			-> ProductType.B2C;
 		case "LIVRAISON  SAMEDI"
-			-> ProductType.OPT1;
+			-> ProductType.OPTS;
 		default
-			-> ProductType.OPT2;
+			-> ProductType.UNK;
 		};
 	}
 

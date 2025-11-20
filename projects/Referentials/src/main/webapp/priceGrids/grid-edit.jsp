@@ -25,7 +25,7 @@
 		class CommandeALivrer {
 			constructor( poids, codePostal){
 				this.poids = poids;
-				this.pays = "France";
+				this.pays = "FR";
 				this.codePostal = codePostal;
 				this.size_length = null;
 				this.size_width = null;
@@ -36,7 +36,7 @@
 				this.isIntegration = false;
 			}
 			getPPGRawCoordinates(){
-				let departement = (this.pays=="France" && this.codePostal &&  this.codePostal.length==5) ? this.codePostal.substring(0,2) : "00";
+				let departement = (this.pays=="FR" && this.codePostal &&  this.codePostal.length==5) ? this.codePostal.substring(0,2) : "00";
 				return {
 						poids : this.poids,
 						poidsEntier: Math.ceil(this.poids),
@@ -832,32 +832,32 @@
 					  type="text" list="countryDatalist" autocomplete="on"
 					  v-model="testPricedObj.pays">
 					<datalist id="countryDatalist">
-						<option value="Allemagne"></option>
-						<option value="Autriche"></option>
-						<option value="Belgique"></option>
-						<option value="Bulgarie"></option>
-						<option value="Croatie"></option>
-						<option value="Danemark"></option>
-						<option value="Espagne (hors îles)"></option>
-						<option value="Estonie"></option>
-						<option value="Finlande"></option>
-						<option value="France"></option>
-						<option value="Grèce (hors îles)"></option>
-						<option value="Hongrie"></option>
-						<option value="Irlande"></option>
+						<option value="DE">Allemagne</option>
+						<option value="AT">Autriche</option>
+						<option value="BE">Belgique</option>
+						<option value="BG">Bulgarie</option>
+						<option value="HR">Croatie</option>
+						<option value="DK">Danemark</option>
+						<option value="ES">Espagne (hors îles)</option>
+						<option value="EE">Estonie</option>
+						<option value="FI">Finlande</option>
+						<option value="FR">France</option>
+						<option value="GR">Grèce (hors îles)</option>
+						<option value="HU">Hongrie</option>
+						<option value="IE">Irlande</option>
 						<option value="Islande"></option>
-						<option value="Italie"></option>
-						<option value="Lettonie"></option>
-						<option value="Luxembourg"></option>
-						<option value="Norvège"></option>
-						<option value="Pays-Bas"></option>
-						<option value="Pologne"></option>
-						<option value="Portugal"></option>
-						<option value="Rép. Tchèque"></option>
-						<option value="Roumanie"></option>
-						<option value="Suisse"></option>
-						<option value="Suède"></option>
-						<option value="Slovaquie"></option>
+						<option value="IT">Italie</option>
+						<option value="LV">Lettonie</option>
+						<option value="LU">Luxembourg</option>
+						<option value="NO">Norvège</option>
+						<option value="NL">Pays-Bas</option>
+						<option value="PL">Pologne</option>
+						<option value="PT">Portugal</option>
+						<option value="CZ">Rép. Tchèque</option>
+						<option value="RO">Roumanie</option>
+						<option value="CH">Suisse</option>
+						<option value="SE">Suède</option>
+						<option value="SK">Slovaquie</option>
 					</datalist>
 				</div>
 			</div>

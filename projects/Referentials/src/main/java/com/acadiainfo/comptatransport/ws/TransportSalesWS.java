@@ -61,16 +61,19 @@ public class TransportSalesWS {
 	public Response getAll_WS(
 	  @QueryParam("start-date") String startDate,
 	  @QueryParam("end-date") String endDate) {
-		if (startDate == null)
-			return WSUtils.response(Status.BAD_REQUEST, servReq, "\"start-date\" query param expected");
+			if (startDate == null)
+				return WSUtils.response(Status.BAD_REQUEST, servReq, "Paramètre de requête \"start-date\" obligatoire.");
 
-		LocalDateTime startDateObj = WSUtils.parseParamDate(startDate);
-
-		// end-date is optional, if not set use start-date + 1
-		LocalDateTime endDateObj = (endDate == null) ? startDateObj.plusDays(1) : WSUtils.parseParamDate(endDate);
-
-		Stream<TransportSalesHeader> headers = getAll(startDateObj, endDateObj);
-		return Response.ok(WSUtils.entityJsonStreamingOutput(headers)).build();
+			LocalDateTime startDateObj, endDateObj;
+			try {
+				startDateObj = WSUtils.parseParamDate(startDate);
+				// end-date is optional, if not set use start-date + 1
+				endDateObj = (endDate == null) ? startDateObj.plusDays(1) : WSUtils.parseParamDate(endDate);
+			} catch (java.time.format.DateTimeParseException exc) {
+				return WSUtils.response(Status.BAD_REQUEST, servReq, "Format de paramètres de date incorrect (\"start-date\" et/ou \"end-date\").");
+			}
+			Stream<TransportSalesHeader> headers = getAll(startDateObj, endDateObj);
+			return Response.ok(WSUtils.entityJsonStreamingOutput(headers)).build();
 	}
 
 	public Stream<TransportSalesHeader> getAll(LocalDateTime startDate, LocalDateTime endDate) {
