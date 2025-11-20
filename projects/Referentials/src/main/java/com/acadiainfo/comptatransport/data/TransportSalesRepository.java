@@ -6,6 +6,7 @@ import java.util.stream.Stream;
 
 import com.acadiainfo.comptatransport.domain.TransportSalesHeader;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 
@@ -43,4 +44,5 @@ public class TransportSalesRepository {
 
 		return stream;
 	}
+
 }

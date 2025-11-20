@@ -47,7 +47,6 @@ public class CustomersRepository extends CrudRepositoryImpl<Customer, Long> {
 	 */
 	@SuppressWarnings("unchecked")
 	public Customer findByErpReference(String erpReference) {
-		EntityManager em = this.getEntityManager();
 		Query query = em.createQuery("SELECT c FROM Customer c WHERE c.erpReference = :erpReference");
 		query.setParameter("erpReference", erpReference);
 

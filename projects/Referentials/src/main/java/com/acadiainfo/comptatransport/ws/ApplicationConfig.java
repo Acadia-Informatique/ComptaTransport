@@ -1,6 +1,7 @@
 package com.acadiainfo.comptatransport.ws;
 
 import com.acadiainfo.comptatransport.domain.*;
+import com.acadiainfo.util.WSUtils;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.ApplicationPath;
@@ -26,6 +27,7 @@ public class ApplicationConfig extends Application {
 		ENTITY_CLASS_MAP.put(PriceGridVersion.class, "Version de Grille Tarifaire");
 		ENTITY_CLASS_MAP.put(Customer.class, "Client");
 		ENTITY_CLASS_MAP.put(CustomerShipPreferences.class, "Préférences Transport du Client");
+		ENTITY_CLASS_MAP.put(InputControlRevenue.class, "Saisie utilisateur de Contrôle Quotidien");
 	}
 
 	public static Response response(jakarta.persistence.PersistenceException exc, HttpServletRequest servletRequest,
@@ -37,21 +39,24 @@ public class ApplicationConfig extends Application {
 		// TODO should find a polymorphic way to do that on
 		// com.acadiainfo.util.DataIntegrityViolationException class hierarchy
 		// ...but beware of the cyclic references to this Application-specific class.
-		if (exc instanceof jakarta.persistence.EntityNotFoundException) {
-			return com.acadiainfo.util.WSUtils.response(Status.NOT_FOUND, servletRequest,
+		if (exc instanceof jakarta.persistence.OptimisticLockException) {
+			return WSUtils.response(Status.CONFLICT, servletRequest,
+			  getEntityLabel(entityClass, locale) + " peut-être modifiée entretemps (\"_v_lock\" non-concordant).");
+		} else if (exc instanceof jakarta.persistence.EntityNotFoundException) {
+			return WSUtils.response(Status.NOT_FOUND, servletRequest,
 			  getEntityLabel(entityClass, locale) + " n'existe pas, ou a été supprimé depuis.\n"
 			  + exc.getMessage());
 		} else if (exc instanceof jakarta.persistence.EntityExistsException) {
-			return com.acadiainfo.util.WSUtils.response(Status.CONFLICT, servletRequest,
+			return WSUtils.response(Status.CONFLICT, servletRequest,
 			  getEntityLabel(entityClass, locale) + " n'a pu être créé en doublon.\n"
 			  + exc.getMessage());
 		} else if (exc instanceof com.acadiainfo.util.UniqueConstraintViolationException customExc) {
-			return com.acadiainfo.util.WSUtils.response(Status.CONFLICT, servletRequest,
+			return WSUtils.response(Status.CONFLICT, servletRequest,
 			  getEntityLabel(entityClass, locale) + " ne peut avoir la même valeur '"
 			  + customExc.getDuplicateValue() + "' de "
 			  + getUniqueAttributeLabel(customExc.getConstraintName(), locale));
 		} else if (exc instanceof com.acadiainfo.util.ForeignKeyViolationException customExc) {
-			return com.acadiainfo.util.WSUtils.response(Status.NOT_ACCEPTABLE, servletRequest,
+			return WSUtils.response(Status.NOT_ACCEPTABLE, servletRequest,
 			  getEntityLabel(entityClass, locale) + " possède encore des "
 			  + getDependentEntityLabel(customExc.getConstraintName(), locale));
 		}
@@ -89,6 +94,8 @@ public class ApplicationConfig extends Application {
 			return "Référence ERP";
 		case "CUSTOMER_SHIP_PREFERENCES.CUSTOMER_SHIP_PREFERENCES_UNIQUE":
 			return "[Client + Date d'application]";
+		case "INPUT_CTRL_REVENUE.INPUT_CTRL_REVENUE_UNIQUE":
+			return "Numéro de facture";
 		default:
 			return constraintName; // as a fallback
 		}

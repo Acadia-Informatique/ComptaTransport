@@ -53,14 +53,14 @@ public class Carrier implements Auditable, VersionLockable {
 	 */
 	@Column(name = "warning_msg", nullable = true)
 	private String warningMessage;
-	
+
 	/**
 	 * JPA Optimistic lock
 	 */
 	@Version
 	@Column(name = "_v_lock")
-	private long _v_lock;
-	
+	private Long _v_lock;
+
 
 	@Embedded
 	private AuditingInfo auditingInfo;
@@ -122,12 +122,12 @@ public class Carrier implements Auditable, VersionLockable {
 	}
 
 	@Override
-	public long get_v_lock() {
+	public Long get_v_lock() {
 		return _v_lock;
 	}
 
 	@Override
-	public void set_v_lock(long _v_lock) {
+	public void set_v_lock(Long _v_lock) {
 		this._v_lock = _v_lock;
 	}
 

@@ -95,6 +95,10 @@ public class CustomerShipPreferences implements Auditable, Comparable<CustomerSh
 	@Column(name = "override_carriers")
 	private Set<String> overrideCarriers = new TreeSet<String>();
 
+	/** Preferences-specific tags (so they have a date, while Customer's direct tags don't) */
+	@Column(name = "tags")
+	private Set<String> tags = new TreeSet<String>();
+
 	/** Tags referring to Carriers' tags */
 	@Column(name = "carrier_tags_whitelist")
 	private Set<String> carrierTagsWhitelist = new TreeSet<String>();
@@ -139,6 +143,14 @@ public class CustomerShipPreferences implements Auditable, Comparable<CustomerSh
 		this.overrideCarriers = overrideCarriers;
 	}
 
+	public Set<String> getTags() {
+		return tags;
+	}
+
+	public void setTags(Set<String> tags) {
+		this.tags = tags;
+	}
+
 	public Set<String> getCarrierTagsWhitelist() {
 		return carrierTagsWhitelist;
 	}
@@ -160,7 +172,13 @@ public class CustomerShipPreferences implements Auditable, Comparable<CustomerSh
 		return auditingInfo;
 	}
 
-	// as per equality contract, as it is mapped as a Set item by Customer
+	/** settable on that bean, only for the sake of lighter serialization */
+	public void emptyAuditingInfo() {
+		auditingInfo = null;
+	}
+
+	// ===================
+	// as a Set item of Customer + sortable
 	@Override
 	public boolean equals(Object o) {
 		if (this == o) {

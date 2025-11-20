@@ -1,13 +1,15 @@
 package com.acadiainfo.comptatransport.fileimport;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
+import java.util.List;
+import java.util.logging.Logger;
 
 import org.dhatim.fastexcel.reader.ReadableWorkbook;
 import org.dhatim.fastexcel.reader.Row;
 import org.dhatim.fastexcel.reader.Sheet;
+
+import com.acadiainfo.comptatransport.domain.Customer;
 
 import jakarta.annotation.Resource;
 import jakarta.ejb.Stateless;
@@ -15,17 +17,19 @@ import jakarta.ejb.TransactionManagement;
 import jakarta.ejb.TransactionManagementType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import jakarta.transaction.HeuristicMixedException;
-import jakarta.transaction.HeuristicRollbackException;
-import jakarta.transaction.NotSupportedException;
-import jakarta.transaction.RollbackException;
-import jakarta.transaction.SystemException;
+import jakarta.persistence.Query;
 import jakarta.transaction.UserTransaction;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
 
 @Stateless
-@jakarta.ws.rs.Path("/import-test")
+@jakarta.ws.rs.Path("/import-transport-vendu")
 @TransactionManagement(TransactionManagementType.BEAN)
-public class ImportTransportVenduService {
+public class ImportTransportVenduWS {
+	private static final Logger logger = Logger.getLogger(ImportTransportVenduWS.class.getName());
+
+	// TODO replace with import from email
+	public static final String IMPORT_FILE_PATH = "C:\\Users\\Robert.KWAN\\Documents\\ComptaTransport-input\\Transport quotidien.xlsx";
 	public static final String IMPORT_TYPE = "Transport Vendu";
 
 	@Resource
@@ -43,23 +47,30 @@ public class ImportTransportVenduService {
 	private EntityManager em;
 
 	@jakarta.ws.rs.GET
-	public void startBatch() throws IllegalStateException, SecurityException, SystemException {
+	@Produces(value = MediaType.TEXT_PLAIN)
+	public String startBatch() {
 		try {
-			this.readExcel();
-		} catch (Exception e) {
-			ut.rollback();
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			try {
+				Import importHeader = this.readExcel();
+				int customerCreated = createMissingCustomers(importHeader);
+
+				return "rows imported : " + importHeader.getRowCount()
+				  + "\ncustomers created: " + customerCreated;
+
+			} catch (Exception e) {
+				ut.rollback();
+				throw e;
+			}
+		} catch (Exception exc) {
+			logger.log(java.util.logging.Level.SEVERE, "Error importing " + IMPORT_TYPE, exc);
+			return "Error importing : " + exc.getMessage();
 		}
 	}
 
-	public void readExcel()
-	    throws FileNotFoundException, IOException, NotSupportedException, SystemException, SecurityException,
-	    IllegalStateException, RollbackException, HeuristicMixedException, HeuristicRollbackException {
+	public Import readExcel() throws Exception {
 		boolean validateHeader = true;
-		//TODO path in app properties
 
-		try (InputStream is = new java.io.FileInputStream("C:\\Users\\Robert.KWAN\\Documents\\ComptaTransport-input\\Transport quotidien.xlsx");
+		try (InputStream is = new java.io.FileInputStream(IMPORT_FILE_PATH);
 			ReadableWorkbook wb = new ReadableWorkbook(is)) {
 		    Sheet sheet = wb.getFirstSheet();
 
@@ -76,7 +87,7 @@ public class ImportTransportVenduService {
 			//2) iterate over rows
 		    java.util.List<Row> rows = sheet.read();
 		    Iterator<Row> rowsIterator = rows.iterator();
-			long iterationCount = -1;
+			int iterationCount = -1, rowCount = 0;
 			while (rowsIterator.hasNext()) {
 		    	Row row = rowsIterator.next();
 				iterationCount++;
@@ -87,9 +98,8 @@ public class ImportTransportVenduService {
 					&& "Article".equals(row.getCell(H1_ARTICLE).asString())
 					&& "Transporteur".equals(row.getCell(H1_TRANSPORTEUR).asString())
 					&& "Ventes".equals(row.getCell(H1_VENTES).asString())
-					&& "Ventes".equals(row.getCell(H1_VENTES_2).asString()))) {
+					&& "Ventes".equals(row.getCell(H1_VENTES_2).asString())))
 						throw new IllegalArgumentException("Row 2 is not the expected header : " + row);
-					}
 		    	} else if (iterationCount == 1 && validateHeader) {
 				    if (!("Code".equals(row.getCell(H2_SOC_CODE).asString())
 					&& "Numéro de commande".equals(row.getCell(H2_NUM_CMD).asString())
@@ -105,9 +115,8 @@ public class ImportTransportVenduService {
 					&& "Date comptable".equals(row.getCell(H2_DATE_COMPTA).asString())
 					&& "Nom du représentant 1".equals(row.getCell(H2_SALESREP).asString())
 					&& "Cumul poids".equals(row.getCell(H2_POIDS).asString())
-					&& "Montant GL".equals(row.getCell(H2_MONTANT).asString()))) {
+					&& "Montant GL".equals(row.getCell(H2_MONTANT).asString())))
 						throw new IllegalArgumentException("Row 3 is not the expected header : " + row);
-					}
 		    	} else if ("".equals(row.getCellAsString(H2_SOC_CODE).orElse(null))
 		        	  && row.getCellAsNumber(H2_MONTANT).orElse(java.math.BigDecimal.ZERO).floatValue()>0) {
 	        		// - Grand total (final row)
@@ -126,10 +135,11 @@ public class ImportTransportVenduService {
 					entity.setProductDesc(row.getCellAsString(H2_DESCRIPTION_1).orElse(null));
 
 
-					/* we don't store the street addresses */
-					String billing_addr = row.getCellAsString(H2_ADR_FACTURATION).orElse("");
-					String shipping_addr = row.getCellAsString(H2_ADR_LIVRAISON).orElse("");
-					entity.setB2c(!billing_addr.equals(shipping_addr));
+					/* we don't store the street addresses anyway */
+					// String billing_addr = row.getCellAsString(H2_ADR_FACTURATION).orElse("");
+					// String shipping_addr = row.getCellAsString(H2_ADR_LIVRAISON).orElse("");
+					// entity.setB2c(!billing_addr.equals(shipping_addr)); heuristics not reliable.
+					entity.setB2c(false); // TODO find a better way to tell B2C orders from the others.
 
 					entity.setCarrierName(row.getCellAsString(H2_TRANSP_CODE).orElse(null));
 					entity.setShipCountry(row.getCellAsString(H2_PAYS).orElse(null));
@@ -144,6 +154,14 @@ public class ImportTransportVenduService {
 					entity.setTotalPrice(row.getCellAsNumber(H2_MONTANT).orElse(null));
 
 					em.persist(entity);
+
+					// purge previous
+					Query deleteDupesQuery = em.createNamedQuery("ImportTransportVendu.purgePrevious");
+					deleteDupesQuery.setParameter("docReference", entity.getDocReference());
+					deleteDupesQuery.setParameter("importHeader", importHeader);
+					deleteDupesQuery.executeUpdate(); // maybe record purged row count ?...
+
+					rowCount++;
 					if (iterationCount % TRANSACTION_BATCH_SIZE == 0) {
 						em.flush();
 						ut.commit();
@@ -152,11 +170,36 @@ public class ImportTransportVenduService {
 	        	}
 		    }
 
-			ut.commit();
-
 		    //3) close header
-			// TODO write _date_ended
+			importHeader.setRowCount(rowCount);
+			importHeader.setDateEnded(System.currentTimeMillis());
+			em.merge(importHeader);
+
+			em.flush();
+			ut.commit();
+			return importHeader;
 
 		} // end try with resources
+	}
+
+
+
+	private int createMissingCustomers(Import importHeader) throws Exception {
+		ut.begin();
+		Query query = em.createNamedQuery("ImportTransportVendu_as_new_Customers");
+		query.setParameter(1, importHeader.getId());
+
+		@SuppressWarnings("unchecked")
+		List<Customer> customers = query.getResultList();
+		for (Customer customer : customers) {
+			em.detach(customer);
+			customer.getTags().add("IMPORT");
+			customer.getTags().add("inactive"); // TODO remove when then the view will support pagination
+			customer.setDescription("(créé par import de frais de port)");
+			em.persist(customer);
+		}
+		em.flush();
+		ut.commit();
+		return customers.size();
 	}
 }

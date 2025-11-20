@@ -2,7 +2,7 @@ package com.acadiainfo.comptatransport.data;
 
 
 import java.time.LocalDateTime;
-import java.util.stream.Stream;
+import java.util.List;
 
 import com.acadiainfo.comptatransport.domain.PriceGridVersion;
 import com.acadiainfo.util.persistence.CrudRepositoryImpl;
@@ -36,7 +36,7 @@ public class PriceGridVersionsRepository extends CrudRepositoryImpl<PriceGridVer
 	}
 
 	/**
-	 * That TEXT column behaves weirdly regarding transactions, worth investigating.  
+	 * That TEXT column behaves weirdly regarding transactions, worth investigating.
 	 */
 	@Override
 	protected boolean excludeFromPatchBean(String propertyName) {
@@ -48,35 +48,34 @@ public class PriceGridVersionsRepository extends CrudRepositoryImpl<PriceGridVer
 	 * @param id - parent PriceGrid id
 	 * @return
 	 */
-	public Stream<PriceGridVersion> findAllOfOnePriceGrid(Long id) {
-		Query query = this.getEntityManager()
-		  .createQuery("SELECT pgv FROM PriceGridVersion pgv WHERE pgv.priceGrid.id=:id ORDER BY pgv.version desc");
+	public List<PriceGridVersion> findAllOfOnePriceGrid(Long id) {
+		Query query = em
+		    .createQuery("SELECT pgv FROM PriceGridVersion pgv WHERE pgv.priceGrid.id=:id ORDER BY pgv.version desc");
 		query.setParameter("id", id);
 
 		@SuppressWarnings("unchecked")
-		Stream<PriceGridVersion> versions = query.getResultStream();
+		List<PriceGridVersion> versions = query.getResultList();
 
 		return versions;
 	}
-	
+
 	/**
 	 * Same as {@link #findAllOfOnePriceGrid(Long)}, only with an applicable date.
 	 * @param id - parent PriceGrid id
-	 * @param dtPublishedAt 
-	 * @return reversed-ordered by publishedDate 
+	 * @param dtPublishedAt
+	 * @return reversed-ordered by publishedDate
 	 */
-	public Stream<PriceGridVersion> findAllPublishedOfOnePriceGrid(Long id, LocalDateTime dtPublishedAt) {
-		Query query = this.getEntityManager()
-		    .createQuery(
+	public List<PriceGridVersion> findAllPublishedOfOnePriceGrid(Long id, LocalDateTime dtPublishedAt) {
+		Query query = em.createQuery(
 		        "SELECT pgv FROM PriceGridVersion pgv WHERE pgv.priceGrid.id=:id AND pgv.publishedDate <= :dtPublishedAt ORDER BY pgv.publishedDate desc");
 		query.setParameter("id", id);
 		query.setParameter("dtPublishedAt", dtPublishedAt);
 
 		@SuppressWarnings("unchecked")
-		Stream<PriceGridVersion> resultStream = query.getResultStream();
-		return resultStream;
+		List<PriceGridVersion> result = query.getResultList();
+		return result;
 	}
-	
+
 
 	/**
 	 * Used for preemptive check on UNIQUE constraint.
@@ -85,7 +84,7 @@ public class PriceGridVersionsRepository extends CrudRepositoryImpl<PriceGridVer
 	 * @return
 	 */
 	public PriceGridVersion findVersionOfOnePriceGrid(Long id, String version) {
-		Query query = this.getEntityManager().createQuery(
+		Query query = em.createQuery(
 				"SELECT pgv FROM PriceGridVersion pgv WHERE pgv.priceGrid.id=:id AND pgv.version = :version");
 		query.setParameter("id", id);
 		query.setParameter("version", version);

@@ -1,5 +1,6 @@
 package com.acadiainfo.comptatransport.domain;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -13,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.NamedQuery;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import jakarta.persistence.Version;
 
 
@@ -56,12 +58,16 @@ public class Customer implements Auditable, VersionLockable {
     )
 	private Set<CustomerShipPreferences> shipPreferences = new TreeSet<CustomerShipPreferences>();
 
+	/** not directly fetched as relationship, needs to be filtered by date */
+	@Transient
+	private Set<AggShippingRevenue> aggShippingRevenues = new HashSet<AggShippingRevenue>();
+
 	/**
 	 * JPA Optimistic lock
 	 */
 	@Version
 	@Column(name = "_v_lock")
-	private long _v_lock;
+	private Long _v_lock;
 
 
 	@Embedded
@@ -123,13 +129,21 @@ public class Customer implements Auditable, VersionLockable {
 		this.shipPreferences = shipPreferences;
 	}
 
+	public Set<AggShippingRevenue> getAggShippingRevenues() {
+		return aggShippingRevenues;
+	}
+
+	public void setAggShippingRevenues(Set<AggShippingRevenue> aggShippingRevenues) {
+		this.aggShippingRevenues = aggShippingRevenues;
+	}
+
 	@Override
-	public long get_v_lock() {
+	public Long get_v_lock() {
 		return _v_lock;
 	}
 
 	@Override
-	public void set_v_lock(long _v_lock) {
+	public void set_v_lock(Long _v_lock) {
 		this._v_lock = _v_lock;
 	}
 
@@ -137,4 +151,10 @@ public class Customer implements Auditable, VersionLockable {
 	public AuditingInfo getAuditingInfo() {
 		return auditingInfo;
 	}
+
+	/** settable on that bean, only for the sake of lighter serialization */
+	public void emptyAuditingInfo() {
+		auditingInfo = null;
+	}
+
 }
