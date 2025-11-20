@@ -76,6 +76,10 @@ Dependencies :
 				editingValidation: new Map(),
 				selectedEntity: null,
 				_technical_key_seq: 0, // sequence counter, used to uniquely identify rows in grid
+
+				// highlight a row by query string "show-attr"
+				showAttribute: null,
+				showAttributeValue: null,
 			};
 		},
 		watch:{
@@ -92,6 +96,13 @@ Dependencies :
 			},
 		},
 		mounted(){
+			const searchParams = new URLSearchParams(window.location.search);
+			let showAttrParamFrags = /^(.*?):(.*)$/.exec(searchParams.get("show-attr"));
+			if (showAttrParamFrags && showAttrParamFrags.length >= 3){
+				this.showAttribute = showAttrParamFrags[1];
+				this.showAttributeValue = showAttrParamFrags[2];
+			}
+
 			this.refreshFullGrid();
 		},
 		methods:{
@@ -244,6 +255,8 @@ Dependencies :
 			},
 			startEditingRow(entity){
 				if (this.readonly) return; // as a safeguard
+				this.showAttribute = this.showAttributeValue = null; // disarm row highlight (until next full refresh, at least)
+
 				this.clearEditingRow();
 				this.editingEntity = deepClone(entity);
 				this.$emit("editing", this.editingEntity);
@@ -324,10 +337,6 @@ Dependencies :
 					}
 					break;
 				}
-			},
-			isRowSelected(entity){
-				if (entity == null || this.selectedEntity == null) return false;
-				return this.selectedEntity["#key"] == entity["#key"];
 			},
 			_buildPayload(entityObj) {
 				let payloadObj = deepClone(entityObj);
@@ -435,7 +444,38 @@ Dependencies :
 				}
 				return rows;
 			},
-			/* helps with column styling */
+
+			/* Row styling */
+			isRowHighlight(entity){
+				return (this.showAttribute && this.showAttributeValue)
+				  ? entity[this.showAttribute] == this.showAttributeValue
+				  : false;
+			},
+
+			rowClassObj(entity){
+				let returnVal = [];
+
+				if (entity != null && this.selectedEntity != null
+				  && this.selectedEntity["#key"] == entity["#key"]) {
+					returnVal.push('table-active');
+				}
+				if (this.isEditingRow(entity)){
+					returnVal.push('row-editing');
+				}
+				if (this.isRowHighlight(entity)){
+					returnVal.push('row-highlight');
+
+					//prepare the scroll to that very row !
+					this.$nextTick(() => {
+						this.$refs.highlightAnchor[0].scrollIntoView({block:"center"});
+						// like "scrollAnchor", that sits in a loop, hence the [0]...
+					});
+
+				}
+				return returnVal;
+			},
+
+			/* Column styling */
 			columnClassObj(column) {
 				return {
 					'identifier-col': column.name==this.identifier,
@@ -523,7 +563,7 @@ Dependencies :
 		<tbody>
 			<TransitionGroup name="list" @after-enter="registerMoveEnd" @before-leave="unregisterMoveEnd">
 			<tr v-for="entity in filteredEntityList" :key="entity['#key']" @click="selectRow(entity)"
-			  :class="{'table-active':isRowSelected(entity), 'row-editing': isEditingRow(entity)}">
+			  :class="rowClassObj(entity)" >
 				<td v-if="!readonly" class="btns-first">
 					<div v-if="isEditingRow(entity)" >
 						<button type="button" class="btn bi bi-check-lg btn-success"
@@ -533,8 +573,12 @@ Dependencies :
 						  @click.stop="clearEditingRow()" title="Annuler la modification"
 						  v-if="this.config.selectRowAction!='edit'"></button>
 					</div>
-					<div v-else >
-						<button type="button" class="btn bi bi-pencil"
+					<div v-else class="position-relative">
+						<i class="position-absolute bi-exclamation" v-if="isRowHighlight(entity)" ref="highlightAnchor"></i>
+						<%-- TODO put the ref="scrollAnchor" and "highlightAnchor" to another column,
+						since this one can be hidden --%>
+
+						<button type="button" class="btn bi bi-pencil" ref="random"
 						  @click.stop="startEditingRow(entity)" title="Modifier la ligne"></button>
 					</div>
 				</td>
@@ -657,10 +701,6 @@ Dependencies :
 				var selectedId =  this.modelValue ? this.modelValue[this.identifier] : -1;
 				bootstrap.Modal.getOrCreateInstance(this.$refs.entitySelectorDialog).show();
 				this.$refs.embedded.selectRowById(selectedId);
-
-				//this.$nextTick(()=>
-
-				//		this.$forceUpdate();
 			},
 			validateEmpty(){
 				this.$emit('update:modelValue', null);

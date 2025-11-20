@@ -10,10 +10,9 @@
 
 	<%@ include file="/WEB-INF/includes/header-inc/client-stack.jspf" %>
 
+	<%@ include file="/WEB-INF/includes/header-inc/vue-entityAttributeComponents.jspf"%>
 	<%@ include file="/WEB-INF/includes/header-inc/vue-datepickers.jspf" %>
-	<%--
-	@ include file="/WEB-INF/includes/header-inc/vue-entityAttributeComponents.jspf"
-	--%>
+
 	<style>
 		/** Bootstrap global overrides */
 		html {
@@ -179,7 +178,7 @@
 						<div>{{ rowData.order }}</div>
 					</td>
 					<td>
-						<div>{{ rowData.customer }}</div>
+						<div><link-to-grid url="../customers" attr="erpReference" :value="rowData.customer"></link-to-grid></div>
 					</td>
 					<td>
 						<div>{{ rowData.customerLabel }}</div>
@@ -216,16 +215,16 @@ Transporteur reco selon grille tarifaire
 					</td>
 
 					<td class="price">
-						<div :title="rowData['P_MAIN']?.desc">{{ rowData['P_MAIN']?.price}}</div>					
+						<div :title="rowData['P_MAIN']?.desc">{{ rowData['P_MAIN']?.price}}</div>
 					</td>
 					<td class="price">
-						<div :title="rowData['P_B2C']?.desc">{{ rowData['P_B2C']?.price}}</div>					
+						<div :title="rowData['P_B2C']?.desc">{{ rowData['P_B2C']?.price}}</div>
 					</td>
 					<td class="price">
-						<div :title="rowData['P_OPT1']?.desc">{{ rowData['P_OPT1']?.price}}</div>					
+						<div :title="rowData['P_OPT1']?.desc">{{ rowData['P_OPT1']?.price}}</div>
 					</td>
 					<td class="price">
-						<div :title="rowData['P_OPT2']?.desc">{{ rowData['P_OPT2']?.price}}</div>					
+						<div :title="rowData['P_OPT2']?.desc">{{ rowData['P_OPT2']?.price}}</div>
 					</td>
 
 					<td class="price">
@@ -258,8 +257,7 @@ Transporteur reco selon grille tarifaire
 		});
 
 		// specific cell renders/editors as VueJS components
-		//app.component("renderer-carrier-tags", CarrierTextTags);
-		//app.component("renderer-auditing-info", AuditingInfoRenderer_IconWithPopover);
+		app.component("link-to-grid", LinkToGrid);
 
 		app.component("datedisplay-day", Datedisplay_Day);
 		app.component("datepicker-day", Datepicker_Day);

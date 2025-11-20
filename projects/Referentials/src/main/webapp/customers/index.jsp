@@ -17,7 +17,7 @@
 
 	<style>
 
-		/* Some table column styling */
+		/* Some table column and row styling */
 		table#customer-grid tr td.mandatory-col {
 			background-color: rgb(255, 245, 245);
 		}
@@ -26,6 +26,9 @@
 		  content: "\00274C"; /* emoji "Red X" */
 		}
 
+		table#customer-grid tr.row-highlight td {
+			background-color: yellow;
+		}
 
 		/* Table row align : fixed height for prettyt anything in this screen: */
 

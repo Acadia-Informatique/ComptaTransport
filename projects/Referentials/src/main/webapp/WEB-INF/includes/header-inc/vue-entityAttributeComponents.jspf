@@ -11,11 +11,12 @@ Since as cell editors and renderers they cannot be directly configured,
 you may need to compose them in custom components, or subclass them.
 
 Components :
+- LinkToGrid (to be composed for parameterizing)
 - MoneyInput
 - IconWithPopover (the value is displayed IN the popover, but icons are hints)
 - AuditingInfoRenderer (auditing info obj)
 - AuditingInfoRenderer_IconWithPopover (smaller variant)
-(- TextTagsComponent is its own file "vue-entityTextTagsComponents)
+(- TextTagsComponent is its own file "vue-entityTextTagsComponents, and is better composed in custom renderer)
 
 Special :
 - EntityActionClient - designed as a composable in a custom renderer :
@@ -30,6 +31,38 @@ Dependencies :
 --%>
 
 <script type="text/javascript">
+	/*
+	Exemple of grid cell renderer using LinkToGrid :
+	var LinkToCustomerGrid = {
+		props: ["modelValue"],
+		components:{
+			"link-to-grid" : LinkToGrid
+		},
+		template: `<link-to-grid url="../customers" attr="erpReference" :value="modelValue"></link-to-grid>`
+	}); */
+	var LinkToGrid = {
+		props: ["url", "attr", "value"], // all mandatory
+		computed:{
+			href(){
+				try {
+					var href = new URL(this.url);
+					href.searchParams.set('show-attr', this.attr + ":" + this.value);
+					return href;
+				} catch(error){ // supposedly new URL() fails with relative urls
+					var href = new URL("http://fakeurl");
+					href.searchParams.set('show-attr', this.attr + ":" + this.value);
+					href = this.url +"?" + href.searchParams;
+					return href;
+
+				}
+			}
+		},
+		template: `<a :href="href">{{ value }}</a>`
+	};
+
+
+
+
 	var MoneyInput = {
 		props: ['modelValue', 'modelModifiers', 'decimals'],
 		//	modelValue: optional Number ?,
