@@ -21,8 +21,9 @@
 	
 	
 	<H2>Contrôles</H2>
+	<%-- TODO sortir les contrôles dans une autre webapp après Mavenization propre --%>
 	<ul>
-		<li>à faire...</li>
+		<li><a href="<c:url value="/controls/revenue.jsp"/> ">Contrôle quotidien</a></li>
 	</ul>	
 </body>
 </html>

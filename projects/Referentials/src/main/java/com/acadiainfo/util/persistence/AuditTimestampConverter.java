@@ -9,7 +9,7 @@ import jakarta.persistence.Converter;
 
 /**
  * UTC Timestamps from MySQL are misinterpreted somewhere in the stack.
- * For an unknown reason, I can't make it work with all 
+ * For an unknown reason, I can't make it work with all
  * the parameters combinations found about it :
  * - useLegacyDatetimeCode=true (Connector/J 5.1)
  * - connectionTimeZone=LOCAL & forceConnectionTimeZoneToSession=false
@@ -17,12 +17,12 @@ import jakarta.persistence.Converter;
  * - connectionTimeZone=SERVER & preserveInstants=true
  * - connectionTimeZone=user_defined & preserveInstants=true
  *
- * Now I am just using connectionTimeZone="UTC" for DATETIME columns, and this class for TIMESTAMP ones. 
- * TODO document current database settings (MySQL + UTC timezone + US-EN locale) 
- * 
- * And I don't want to change the JVM's user.timezone because *IT IS OUTRAGEOUS*. 
+ * Now I am just using connectionTimeZone="UTC" for DATETIME columns, and this class for TIMESTAMP ones.
+ * TODO document current database settings (MySQL + UTC timezone + US-EN locale)
+ *
+ * And I don't want to change the JVM's user.timezone because *IT IS OUTRAGEOUS*.
  * TODO find a way to make it work at JDBC driver level, and REMOVE it altogether.
- * 
+ *
  * @see <a href="https://dev.mysql.com/blog-archive/support-for-date-time-types-in-connector-j-8-0/">source for the (mostly useless) JDBC parameters</a>
  */
 @Converter
@@ -30,8 +30,11 @@ public class AuditTimestampConverter implements AttributeConverter<Long, java.ti
 
 	@Override
 	public LocalDateTime convertToDatabaseColumn(Long attribute) {
-		throw new UnsupportedOperationException(
-				"DEV error : code has been commented out for it is not supposed to be used.");
+		if (attribute == null || attribute.longValue() == 0L) {
+			return null;
+		} else {
+			return LocalDateTime.ofEpochSecond(attribute.longValue(), 0, java.time.ZoneOffset.UTC);
+		}
 	}
 
 	@Override

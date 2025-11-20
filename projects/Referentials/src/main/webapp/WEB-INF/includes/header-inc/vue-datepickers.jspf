@@ -47,7 +47,12 @@ const Datepicker = {
 		return date.substring(0, 7); //YYYY-MM
 	}
 };
+</script>
 
+
+<!-- ----------------  MONTH --------------------  -->
+
+<script type="text/javascript">
 var Datedisplay_Month = {
 	props:['value'],
 	methods:{
@@ -65,7 +70,7 @@ var Datepicker_Month = {
 	computed: {
 		monthValue: {
 			get() {
-				return this.modelValue.substring(0, 7);
+				return Datepicker.formatAsMonth(this.modelValue);
 			},
 			set(v) {
 				v = this._normalize(v, 0);
@@ -103,7 +108,6 @@ var Datepicker_Month = {
 };
 </script>
 
-
 <script type="text/x-template" id="Datepicker-Month-template">
 	<div class="d-flex">
 		<button type="button" @click="addMonth(-1)"
@@ -114,5 +118,59 @@ var Datepicker_Month = {
 		  class="btn bi bi-caret-right-fill px-0">
 		</button>
 
+	</div>
+</script>
+
+
+<!-- ----------------  DAY --------------------  -->
+
+<script type="text/javascript">
+var Datedisplay_Day = {
+	props:['value'],
+	methods:{
+		format: (v)=>{
+			return v ? new Date(v).toLocaleDateString() : "";
+		}
+	},
+	template:"{{format(value)}}"
+};
+
+var Datepicker_Day = {
+	props: ['modelValue', 'modelModifiers'],
+	//	modelValue: String ISO8601 (if null -> start with current month),
+	//	modelModifiers: capture and ignore
+	// },
+	emits: ['update:modelValue'],
+	computed: {
+		dayValue: {
+			get() {
+				return Datepicker.formatAsDate(this.modelValue);
+			},
+			set(v) {
+				this.$forceUpdate();
+				this.$emit('update:modelValue', v + "T00:00:00.0");
+			}
+		}
+	},
+	methods:{
+		addDay(offset){
+			let millis = new Date(this.dayValue).getTime();
+			millis += offset * 24 * 60 * 60 * 1000;
+			this.dayValue = Datepicker.formatAsDate(new Date(millis));
+		}
+	},	
+	template: "#Datepicker-Day-template"
+};
+</script>
+
+<script type="text/x-template" id="Datepicker-Day-template">
+	<div class="d-flex">
+		<button type="button" @click="addDay(-1)"
+		  class="btn bi bi-caret-left-fill px-0">
+		</button>
+		<input type="date" v-model="dayValue"></input>
+		<button type="button" @click="addDay(+1)"
+		  class="btn bi bi-caret-right-fill px-0">
+		</button>
 	</div>
 </script>

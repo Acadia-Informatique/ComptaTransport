@@ -6,8 +6,8 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.acadiainfo.comptatransport</groupId>
 	<artifactId>comptatransport.referentials</artifactId>
-	<version>0.0.1</version>  
-  
+	<version>0.0.1</version>
+
 	<build>
 		<plugins>
 			<!-- Flyway for database -->
@@ -34,9 +34,9 @@
 						<artifactId>mysql-connector-j</artifactId>
 						<version>9.4.0</version>
 					</dependency>
-				</dependencies>				
+				</dependencies>
 			</plugin>
-			
+
 			<!-- copy WebJars dependencies to main project (TODO remove when mavenizing main project) -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -55,23 +55,23 @@
 									<artifactId>vue</artifactId>
 									<version>3.5.22</version>
 									<outputDirectory>../Referentials/src/main/webapp/WEB-INF/lib/</outputDirectory>
-								</artifactItem>	
+								</artifactItem>
 								<artifactItem>
 									<groupId>org.webjars.npm</groupId>
 									<artifactId>axios</artifactId>
 									<version>1.12.2</version>
 									<outputDirectory>../Referentials/src/main/webapp/WEB-INF/lib/</outputDirectory>
-								</artifactItem>	
+								</artifactItem>
 								<artifactItem>
 									<groupId>org.webjars</groupId>
 									<artifactId>bootstrap</artifactId>
 									<version>5.3.8</version>
 									<outputDirectory>../Referentials/src/main/webapp/WEB-INF/lib/</outputDirectory>
-								</artifactItem>	
+								</artifactItem>
 								<artifactItem>
 									<groupId>org.webjars.npm</groupId>
 									<artifactId>bootstrap-icons</artifactId>
-									<version>1.13.1</version>								
+									<version>1.13.1</version>
 									<outputDirectory>../Referentials/src/main/webapp/WEB-INF/lib/</outputDirectory>
 								</artifactItem>
 								<artifactItem>
@@ -79,7 +79,7 @@
 									<artifactId>popperjs__core</artifactId>
 									<version>2.11.8</version>
 									<outputDirectory>../Referentials/src/main/webapp/WEB-INF/lib/</outputDirectory>
-								</artifactItem>								
+								</artifactItem>
 							</artifactItems>
 							<!-- other configurations here -->
 						</configuration>
@@ -88,8 +88,25 @@
 			</plugin>
 		</plugins>
 	</build>
-	
+
 	<dependencies>
+
+		<!-- server stack -->
+
+		<!-- MS Excel reading -->
+
+		<dependency>
+			<groupId>org.dhatim</groupId>
+			<artifactId>fastexcel-reader</artifactId>
+			<version>0.19.0</version>
+		</dependency>
+		<!-- should the need ever comes...
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi</artifactId>
+			<version>5.5.0</version>
+		</dependency>
+		-->
 
 		<!-- client stack as WebJars (core: VueJS + Bootstrap)-->
 		<dependency>
@@ -101,7 +118,7 @@
 			<groupId>org.webjars.npm</groupId>
 			<artifactId>axios</artifactId>
 			<version>1.12.2</version>
-		</dependency>		
+		</dependency>
 		<dependency>
 			<groupId>org.webjars</groupId>
 			<artifactId>bootstrap</artifactId>
@@ -117,7 +134,7 @@
 			<artifactId>popperjs__core</artifactId>
 			<version>2.11.8</version>
 		</dependency>
-		
+
 		<!-- client stack as WebJars (optional) -->
 
 	</dependencies>

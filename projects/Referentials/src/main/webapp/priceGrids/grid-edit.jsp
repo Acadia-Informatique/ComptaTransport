@@ -17,8 +17,7 @@
 
 	<script type="text/javascript">
 		"use strict";
-
-		let params = new URL(document.location.toString()).searchParams;
+		const params = new URLSearchParams(window.location.search);
 		var PRICE_GRID_ID          = params.get("pgid");
 		var PRICE_GRID_VERSION_ID  = params.get("pgvid");
 
