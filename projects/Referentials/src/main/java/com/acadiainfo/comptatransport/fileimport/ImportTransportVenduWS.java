@@ -29,7 +29,7 @@ public class ImportTransportVenduWS {
 	private static final Logger logger = Logger.getLogger(ImportTransportVenduWS.class.getName());
 
 	// TODO replace with import from email
-	public static final String IMPORT_FILE_PATH = "C:\\Users\\Robert.KWAN\\Documents\\ComptaTransport-input\\Transport quotidien.xlsx";
+	public static final String IMPORT_FILE_PATH = "C:\\Users\\Robert.KWAN\\Documents\\ComptaTransport-input\\DAILY.xlsx";
 	public static final String IMPORT_TYPE = "Transport Vendu";
 
 	@Resource

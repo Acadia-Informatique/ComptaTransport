@@ -30,7 +30,7 @@ public class ImportForfaitTrspVenduWS {
 	private static final Logger logger = Logger.getLogger(ImportForfaitTrspVenduWS.class.getName());
 
 	// TODO replace with import from email
-	public static final String IMPORT_FILE_PATH = "C:\\Users\\Robert.KWAN\\Documents\\ComptaTransport-input\\Transport factu frais mensuel.xlsx";
+	public static final String IMPORT_FILE_PATH = "C:\\Users\\Robert.KWAN\\Documents\\ComptaTransport-input\\MONTHLY.xlsx";
 	public static final String IMPORT_TYPE = "Forfait Transport Vendu";
 
 	@Resource
@@ -50,18 +50,12 @@ public class ImportForfaitTrspVenduWS {
 	@Produces(value = MediaType.TEXT_PLAIN)
 	public String startBatch() {
 		try {
-			try {
-				Import importHeader = this.readExcel();
-				int customerCreated = createMissingCustomers(importHeader);
-				int aggregatesCreated = adjustAggShippingRevenues(importHeader);
+			Import importHeader = this.readExcel();
+			int customerCreated = createMissingCustomers(importHeader);
+			int aggregatesCreated = adjustAggShippingRevenues(importHeader);
 
-				return "rows imported : " + importHeader.getRowCount()
-				  + "\ncustomers created: " + customerCreated
-				  + "\naggregates created: " + aggregatesCreated;
-			} catch (Exception e) {
-				ut.rollback();
-				throw e;
-			}
+			return "rows imported : " + importHeader.getRowCount() + "\ncustomers created: " + customerCreated
+			    + "\naggregates created: " + aggregatesCreated;
 		} catch (Exception exc) {
 			logger.log(java.util.logging.Level.SEVERE, "Error importing " + IMPORT_TYPE, exc);
 			return "Error importing : " + exc.getMessage();
@@ -163,46 +157,56 @@ public class ImportForfaitTrspVenduWS {
 	}
 
 	private int createMissingCustomers(Import importHeader) throws Exception {
-		ut.begin();
-		Query query = em.createNamedQuery("ImportForfaitTrspVendu_as_new_Customers");
-		query.setParameter(1, importHeader.getId());
+		try {
+			ut.begin();
+			Query query = em.createNamedQuery("ImportForfaitTrspVendu_as_new_Customers");
+			query.setParameter(1, importHeader.getId());
 
-		@SuppressWarnings("unchecked")
-		List<Customer> customers = query.getResultList();
-		for (Customer customer : customers){
-			em.detach(customer);
-			customer.getTags().add("IMPORT forfait");
-			customer.setDescription("(créé par import des Forfaits mensuels)");
-			em.persist(customer);
+			@SuppressWarnings("unchecked")
+			List<Customer> customers = query.getResultList();
+			for (Customer customer : customers) {
+				em.detach(customer);
+				customer.getTags().add("IMPORT forfait");
+				customer.setDescription("(créé par import des Forfaits mensuels)");
+				em.persist(customer);
+			}
+			em.flush();
+			ut.commit();
+			return customers.size();
+		} catch (Exception e) {
+			ut.rollback();
+			throw e;
 		}
-		em.flush();
-		ut.commit();
-		return customers.size();
 	}
 
 	private int adjustAggShippingRevenues(Import importHeader) throws Exception {
-		ut.begin();
-		Query query = em.createNamedQuery("ImportForfaitTrspVendu_as_new_AggShippingRevenues");
-		query.setParameter(1, importHeader.getId());
+		try {
+			ut.begin();
+			Query query = em.createNamedQuery("ImportForfaitTrspVendu_as_new_AggShippingRevenues");
+			query.setParameter(1, importHeader.getId());
 
-		Query deleteDupesQuery = em.createNamedQuery("AggShippingRevenue.deleteByUniqueRef");
+			Query deleteDupesQuery = em.createNamedQuery("AggShippingRevenue.deleteByUniqueRef");
 
-		@SuppressWarnings("unchecked")
-		List<AggShippingRevenue> aggs = query.getResultList();
-		for (AggShippingRevenue agg : aggs){
-			em.detach(agg);
+			@SuppressWarnings("unchecked")
+			List<AggShippingRevenue> aggs = query.getResultList();
+			for (AggShippingRevenue agg : aggs) {
+				em.detach(agg);
 
-			deleteDupesQuery.setParameter("customer", agg.getCustomer());
-			deleteDupesQuery.setParameter("product", agg.getProduct());
-			deleteDupesQuery.setParameter("date", agg.getDate());
-			deleteDupesQuery.executeUpdate();
+				deleteDupesQuery.setParameter("customer", agg.getCustomer());
+				deleteDupesQuery.setParameter("product", agg.getProduct());
+				deleteDupesQuery.setParameter("date", agg.getDate());
+				deleteDupesQuery.executeUpdate();
+				em.flush();
+
+				em.persist(agg);
+			}
 			em.flush();
-
-			em.persist(agg);
+			ut.commit();
+			return aggs.size();
+		} catch (Exception e) {
+			ut.rollback();
+			throw e;
 		}
-		em.flush();
-		ut.commit();
-		return aggs.size();
 	}
 
 }
