@@ -174,14 +174,6 @@
 				this.level = level;
 				this.cellValue = cellValue;
 			}
-			numericCellValue(){
-				// undefined or null really non expected here, better let it fail hard.
-				if (isNaN(this.cellValue)){
-					return "N/A";
-				} else {
-					return this.cellValue.toFixed(2);
-				}
-			}
 		}
 
 
@@ -331,31 +323,22 @@
 						}
 					}
 
-					if (customerShipPreferences) {
-						if (customerShipPreferences.overridePriceGrid){
-							
-							let altSystem = this.otherPricingSystems.get(customerShipPreferences.overridePriceGrid.name);
-							try {
-								let altRes = altSystem.applyGrid("Toutes livraisons", this.pricedObject);
-								let altFlatRes = PricingSystem.summarizeResult(altRes);
-	
-								console.warn(customerShipPreferences.overridePriceGrid);
-								console.warn(altFlatRes.total());
-								return new Assessment("Le client possède une grille tarifaire personnalisée : \"" + customerShipPreferences.overridePriceGrid.name + "\"",
-								  LEVEL_BAD, altFlatRes.total());
-							} catch (err) {
-								alert_dialog("Erreur Grille Tarifaire " + customerShipPreferences.overridePriceGrid.name,
-								 "Une erreur s'est produite à l'application de la grille personnalisée du client "
-								 + "\"" + this.rowData.customerLabel + "\" ["+ this.rowData.customerRef + "] : " + err.message);
-								// TODO : investigate on why the message can be wrong about the involved customer ?!
-							}
+
+					let alternatePriceGridResult;
+					if (customerShipPreferences?.overridePriceGrid){
+						let altSystem = this.otherPricingSystems.get(customerShipPreferences.overridePriceGrid.name);
+						try {
+							alternatePriceGridResult = altSystem.applyGrid("Toutes livraisons", this.pricedObject);
+						} catch (err) {
+							alert_dialog("Erreur Grille Tarifaire " + customerShipPreferences.overridePriceGrid.name,
+							 "Une erreur s'est produite à l'application de la grille personnalisée du client "
+							 + "\"" + this.rowData.customerLabel + "\" ["+ this.rowData.customerRef + "] : " + err.message);
 						}
 					}
 
-
 					// customer B2C tag -> override PriceSystem computed value
-					let cust_b2cAmount_override;
-					if (this.rowDataCached_final_b2c && customerShipPreferences) {
+					let cust_b2cAmount_override = null;
+					if (this.rowDataCached_final_b2c && customerShipPreferences?.tags) {
 						const B2C_tag_regex = /^B2C\s*:\s*(\d+[,\.]?\d*).*$/;
 						for (let tag of customerShipPreferences.tags){
 							let match = B2C_tag_regex.exec(tag);
@@ -367,20 +350,24 @@
 					}
 
 					// common case
-					let priceGridFlatResult_overridden_total = //derived from priceGridFlatResult.total()
-						(this.priceGridFlatResult["MAIN"]??0)
-					  + (cust_b2cAmount_override ?? (this.priceGridFlatResult["B2C"]??0))
-					  + (this.priceGridFlatResult["OPTS"]??0)
-					  + (this.priceGridFlatResult["UNK"]??0);
+					let baseFlatResult = PricingSystem.summarizeResult(alternatePriceGridResult ?? this.priceGridResult); // this rule may change, we could display ALL alternative results.
+					// note: baseFlatResult may be equal to this.priceGridFlatResult at this stage,
+					// but we may need to *alter* it - so better not share it.
 
-					let margin = Math.floor(100 * (this.rowData_overridden_price - priceGridFlatResult_overridden_total)) / 100;
-					let message = isNaN(margin) ? "N/A" : (margin >=0 ? "Nul ou Positif" : "Négatif"); // TODO alerter si marge relative trop forte ?...
-					if (cust_b2cAmount_override){
-						message += ` (avec supplém. B2C spécial du client à \${cust_b2cAmount_override})`;
+					let baseMessage = "";
+					if (alternatePriceGridResult) {
+						baseMessage += `Grille tarifaire personnalisée : "\${customerShipPreferences.overridePriceGrid.name}"`;
 					}
-					return new Assessment(message,
+					if (cust_b2cAmount_override !== null){
+						baseFlatResult["B2C"] = cust_b2cAmount_override;
+						baseMessage += ` (avec supplém. B2C spécial du client à \${cust_b2cAmount_override})`;
+					}
+
+					let baseFlatResult_total = Math.floor(100 * baseFlatResult.total()) / 100;
+					let margin = Math.floor(100 * (this.rowData_overridden_price - baseFlatResult_total)) / 100;
+					return new Assessment(baseMessage,
 					  margin === 0 ? LEVEL_OK : (margin > 0 ? LEVEL_WARN : LEVEL_BAD),
-					  priceGridFlatResult_overridden_total);
+					  isNaN(baseFlatResult_total) ? "N/A" : baseFlatResult_total);
 				},
 
 				amountOKclass(){
@@ -688,7 +675,7 @@
 
 			<td class="price computed">
 				<div :title="assessAmountOK.msg" :class="amountOKclass">
-					{{ assessAmountOK.numericCellValue() }}
+					{{ assessAmountOK.cellValue }}
 				</div>
 			</td>
 			<td class="price comment">
@@ -967,27 +954,8 @@
 					_updatePricingSystem("Acadia", dt, this.pricingSystem);
 				},
 				loadRef_OtherPricingSystem(dt){
-					axios_backend.get("price-grids?tag=Tarif+Spécial")
-					.then(response => {
-						for (let pricegrid of response.data){
-							this.otherPricingSystems.set(pricegrid.name, new PricingSystem());
-						}
-
-						this.otherPricingSystems.values().map(system =>
-							_updatePricingSystem(pricegrid.name, dt, system)
-						);
-					});
-
-
-
-				},
-				loadRef_Carriers(){
-					this.reflist_carriers.clear();
-					axios_backend.get("carriers")
-					.then(response => {
-						for (let carrier of response.data){
-							this.reflist_carriers.set(carrier.name, carrier);
-						}
+					this.otherPricingSystems.forEach((system, pgname) => {
+						_updatePricingSystem(pgname, dt, system)
 					});
 				},
 				clearGridFilters(){
@@ -998,6 +966,7 @@
 				sharedReady(){ // almost a reactivity hack
 					console.debug("shared ready");
 					return !this.pricingSystem.isEmpty() > 0
+					  && ![...this.otherPricingSystems.values()].some(system => system.isEmpty())
 					  && this.reflist_carriers.size > 0;
 				}
 			},
@@ -1012,7 +981,21 @@
 				}
 			},
 			created(){
-				this.loadRef_Carriers();
+				axios_backend.get("carriers")
+				.then(response => {
+					for (let carrier of response.data){
+						this.reflist_carriers.set(carrier.name, carrier);
+					}
+				});
+
+				axios_backend.get("price-grids?tag=Tarif+Spécial")
+				.then(response => {
+					for (let pricegrid of response.data){
+						this.otherPricingSystems.set(pricegrid.name, new PricingSystem());
+					}
+
+					this.loadRef_OtherPricingSystem(this.ctrlDate);
+				});
 			}
 		});
 
