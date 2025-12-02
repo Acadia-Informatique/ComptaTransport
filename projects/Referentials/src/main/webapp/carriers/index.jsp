@@ -31,25 +31,6 @@
 		  content: "\00274C"; /* emoji "Red X" */
 		}
 
-
-		/** List animations */
-		.list-move, /* apply transition to moving elements */
-		.list-enter-active,
-		.list-leave-active {
-			transition: all 0.5s ease;
-		}
-
-		.list-enter-from,
-		.list-leave-to {
-			opacity: 0;
-			transform: translateX(30px);
-		}
-
-		/* ensure leaving items are taken out of layout flow so that moving
-		animations can be calculated correctly. */
-		.list-leave-active {
-			position: absolute;
-		}
 	</style>
 
 </head>
@@ -59,7 +40,8 @@
 
 	<div id="app">
 		<entity-data-grid id="carrier-grid" resource-name="Liste de Transporteurs" resource-uri="carriers" identifier="name"
-		  :config="carrierGridConfig" class="table-hover" ></entity-data-grid>
+		  :config="carrierGridConfig" class="table-hover"
+		  v-if="sharedReady" ></entity-data-grid>
 	</div>
 
 	<!-- =========================================================== -->
@@ -108,23 +90,23 @@
 								label: "Groupe de contrôle",
 								width: "8em",
 								format: {pattern:/^.{0,32}$/, errorMsg:"Longueur max: 32"},
-								descriptionIcon : "exclamation-diamond",
-								description: "Référence pour les Grilles Tarifaires, les Contrôles, etc."
+								descriptionIcon : "2-circle-fill",
+								description: "Référence pour les Grilles Tarifaires, les Contrôles, etc. Mais attention, si le champ est vide, le transport n'est plus contrôlé !"
 							},
 							{
 								name: "tags",
 								label: "Tags",
 								renderer: "renderer-carrier-tags",
 								editor: "renderer-carrier-tags",
-								descriptionIcon : "exclamation-diamond",
-								description: "Description complémentaire, notamment utilisé par le module Clients forfaits"
+								descriptionIcon : "3-circle-fill",
+								description: "Description complémentaire, notamment utilisé par le module Clients forfaits et les contrôles."
 							},
 							{
 								name: "warningMessage",
 								label: "Message d'alerte",
 								format: {pattern:/^.{0,64}$/, errorMsg:"Longueur max: 64"},
-								descriptionIcon : "exclamation-diamond",
-								description: "Signale les Transporteurs problématiques, ce qui lève une alerte au niveau des contrôles."
+								descriptionIcon : "1-circle-fill",
+								description: "Signale les Transporteurs problématiques, ce qui lève systématiquement une alerte au niveau des contrôles."
 							},
 							{
 								name: "description",
@@ -145,7 +127,7 @@
 							{
 								name: "auditingInfo",
 								label: "ℹ️",
-								width: "50px",
+								width: "3em",
 								sortable: false,
 								editable: false,
 								renderer: "renderer-auditing-info",
@@ -158,6 +140,12 @@
 					},
 					selectableTags : {}
 				};
+			},
+			computed:{
+				sharedReady(){ // almost a reactivity hack
+					console.debug("shared ready");
+					return Object.keys(this.selectableTags).length > 0;
+				}
 			},
 			provide(){
 				return {"sharedCarrierTextTags": this.selectableTags };

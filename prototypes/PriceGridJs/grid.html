@@ -37,9 +37,9 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 				this.poids = poids;
 				this.pays = "France";
 				this.codePostal = codePostal;
-				this.size_length = null;
-				this.size_width = null;
-				this.size_height = null;
+				this.size_length = 0;
+				this.size_width = 0;
+				this.size_height = 0;
 				this.size_parcel_count = 1;
 				this.transporteur100 = "";
 				this.market = "BTB";
@@ -592,8 +592,8 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 				<div class="input-group has-validation">
 					<span class="input-group-text">Prix au</span>
 					<select class="form-select" v-model="policy.attribute" required>
-						<option disabled value="">Coordonnée brute</option>
-						<option v-for="k in numericRawCoords" :value="k">
+						<option disabled value="">Attribut de volume</option>
+						<option v-for="k in numericProperties" :value="k">
 							{{ k }}
 						</option>
 					</select>
@@ -904,8 +904,11 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 		import {confirm_dialog, alert_dialog} from "./ConfirmDialog.js";
 
 
-		let typicalRawCoords = Object.entries(new CommandeALivrer(0, "01000").getPPGRawCoordinates()); //arguably typical ?...
+		let typicalPricedObj = new CommandeALivrer(0, "01000"); //arguably typical ?...
+		let typicalProperties = Object.entries(typicalPricedObj);
+		let typicalRawCoords = Object.entries(typicalPricedObj.getPPGRawCoordinates());
 
+		const numericProperties = typicalProperties.filter(([k,v]) => typeof v == "number").map(([k,v]) => k);
 		const numericRawCoords =  typicalRawCoords.filter(([k,v]) => typeof v == "number").map(([k,v]) => k);
 		const stringRawCoords =  typicalRawCoords.filter(([k,v]) =>typeof v == "string").map(([k,v]) => k);
 		const DEFAULT_POLICIES = {
@@ -1672,6 +1675,7 @@ https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/cerulean/bootstrap.min.css
 			},
 			data(){
 				return {
+					numericProperties,
 					numericRawCoords,
 					stringRawCoords
 				}

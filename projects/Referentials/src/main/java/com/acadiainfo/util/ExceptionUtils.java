@@ -26,6 +26,7 @@ public class ExceptionUtils {
 			jakarta.persistence.PersistenceException exc) {
 
 		if (exc instanceof com.acadiainfo.util.DataIntegrityViolationException
+		  || exc instanceof jakarta.persistence.OptimisticLockException
 		  || exc instanceof jakarta.persistence.EntityNotFoundException
 		  || exc instanceof jakarta.persistence.EntityExistsException) {
 			return exc; // those are explicit enough

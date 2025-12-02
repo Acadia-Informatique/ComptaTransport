@@ -1,19 +1,12 @@
 package com.acadiainfo.comptatransport.domain;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.Objects;
 
 import jakarta.json.bind.annotation.JsonbProperty;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.NamedNativeQuery;
 import jakarta.persistence.Table;
 
 /**
@@ -29,7 +22,7 @@ import jakarta.persistence.Table;
 @Table(schema = "ComptaTransport", name = "I_TRANSPORT_VENDU")
 public class TransportSalesDetails {
 	public enum ProductType {
-		MAIN, B2C, OPT1, OPT2
+		MAIN, B2C, OPTS, UNK
 	};
 
 	/** Tech. PK */
@@ -62,9 +55,9 @@ public class TransportSalesDetails {
 			"Frais Commande Drop"
 			-> ProductType.B2C;
 		case "LIVRAISON  SAMEDI"
-			-> ProductType.OPT1;
+			-> ProductType.OPTS;
 		default
-			-> ProductType.OPT2;
+			-> ProductType.UNK;
 		};
 	}
 

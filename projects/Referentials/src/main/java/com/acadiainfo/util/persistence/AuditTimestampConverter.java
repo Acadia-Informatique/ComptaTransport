@@ -30,18 +30,16 @@ public class AuditTimestampConverter implements AttributeConverter<Long, java.ti
 
 	@Override
 	public LocalDateTime convertToDatabaseColumn(Long attribute) {
-		if (attribute == null || attribute.longValue() == 0L) {
+		if (attribute == null || attribute.longValue() == 0L)
 			return null;
-		} else {
-			return LocalDateTime.ofEpochSecond(attribute.longValue(), 0, java.time.ZoneOffset.UTC);
-		}
+		else
+			return LocalDateTime.ofEpochSecond(attribute.longValue()/1000, 0, java.time.ZoneOffset.UTC);
 	}
 
 	@Override
 	public Long convertToEntityAttribute(LocalDateTime dbData) {
-		if (dbData == null) {
+		if (dbData == null)
 			return null;
-		}
 
 		// -either the DB column value is at offset time zone (such as UTC)
 		OffsetDateTime odt = dbData.atOffset(java.time.ZoneOffset.UTC);

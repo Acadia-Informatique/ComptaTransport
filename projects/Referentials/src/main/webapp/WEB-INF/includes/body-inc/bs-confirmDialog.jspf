@@ -32,21 +32,25 @@ function confirm_dialog(txt, ...choiceObjs) {
 	// 1) Texts
 	//- title (optional)
 	let title;
-	if (choiceObjs && choiceObjs.length > 0 && typeof choiceObjs[0] == 'string') {
+	if (typeof choiceObjs != "undefined") {
 		title = txt;
-		txt = choiceObjs.shift();
+		txt = "";
 	} else {
 		title = "";
 	}
+
+	if (choiceObjs && choiceObjs.length > 0 && typeof choiceObjs[0] == 'string') {
+		txt = choiceObjs.shift();
+	}
 	const modalTitle = modal.querySelector(".modal-title");
 	modalTitle.textContent = title;
-	
+
 	//- main text (required)
 	const TXT_MAX_LENGTH = 512; // so arbitrary...
-	if (txt.length > TXT_MAX_LENGTH) txt = txt.substring(0, TXT_MAX_LENGTH) + "[...]" 
+	if (txt.length > TXT_MAX_LENGTH) txt = txt.substring(0, TXT_MAX_LENGTH) + "[...]"
 	const modalMsg = modal.querySelector(".msg");
 	modalMsg.textContent = txt;
-	
+
 	// 2) default close button (X)
 	const buttonClose = modal.querySelector(".btn-close");
 	if (choiceObjs && choiceObjs.length > 0) {

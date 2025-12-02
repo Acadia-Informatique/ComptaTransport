@@ -1,26 +1,41 @@
 package com.acadiainfo.comptatransport.ws;
 
 import java.time.LocalDateTime;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
-import com.acadiainfo.comptatransport.data.CarriersRepository;
 import com.acadiainfo.comptatransport.data.TransportSalesRepository;
+import com.acadiainfo.comptatransport.domain.AggShippingRevenue;
 import com.acadiainfo.comptatransport.domain.Carrier;
+import com.acadiainfo.comptatransport.domain.Customer;
+import com.acadiainfo.comptatransport.domain.CustomerShipPreferences;
+import com.acadiainfo.comptatransport.domain.InputControlRevenue;
 import com.acadiainfo.comptatransport.domain.TransportSalesHeader;
 import com.acadiainfo.util.WSUtils;
 
 import jakarta.ejb.Stateless;
-import jakarta.json.*;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Query;
 import jakarta.servlet.http.HttpServletRequest;
-
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.*;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
 
+/**
+ * Used for manipulating Transport Sales (and their dependencies),
+ * which are basically the rows of Transport Revenue Control (aka Contrôle Quotidien du Transport).
+ */
 @Stateless
 @Path("/transport-sales")
 public class TransportSalesWS {
@@ -32,23 +47,7 @@ public class TransportSalesWS {
 	@PersistenceContext(unitName = "ComptaTransportPU")
 	private EntityManager em;
 
-//
-//	@GET
-//	@Path("/{name}")
-//	@Produces(MediaType.APPLICATION_JSON)
-//	public Response getOne_WS(@PathParam("name") String name) {
-//		Carrier carrier = this.getOne(name);
-//		if (carrier != null) {
-//			return Response.ok(carrier).build();
-//		} else {
-//			return WSUtils.response(Status.NOT_FOUND, servReq,
-//					"Transporteur non-trouvé avec ce nom.");
-//		}
-//	}
-//
-//	public Carrier getOne(String name) {
-//		return CarriersRepository.getInstance(em).findById(name);
-//	}
+
 
 	/**
 	 * Get data row for a date interval.
@@ -61,23 +60,136 @@ public class TransportSalesWS {
 	public Response getAll_WS(
 	  @QueryParam("start-date") String startDate,
 	  @QueryParam("end-date") String endDate) {
-		if (startDate == null)
-			return WSUtils.response(Status.BAD_REQUEST, servReq, "\"start-date\" query param expected");
+			if (startDate == null)
+				return WSUtils.response(Status.BAD_REQUEST, servReq, "Paramètre de requête \"start-date\" obligatoire.");
 
-		LocalDateTime startDateObj = WSUtils.parseParamDate(startDate);
-
-		// end-date is optional, if not set use start-date + 1
-		LocalDateTime endDateObj = (endDate == null) ? startDateObj.plusDays(1) : WSUtils.parseParamDate(endDate);
-
-		Stream<TransportSalesHeader> headers = getAll(startDateObj, endDateObj);
-		return Response.ok(WSUtils.entityJsonStreamingOutput(headers)).build();
+			LocalDateTime startDateObj, endDateObj;
+			try {
+				startDateObj = WSUtils.parseParamDate(startDate);
+				// end-date is optional, if not set use start-date + 1
+				endDateObj = (endDate == null) ? startDateObj.plusDays(1) : WSUtils.parseParamDate(endDate);
+			} catch (java.time.format.DateTimeParseException exc) {
+				return WSUtils.response(Status.BAD_REQUEST, servReq, "Format de paramètres de date incorrect (\"start-date\" et/ou \"end-date\").");
+			}
+			Stream<TransportSalesHeader> headers = getAll(startDateObj, endDateObj);
+			return Response.ok(WSUtils.entityJsonStreamingOutput(headers)).build();
 	}
 
 	public Stream<TransportSalesHeader> getAll(LocalDateTime startDate, LocalDateTime endDate) {
 		TransportSalesRepository repo = TransportSalesRepository.getInstance(em);
 
-		return repo.getAllBetween(startDate, endDate);
+		List<TransportSalesHeader> headers = repo.getAllBetween(startDate, endDate).toList();
+		for (TransportSalesHeader header : headers) {
+			// Simplify and enrich Customer, if any, to make it contain only pricing details
+
+			Customer customer = header.getCustomer();
+			if (customer == null)
+				continue;
+
+			// - disconnect Customer entity before manipulating it for serialization
+			em.detach(customer);
+			// ... we mainly need customer.getTags();
+			customer.setDescription(null);
+			customer.setErpReference(null); // useful, but redundant with TransportSalesHeader.customerRef
+			customer.setLabel(null);
+			customer.setSalesrep(null);
+			customer.set_v_lock(null);
+			customer.emptyAuditingInfo();
+
+
+			// - keep only last applicable preferences
+			List<CustomerShipPreferences> preferences = new ArrayList<>(customer.getShipPreferences());
+			customer.getShipPreferences().clear();
+			preferences.removeIf(pref -> pref.getApplicationDate().isAfter(header.getDocDate()));
+			java.util.Collections.sort(preferences,
+			    java.util.Comparator.comparing(CustomerShipPreferences::getApplicationDate));
+			if (!preferences.isEmpty()) {
+				CustomerShipPreferences lastPref = preferences.getLast();
+				lastPref.emptyAuditingInfo();
+				customer.getShipPreferences().add(lastPref);
+			}
+
+			// - get applicable AggShippingRevenue items (usually 1 / product / date)
+			customer.getAggShippingRevenues().clear();
+			LocalDateTime startOfMonthAtDate = header.getDocDate().withDayOfMonth(1);
+			Query aggRevQuery = em
+			    .createQuery("select agg from AggShippingRevenue agg where agg.customer=:customer and agg.date=:date");
+			aggRevQuery.setParameter("customer", customer);
+			aggRevQuery.setParameter("date", startOfMonthAtDate);
+			@SuppressWarnings("unchecked")
+			List<AggShippingRevenue> aggRevenues = aggRevQuery.getResultList();
+			for (AggShippingRevenue aggRevenue : aggRevenues) {
+				// simplify json content
+				em.detach(aggRevenue);
+				aggRevenue.setCustomer(null);
+				aggRevenue.setDate(null);
+				customer.getAggShippingRevenues().add(aggRevenue);
+			}
+
+		}
+
+		return headers.stream();
 	}
+
+	/**
+	 *
+	 * Persist the user entry on one row of Transport Revenue Control.
+	 * @param id - ignored, dummy id in view !
+	 * @param row - TransportSalesHeader is never saved per-se, so it is really a convenient
+	 *              wrapper for *saving* its 1-to-1 writable counterpart, InputControlRevenue.
+	 * @return
+	 */
+	@PUT
+	@Path("/{id}")
+	@Consumes(value = MediaType.APPLICATION_JSON)
+	@Produces(value = MediaType.APPLICATION_JSON)
+	public Response saveOne(@PathParam("id") Long id, TransportSalesHeader row) {
+		try {
+			// TransportSalesHeader will NOT be retrieved by its id,
+			// since it is a view Object.
+			// Nor will it be persisted... (hence no cascading between them).
+
+			InputControlRevenue realPayload = row.getUserInputs();
+			if (realPayload == null) return Response.noContent().build();
+
+			// linking is through docReference(=invoice number)
+			// because current choice is : a row represents an Invoice (and not an Order).
+			if (row.getDocReference() == null) throw new IllegalArgumentException("Numéro de facture obligatoire dans le bloc \"userInputs\" (attribut \"invoice\")");
+			realPayload.setDocReference(row.getDocReference());
+
+			InputControlRevenue saved;
+			if (realPayload.getId() == null) {
+				em.persist(realPayload);
+				saved = realPayload;
+			} else {
+				// "manual merge" of related entities in payload (find by id instead, in fact)
+				Carrier carrierOverride = realPayload.getCarrier_override();
+				if (carrierOverride != null) {
+					carrierOverride = em.find(Carrier.class, carrierOverride.getName());
+					if (carrierOverride != null) {
+						realPayload.setCarrier_override(carrierOverride);
+					} else {
+						throw new IllegalArgumentException(
+						    "Transport de nom inconnu dans le bloc \"userInputs\" (attribut \"carrier_override\")");
+					}
+				}
+
+				saved = em.merge(realPayload);
+			}
+			em.flush();
+
+			row.setUserInputs(saved);
+			// all others are just irrelevent, we send them back unchanged.
+			row.setDetails(null); // except details is nullified
+
+			return Response.ok(row).build();
+		} catch (IllegalArgumentException exc) {
+			return WSUtils.response(Status.BAD_REQUEST, servReq, exc.getMessage());
+		} catch (jakarta.persistence.PersistenceException exc) {
+			return ApplicationConfig.response(exc, servReq, InputControlRevenue.class);
+		}
+	}
+
 //
 //	@POST
 //	@Consumes(value = MediaType.APPLICATION_JSON)

@@ -12,6 +12,7 @@
 
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityDataGrid.jspf" %>
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityAttributeComponents.jspf" %>
+	<%@ include file="/WEB-INF/includes/header-inc/vue-datepickers.jspf" %>
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityTextTagsComponents.jspf" %>
 
 	<style>
@@ -29,33 +30,6 @@
 		  content: "\00274C"; /* emoji "Red X" */
 		}
 
-
-		/** List animations */
-		.list-move, /* apply transition to moving elements */
-		.list-enter-active,
-		.list-leave-active {
-			transition: all 0.5s ease;
-		}
-
-		.list-enter-from,
-		.list-leave-to {
-			opacity: 0;
-			transform: translateX(30px);
-		}
-
-		/* ensure leaving items are taken out of layout flow so that moving
-		animations can be calculated correctly. */
-		.list-leave-active {
-			position: absolute;
-		}
-
-
-
-		.p-datepicker-calendar-container {
-			background-color: pink;
-
-		}
-
 	</style>
 
 </head>
@@ -68,7 +42,8 @@
 			<div class="col-12 col-lg-5 custom-lg-scrollcolumn">
 				<entity-data-grid id="pricegrid-grid"
 				  resource-name="Grilles tarifaires de port" resource-uri="price-grids" identifier="id"
-				  :config="pricegridGridConfig" class="table-hover"></entity-data-grid>
+				  :config="pricegridGridConfig" class="table-hover"
+				  v-if="sharedReady"></entity-data-grid>
 			</div>
 			<div class="col-12 col-lg-7 custom-lg-scrollcolumn">
 				<template v-if="selectedPriceGridId">
@@ -102,7 +77,7 @@
 						defaultNewEntity : {
   							"name": "",
 							"description": "",
-							"tags": ["interne"]
+							"tags": []
 						},
 						columns: [
 							{
@@ -144,7 +119,7 @@
 							{
 								name: "auditingInfo",
 								label: "ℹ️",
-								width: "50px",
+								width: "3em",
 								sortable: false,
 								editable: false,
 								renderer: "renderer-auditing-info",
@@ -192,21 +167,23 @@
 							{
 								name: "publishedDate",
 								label: "Publié le",
-								//renderer: TODO date picker
-								//editor: TODO date picker, publishing tool ?
+								renderer: "date-picker-datetime",
+								editor: "date-picker-datetime",
 								description: "Date de publication (libre, peut être dans le futur)"
 							},
 							{
 								name: "id",
 								label: "Éditer",
-								width: "150px",
+								width: "10em",
+								sortable: false,
 								renderer: "pricegrid-edit-launcher",
 								editor: "none"
 							},
 							{
 								name: "#uri",
 								label: "Copie",
-								width: "100px",
+								width: "8em",
+								sortable: false,
 								renderer: "pricegrid-action-copy",
 								editor: "none"
 							},
@@ -219,10 +196,12 @@
 							},
 							{
 								name: "auditingInfo",
-								label: "",
-								width: "50px",
+								label: "ℹ️",
+								width: "3em",
+								sortable: false,
 								editable: false,
-								renderer: "renderer-auditing-info"
+								renderer: "renderer-auditing-info",
+								description: "Informations d'audit"
 							},
 						],
 						inferColumns: true,
@@ -234,6 +213,12 @@
 					selectableTags: {},
 				};
 			},
+			computed:{
+				sharedReady(){ // almost a reactivity hack
+					console.debug("shared ready");
+					return Object.keys(this.selectableTags).length > 0;
+				}
+			},
 			created(){
 				PricegridTextTags.initSharedTags(this.selectableTags);
 			}
@@ -242,6 +227,7 @@
 
 		// specific cell renders/editors as VueJS components
 
+		app.component("date-picker-datetime", Datepicker_Datetime);
 		app.component("renderer-pricegrid-tags", PricegridTextTags);
 
 		app.component("renderer-auditing-info", AuditingInfoRenderer_IconWithPopover);

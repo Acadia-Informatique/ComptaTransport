@@ -14,6 +14,8 @@
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityAttributeComponents.jspf" %>
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityTextTagsComponents.jspf" %>
 	<%@ include file="/WEB-INF/includes/header-inc/vue-datepickers.jspf" %>
+	
+	<script src="${libsUrl}/customer.js"></script>
 
 	<style>
 
@@ -30,7 +32,7 @@
 			background-color: yellow;
 		}
 
-		/* Table row align : fixed height for prettyt anything in this screen: */
+		/* Table row align : fixed height for pretty anything in this screen: */
 
 		/* - table "tops" */
 		table#customer-grid caption,
@@ -47,32 +49,16 @@
 			height:4rem;
 			max-height:4rem;
 			overflow:hidden;
+			margin: 0;
+			padding: 0.1rem  0.25rem;
 		}
 		table#customer-grid tr:not(.row-editing) td > div,
 		table#shipPref-grid tr:not(.row-editing) td > div  {
-			height:3rem;
-			max-height:3rem;
+			height:2.5rem;
+			max-height:2.5rem;
 			overflow:hidden;
-		}
-
-
-		/** List animations */
-		.list-move, /* apply transition to moving elements */
-		.list-enter-active,
-		.list-leave-active {
-			transition: all 0.5s ease;
-		}
-
-		.list-enter-from,
-		.list-leave-to {
-			opacity: 0;
-			transform: translateX(30px);
-		}
-
-		/* ensure leaving items are taken out of layout flow so that moving
-		animations can be calculated correctly. */
-		.list-leave-active {
-			position: absolute;
+			margin: 0;
+			padding: 0.1rem  0.25rem;
 		}
 	</style>
 
@@ -84,8 +70,9 @@
 	<div id="app" class="d-flex col-12">
 		<div class="col-6">
 			<entity-data-grid id="customer-grid" resource-name="Liste de Clients" resource-uri="customers" identifier="id" :config="customerGridConfig"
-			  @reorder="mainListChanged" @editing="mainEditingChanged"
-			  class="table-striped"></entity-data-grid>
+			  @view-list="mainListChanged" @editing="mainEditingChanged"
+			  class="table-striped"
+			  v-if="sharedReady"></entity-data-grid>
 
 		</div>
 
@@ -134,26 +121,29 @@
 				<th data-bs-toggle="tooltip" title="Date initiale d'application">
 					<div>Depuis</div>
 				</th>
-				<th data-bs-toggle="tooltip" title="Transporteurs exclusifs">
+				<th data-bs-toggle="tooltip" title="Transports exclusifs (càd portant le tag Exclusif)">
 					<div>Transp. par</div>
 				</th>
 				<th data-bs-toggle="tooltip" title="Grille tarifaire personnalisée">
-					<div>Grille</div>
+					<div>Grille spécif.</div>
 				</th>
-				<th data-bs-toggle="tooltip" title="Tags de transporteurs préférés">
+				<th data-bs-toggle="tooltip" title="Complément tarifs personnalisés (ex. tarif réduit sur option B2C)">
+					<div>Autres spécif.</div>
+				</th>
+				<th data-bs-toggle="tooltip" title="Tags de transporteurs préférés. Signalé quand présent sur le transporteur CHOISI, pour le justifier.">
 					<div>Whitelist Transporteurs</div>
 				</th>
-				<th data-bs-toggle="tooltip" title="Tags de transporteurs à éviter">
+				<th data-bs-toggle="tooltip" title="Tags de transporteurs à éviter. Signalé quand présent sur le transporteur RECOMMANDÉ, pour expliquer son éviction.">
 					<div>Blacklist Transporteurs</div>
 				</th>
 				<th data-bs-toggle="tooltip" title="Informations d'audit sur les Préférences de Transport"
-				  style="width:50px">
+				  style="width:40px">
 					<div>ℹ️</div>
 				</th>
-				<th>
+				<th style="width:4em">
 					<div>Franco ?</div>
 				</th>
-				<th>
+				<th style="width:8em">
 					<div><datepicker-month v-model="shipPrefMonth"></datepicker-month></div>
 				</th>
 			</tr>
@@ -169,7 +159,7 @@
 					)}}
 					<template v-if="editingCustomer['#currPref']">
 						<td>
-							<div><datepicker-month v-model="editingCustomer['#currPref'].applicationDate"/></div>
+							<div><datepicker-month v-model="editingCustomer['#currPref'].applicationDate"></datepicker-month> </div>
 						</td>
 						<td>
 							<div><select multiple="true" v-model="editingCustomer['#currPref'].overrideCarriers">
@@ -180,25 +170,29 @@
 							</select></div>
 						</td>
 						<td>
-							<entity-selector v-model="editingCustomer['#currPref'].overridePriceGrid"
+							<div><entity-selector v-model="editingCustomer['#currPref'].overridePriceGrid"
 								labelPty = "name"
-								resource-name="Grilles tarifaires de port" resource-uri="price-grids" identifier="id"
-								:config="pricegridSelectorConfig" />
+								resource-name="Grilles tarifaires de port" resource-uri="price-grids?tag=Tarif+Spécial" identifier="id"
+								:config="pricegridSelectorConfig" ></entity-selector></div>
+						</td>
+						<td>
+							<div><renderer-shipPreferences-tags v-model="editingCustomer['#currPref'].tags"
+							  editable ></renderer-shipPreferences-tags></div>
 						</td>
 						<td>
 							<div><renderer-carrier-tags v-model="editingCustomer['#currPref'].carrierTagsWhitelist"
-							  editable onlySelectables /></div>
+							  editable onlySelectables ></renderer-carrier-tags></div>
 						</td>
 						<td>
 							<div><renderer-carrier-tags v-model="editingCustomer['#currPref'].carrierTagsBlacklist"
-							  editable onlySelectables /></div>
+							  editable onlySelectables ></renderer-carrier-tags></div>
 						</td>
 						<td>
-							<div><renderer-auditing-info v-model="editingCustomer['#currPref'].auditingInfo" /></div>
+							<div><renderer-auditing-info v-model="editingCustomer['#currPref'].auditingInfo" ></renderer-auditing-info></div>
 						</td>
 					</template>
 					<template v-else>
-						<td colspan="6"><div><button @click="initApplicablePref(editingCustomer)">Ajouter préférences spécifiques</button></div></td>
+						<td colspan="6"><div><button class="btn btn-sm btn-primary" @click="initApplicablePref(editingCustomer)">Ajouter préférences spécifiques</button></div></td>
 					</template>
 					<td>
 						<div>
@@ -226,6 +220,9 @@
 							<div>{{ customer['#currPref'].overridePriceGrid?.name }}</div>
 						</td>
 						<td>
+							<div><renderer-shipPreferences-tags v-model="customer['#currPref'].tags"></renderer-shipPreferences-tags></div>
+						</td>
+						<td>
 							<div><renderer-carrier-tags v-model="customer['#currPref'].carrierTagsWhitelist" /></div>
 						</td>
 						<td>
@@ -236,7 +233,7 @@
 						</td>
 					</template>
 					<template v-else>
-						<td colspan="6"><div>...</div></td>
+						<td colspan="7"><div>...</div></td>
 					</template>
 					<td>
 						<div>
@@ -245,8 +242,14 @@
 						</div>
 					</td>
 				</template>
-				<td>
-					<div>Montant du jour</div>
+				<td> 
+					<div v-if="monthlyAggShippingRevenue(customer)"
+					  :class="monthlyAggShippingRevenue(customer)?.product=='MONTHLY' ? 'text-bg-success' : 'text-bg-warning'">
+						{{ monthlyAggShippingRevenue(customer)?.amount }}
+					</div>
+					<div v-else>
+						<input value="TODO"></input>
+					</div>
 				</td>
 			</tr>
 			</TransitionGroup>
@@ -288,7 +291,7 @@
 							{
 								name: "auditingInfo",
 								label: "ℹ️",
-								width: "50px",
+								width: "3em",
 								sortable: false,
 								editable: false,
 								renderer: "renderer-auditing-info",
@@ -297,23 +300,32 @@
 						],
 						inferColumns: false
 					},
+					aggShippingRevenues: new Map()
 				};
 			},
-			watch(){
-					// if (!entityList) return;
-					// this.masterCustomerIds = entityList.map(customer => customer.id);
+			watch:{
+				shipPrefMonth:{
+					handler(v){
+						this.aggShippingRevenues.clear();
 
-					// entityList.forEach(customer => {
-					// 	if (customer.shipPreferences && customer.shipPreferences.length > 0) {
-					// 		this.customerPreferences.set(customer.id, customer.shipPreferences[0]); // supposedly sorted by date DESC
-					// 	} else {
-					// 		this.customerPreferences.set(customer.id, {DUMMY: "DUMMY"});
-					// 	}
-					// });
+						let startDate = v + ".0";
+						let endDate = v + ".1";
+						axios_backend.get(`customers/*/agg-shipping-revenues?start-date=\${startDate}&end-date=\${endDate}`)
+						.then(response => {
+							for (let agg of response.data){
+								let custAggs = this.aggShippingRevenues.get(agg.customerId);
+								if (!custAggs) { custAggs = []; }
+
+								custAggs.push(agg);
+								this.aggShippingRevenues.set(agg.customerId, custAggs); // should only be needed in case of new array, but with VueJS better be safe
+							}
+						});
+					},
+					immediate : true
+				}
 			},
 			methods:{
 				//TODO make each row a Vue Component ?
-				//TODO externalize applicablePref() and assessZeroFee() for reuse in Contrôle (but you ll need a full list of Carriers(=selectableCarriers))
 				applicablePref(customer){
 					let returnVal = null;
 					if (customer.shipPreferences){
@@ -337,6 +349,7 @@
 					if (!customer.shipPreferences) customer.shipPreferences = [];
 					customer.shipPreferences.push({
 						"applicationDate": this.shipPrefMonth, // so directly visible
+						"tags": [],
 						"carrierTagsBlacklist": [],
 						"carrierTagsWhitelist": [],
 						"overrideCarriers": [],
@@ -344,24 +357,15 @@
 					});
 				},
 
-				assessZeroFee(customer){
-					let reasons = [];
-					if (customer.tags.includes("Grand Compte")) {
-						reasons.push(`Client "Grand Compte"`);
-					}
-				/*	let shipPreferences = customer["#currPref"];
-					if (shipPreferences?.overrideCarriers?.length > 0){
-						let areAllCarriersFree = shipPreferences.overrideCarriers
-						.map(name => this.selectableCarriers.get(name))
-						.every(c => c.tags.includes("Sans frais"));
-
-						if (areAllCarriersFree){
-							reasons.push(`Transports gratuits uniquement`);
-						}
-					}
-*/
-					return (reasons.length > 0) ? reasons : null;
+				monthlyAggShippingRevenue(customer){
+					return CustomerFunc.getMonthlyOne(this.aggShippingRevenues.get(customer.id));
 				},
+				
+				assessZeroFee(customer){
+					return CustomerFunc.assessZeroFee(false, customer, customer["#currPref"], this.aggShippingRevenues.get(customer.id), this.selectableCarriers);
+				},
+				
+				
 
 				isEditingRow(entity){
 					return entity["#key"] == (this.editingCustomer ? this.editingCustomer["#key"] : null);
@@ -449,6 +453,10 @@
 								visible: false,
 							},
 							{
+								name: "aggShippingRevenues",
+								visible: false,
+							},
+							{
 								name: "_v_lock",
 								label: "(version)",
 								editable: false,
@@ -458,8 +466,7 @@
 							{
 								name: "auditingInfo",
 								label: "ℹ️",
-								visible: false, /* table a bit too cramped */
-								width: "50px",
+								width: "3em",
 								sortable: false,
 								editable: false,
 								renderer: "renderer-auditing-info",
@@ -490,23 +497,37 @@
 					selectableTags: {},
 					sharedPricegridTextTags: {},
 					sharedCarrierTextTags: {},
+					sharedShipPreferencesTags: {},
 
 					activeTab: "shipPref",
 
-					amountMode: "amt-margin"
+					amountMode: "amt-margin",
+
 				};
+			},
+			computed:{
+				sharedReady(){ // almost a reactivity hack
+					console.debug("shared ready");
+					return Object.keys(this.selectableTags).length > 0
+					&& Object.keys(this.sharedPricegridTextTags).length > 0
+					&& Object.keys(this.sharedCarrierTextTags).length > 0;
+				}
 			},
 			created(){
 				CustomerTextTags.initSharedTags(this.selectableTags);
-
 				PricegridTextTags.initSharedTags(this.sharedPricegridTextTags);
 				CarrierTextTags.initSharedTags(this.sharedCarrierTextTags);
+
+				// cf. controls/revenue.jsp for how these tags are used:
+				this.sharedShipPreferencesTags["text-bg-warning"] = ["B2B: Franco"];
+				this.sharedShipPreferencesTags["text-bg-primary"] = ["B2C: xxx €"]; //cf. B2C_tag_regex
 			},
 			provide(){
 				return {
 					sharedCustomerTextTags: this.selectableTags,
 					sharedPricegridTextTags: this.sharedPricegridTextTags,
-					sharedCarrierTextTags: this.sharedCarrierTextTags
+					sharedCarrierTextTags: this.sharedCarrierTextTags,
+					sharedShipPreferencesTags : this.sharedShipPreferencesTags
 				};
 			},
 			methods: {
@@ -532,6 +553,13 @@
 		app.component("renderer-customer-tags", CustomerTextTags);
 		app.component("renderer-carrier-tags", CarrierTextTags);
 		app.component("renderer-pricegrid-tags", PricegridTextTags);
+		app.component("renderer-shipPreferences-tags", {
+			extends: _AbstractEntityTextTags,
+			inject: {
+				"selectables": { from: "sharedShipPreferencesTags"}
+			}
+		});
+
 
 		app.component("renderer-auditing-info", AuditingInfoRenderer_IconWithPopover);
 

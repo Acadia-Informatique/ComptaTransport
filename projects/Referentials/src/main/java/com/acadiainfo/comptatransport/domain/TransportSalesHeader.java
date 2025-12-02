@@ -4,21 +4,17 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.TreeSet;
 
 import jakarta.json.bind.annotation.JsonbProperty;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.NamedNativeQuery;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
+import jakarta.persistence.OneToOne;
 
 /**
  * This is a read-only view of imported rows as Transport sales HEADERS.
@@ -31,17 +27,19 @@ import jakarta.persistence.Table;
 
 @NamedNativeQuery(name = "TransportSalesHeader_as_INVOICE", query = """
     select
-    max(id) as id,
-    doc_reference,
-    group_concat(order_reference ORDER BY order_reference SEPARATOR ';' ) as order_reference,
-    max(customer_erp_reference) as customer_erp_reference,
-    max(customer_label) as customer_label,
-    max(carrier_name) as carrier_name,
-    max(ship_country) as ship_country,
-    max(ship_zipcode) as ship_zipcode,
-    max(doc_date) as doc_date,
-    max(salesrep) as salesrep,
-    sum(total_weight) as total_weight
+        max(vto.id) as id,
+    	vto.doc_reference,
+        group_concat(vto.order_reference ORDER BY vto.order_reference SEPARATOR ';' ) as order_reference,
+        max(CUSTOMER.id) as customer_id,
+        max(vto.customer_erp_reference) as customer_erp_reference,
+        max(vto.customer_label) as customer_label,
+        max(vto.carrier_name) as carrier_name,
+        max(vto.ship_country) as ship_country,
+        max(vto.ship_zipcode) as ship_zipcode,
+        max(vto.doc_date) as doc_date,
+        max(vto.salesrep) as salesrep,
+		max(vto.is_b2c) as is_b2c,
+        sum(vto.total_weight) as total_weight
     from (
     	select
     	max(id) as id,
@@ -53,12 +51,14 @@ import jakarta.persistence.Table;
     	max(ship_zipcode) as ship_zipcode,
     	max(doc_date) as doc_date,
     	max(salesrep) as salesrep,
+		max(is_b2c) as is_b2c,
     	max(total_weight) as total_weight
     	from I_TRANSPORT_VENDU
     	where doc_date >= ?1 and doc_date < ?2
     	group by doc_reference, order_reference
-    ) as V_TRANSPORT_ORDER
-    group by doc_reference
+       ) as vto
+       left outer join CUSTOMER on CUSTOMER.erp_reference = vto.customer_erp_reference
+       group by vto.doc_reference
        """, resultClass = TransportSalesHeader.class)
 /*
  * @NamedNativeQuery(name = "TransportSalesHeader_as_ORDER", query = """ select
@@ -72,42 +72,56 @@ import jakarta.persistence.Table;
  */
 @Entity
 public class TransportSalesHeader {
-	/** Tech. PK */
+	/** Virtual PK, "view" entity is never persisted as is.
+	 * Using it as identifier allow us to postpone the choice between instance being an Order or an Invoice... indefinitely. */
 	@Id
 	@Column(name = "id")
 	private Long id;
 
+	@JsonbProperty("order")
 	@Column(name = "order_reference", insertable = false, updatable = false)
 	private String orderReference;
 
+	@JsonbProperty("invoice")
 	@Column(name = "doc_reference", insertable = false, updatable = false)
 	private String docReference;
 
+	/** Note : since CUSTOMER table contains only those with an "interesting" profile regarding Transport,
+	 * this relationship is mostly empty. */
+	@ManyToOne(fetch = FetchType.EAGER)
+	@JoinColumn(name = "customer_id", nullable = true, insertable = false, updatable = false)
+	private Customer customer;
+
+	@JsonbProperty("customerRef")
 	@Column(name = "customer_erp_reference", insertable = false, updatable = false)
 	private String customerErpReference;
 
 	@Column(name = "customer_label", insertable = false, updatable = false)
 	private String customerLabel;
 
-// TODO currently deemed unusable, need better qualification at source (from ERP X3 ? SEI report ?...)
-//	@Column(name = "is_b2c", insertable = false, updatable = false)
-//	private boolean b2c;
-
+	@JsonbProperty("carrier")
 	@Column(name = "carrier_name", insertable = false, updatable = false)
 	private String carrierName;
 
+	@JsonbProperty("country")
 	@Column(name = "ship_country", insertable = false, updatable = false)
 	private String shipCountry;
 
+	@JsonbProperty("zip")
 	@Column(name = "ship_zipcode", insertable = false, updatable = false)
 	private String shipZipcode;
 
+	@JsonbProperty("date")
 	@Column(name = "doc_date", insertable = false, updatable = false)
 	private LocalDateTime docDate;
 
 	@Column(name = "salesrep", insertable = false, updatable = false)
 	private String salesrep;
 
+	@Column(name = "is_b2c", insertable = false, updatable = false)
+	private Boolean b2c;
+
+	@JsonbProperty("weight")
 	@Column(name = "total_weight", insertable = false, updatable = false)
 	private BigDecimal totalWeight;
 
@@ -116,68 +130,174 @@ public class TransportSalesHeader {
 	@JoinColumn(name = "doc_reference", referencedColumnName = "doc_reference")
 	private Set<TransportSalesDetails> details = new HashSet<TransportSalesDetails>();
 
+	/** The user inputs from Contrôle Quotidien (revenue control) */
+	@OneToOne(optional = true)
+	@JoinColumn(name = "doc_reference", referencedColumnName = "doc_reference")
+	// note : The Join columns *now* is the doc_reference, since the header
+	// represents an Invoice (it could have been an Order).
+	private InputControlRevenue userInputs;
+
+
+	// Note : even for this non-writable entity we still have setters.
+	// For instance, in TransportSalesWS.saveOne(), they are needed for :
+	// - parsing the JSON request payload
+	// - making the JSON response lighter
+
+
 	public Long getId() {
 		return id;
 	}
 
-	@JsonbProperty("order")
+	public void setId(Long id) {
+		this.id = id;
+	}
+
 	public String getOrderReference() {
 		return orderReference;
 	}
 
-	@JsonbProperty("invoice")
+	public void setOrderReference(String orderReference) {
+		this.orderReference = orderReference;
+	}
+
 	public String getDocReference() {
 		return docReference;
 	}
 
-	@JsonbProperty("customer")
+	public void setDocReference(String docReference) {
+		this.docReference = docReference;
+	}
+
+	public Customer getCustomer() {
+		return customer;
+	}
+
+	public void setCustomer(Customer customer) {
+		this.customer = customer;
+	}
+
 	public String getCustomerErpReference() {
 		return customerErpReference;
+	}
+
+	public void setCustomerErpReference(String customerErpReference) {
+		this.customerErpReference = customerErpReference;
 	}
 
 	public String getCustomerLabel() {
 		return customerLabel;
 	}
 
-	@JsonbProperty("carrier")
+	public void setCustomerLabel(String customerLabel) {
+		this.customerLabel = customerLabel;
+	}
+
 	public String getCarrierName() {
 		return carrierName;
 	}
 
-	@JsonbProperty("country")
+	public void setCarrierName(String carrierName) {
+		this.carrierName = carrierName;
+	}
+
 	public String getShipCountry() {
 		return shipCountry;
 	}
 
-	@JsonbProperty("zip")
+	public void setShipCountry(String shipCountry) {
+		this.shipCountry = shipCountry;
+	}
+
 	public String getShipZipcode() {
 		return shipZipcode;
 	}
 
-	@JsonbProperty("date")
+	public void setShipZipcode(String shipZipcode) {
+		this.shipZipcode = shipZipcode;
+	}
+
 	public LocalDateTime getDocDate() {
 		return docDate;
 	}
+
+	public void setDocDate(LocalDateTime docDate) {
+		this.docDate = docDate;
+	}
+
 
 	public String getSalesrep() {
 		return salesrep;
 	}
 
-	@JsonbProperty("weight")
+
+	public void setSalesrep(String salesrep) {
+		this.salesrep = salesrep;
+	}
+
+	/** TODO currently deemed unusable, need better qualification at source (from ERP X3 ? SEI report ?...)
+	 * Until we find a better way to qualify B2C orders from X3,
+	 * we are using the same heuristics from the original Excel spreadsheet.
+	 * So we cannot apply B2C price grids until the human users *are* applying it themselves,
+	 * which defeats the very meaning of a control ;-) */
+	public Boolean isB2c() {
+		// return b2c;
+
+		if (customer != null) {
+			boolean isCustomerB2C = customer.getTags().contains("Dropshipper");
+			// if a customer is a Dropshipping pure player,
+			// everything it sells is deemed B2C.
+			if (isCustomerB2C) return true;
+		}
+
+		if (details != null) {
+			boolean orderhasB2C = details.stream()
+			    .anyMatch(det -> det.getProductType() == TransportSalesDetails.ProductType.B2C);
+			return orderhasB2C;
+		}
+		return null;
+	}
+
+	public void setB2c(Boolean b2c) {
+		this.b2c = b2c;
+	}
+
 	public BigDecimal getTotalWeight() {
 		return totalWeight;
+	}
+
+	public void setTotalWeight(BigDecimal totalWeight) {
+		this.totalWeight = totalWeight;
 	}
 
 	public Set<TransportSalesDetails> getDetails() {
 		return details;
 	}
 
+	public void setDetails(Set<TransportSalesDetails> details) {
+		this.details = details;
+	}
+
+	public InputControlRevenue getUserInputs() {
+		return userInputs;
+	}
+
+	public void setUserInputs(InputControlRevenue userInputs) {
+		this.userInputs = userInputs;
+	}
+
+	/**
+	 * New computed property : total price of details
+	 * @return
+	 */
 	@JsonbProperty("price")
 	public BigDecimal getTotalPrice() {
+		if (this.details == null) return null;
+
 		BigDecimal sum = BigDecimal.ZERO;
 		for (TransportSalesDetails detailsItem : this.details) {
 			sum = sum.add(detailsItem.getTotalPrice());
 		}
 		return sum;
 	}
+
 }

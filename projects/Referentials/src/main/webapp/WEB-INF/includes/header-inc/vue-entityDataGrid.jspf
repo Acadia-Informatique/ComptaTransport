@@ -12,8 +12,8 @@ Dependencies :
 <script type="text/javascript">
 	// used in EntityDataGrid, because there is no proper Transition@move hook (yet)
 	var debouncedScrollIntoView = debounce((element, options)=>{if(element) element.scrollIntoView(options);}, 50);
-	// used in EntityDataGrid, to make "reorder" event handling slightly less costly
-	var debouncedEmitListChanged = debounce((component)=>{component.$emit("reorder", component.entityList);}, 500);
+	// used in EntityDataGrid, to make "viewList" event handling slightly less costly
+	var debouncedEmitListChanged = debounce((component)=>{component.$emit("viewList", component.entityList);}, 500);
 
 
 
@@ -37,6 +37,11 @@ Dependencies :
 				type: Boolean,
 				required: false,
 				default: false
+			},
+			pageSize: {
+				type: Number,
+				required: false,
+				default: 0 /* 0 for no paging, n for fixed page size, and -n for customizable page size (defaulted with n). */
 			},
 			config : {
 				type: Object,
@@ -66,7 +71,8 @@ Dependencies :
 				}
 			}
 		},
-		emits:["reorder", "editing"], // "reorder" in a broader meaning : "any shallow change in list" (order, number of items)
+		emits:["viewList",
+			"editing"], // "viewList"  : "any shallow change in list" (order, number of items)
 		data(){
 			return {
 				columnList: [],
@@ -80,7 +86,20 @@ Dependencies :
 				// highlight a row by query string "show-attr"
 				showAttribute: null,
 				showAttributeValue: null,
+
+				// paging system
+				pgSize : Math.abs(this.pageSize),
+				pgSizeModifiable : (this.pageSize < 0),
+				pgIndex: 0,
 			};
+		},
+		computed:{
+			pgCount(){
+				if (this.pgSize == 0) return 1;
+				let pgCount = this.entityList.length / this.pgSize;
+				if (this.pgIndex >= pgCount) this.pgIndex = pgCount - 1;
+				return pgCount;
+			}
 		},
 		watch:{
 			columnList(){
@@ -652,6 +671,21 @@ Dependencies :
 			</tr>
 			</TransitionGroup>
 		</tbody>
+		<tfoot v-if="pageSize!=0">
+			<tr>
+				<td v-if="!readonly" class="btns-first"></td>
+				<td :colspan="columnList.filter(c=>c.visible).length">
+					<a v-for="i in pgCount" role="nav" @click="pgGoto(i)" :class="{'active': pgIndex==i}">
+						{{i}}
+					</a>
+
+					Page de
+					<input v-if="pgSizeModifiable" v-model="pgSize" type="number" min="1" step="1"></input>
+					<span v-else>{{ pgSize }}</span>
+				</td>
+				<td class="btns-last"></td>
+			</tr>
+		</tfoot>
 	</table>
 </script>
 
@@ -717,7 +751,7 @@ Dependencies :
 <script type="text/x-template" id="entitySelector-template">
 	<div class="d-flex">
 		<input readonly :value="modelValue ? modelValue[labelPty] : '-'" class="w-100 flex-grow-1 flex-shrink-1"/>
-		<button v-if="!readonly" class="flex-grow-0 flex-shrink-0 btn btn-secondary bi bi-table" @click="openModal" />
+		<button v-if="!readonly" class="btn btn-sm flex-grow-0 flex-shrink-0 btn btn-secondary bi bi-table" @click="openModal" />
 	</div>
 	<div v-for="x in 1" ref="columnTooltip"></div><!-- dummy tooltip -->
 	<div class="modal modal-lg" id="entitySelector-dialog" data-bs-backdrop="static" tabindex="-1" ref="entitySelectorDialog">

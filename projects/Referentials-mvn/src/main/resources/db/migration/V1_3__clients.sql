@@ -1,4 +1,4 @@
--- ComptaTransport.CUSTOMER definition
+-- CUSTOMER definition
 
 CREATE TABLE `CUSTOMER` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -9,21 +9,22 @@ CREATE TABLE `CUSTOMER` (
   `description` varchar(256) DEFAULT NULL COMMENT 'libre, pour doc.',
 	`_v_lock` bigint unsigned NOT NULL DEFAULT '0' COMMENT '(technical: JPA @Version)',
 	`_date_created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '(audit)',
-	`_date_modified` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '(audit)',  
+	`_date_modified` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '(audit)',
   PRIMARY KEY (`id`),
   UNIQUE KEY `CUSTOMER_ERP_REF_UNIQUE` (`erp_reference`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
--- ComptaTransport.CUSTOMER_SHIP_PREFERENCES definition
+-- CUSTOMER_SHIP_PREFERENCES definition
 
 CREATE TABLE `CUSTOMER_SHIP_PREFERENCES` (
   `customer_id` bigint unsigned NOT NULL,
   `application_date` datetime NOT NULL COMMENT 'Indique les conditions applicables à un instant donné.',
   `override_price_grid` bigint unsigned DEFAULT NULL COMMENT '(optionel) La grille tarifaire particulière à ce client',
   `override_carriers` varchar(256) DEFAULT NULL COMMENT '"semicolon-separated string", FK virtuelle vers CARRIER. A priori le client n''utilisera QUE ces transporteurs.',
-  `carrier_tags_whitelist` varchar(256) DEFAULT NULL COMMENT '(optionel) "semicolon-separated string", CARRIER.tags préférés du client',
-  `carrier_tags_blacklist` varchar(256) DEFAULT NULL COMMENT '(optionel) "semicolon-separated string", CARRIER.tags que le client veut éviter',
+  `tags` varchar(256) DEFAULT NULL COMMENT '(optionnel) "semicolon-separated string", preferences tags (such as B2C options)',
+  `carrier_tags_whitelist` varchar(256) DEFAULT NULL COMMENT '(optionnel) "semicolon-separated string", CARRIER.tags préférés du client',
+  `carrier_tags_blacklist` varchar(256) DEFAULT NULL COMMENT '(optionnel) "semicolon-separated string", CARRIER.tags que le client veut éviter',
 	-- no modification lock on this one: `_v_lock` bigint unsigned NOT NULL DEFAULT '0' COMMENT '(technical: JPA @Version)',
   `_date_created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '(audit)',
   `_date_modified` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '(audit)',
@@ -34,7 +35,7 @@ CREATE TABLE `CUSTOMER_SHIP_PREFERENCES` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Préférences du client en matière de transport';
 
 
--- ComptaTransport.AGG_SHIPPING_REVENUE definition
+-- AGG_SHIPPING_REVENUE definition
 
 CREATE TABLE `AGG_SHIPPING_REVENUE` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -49,7 +50,7 @@ CREATE TABLE `AGG_SHIPPING_REVENUE` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Agrégat des revenus de transport par client/période/"type"';
 
 
--- ComptaTransport.AGG_SHIPPING_COST definition
+-- AGG_SHIPPING_COST definition
 
 CREATE TABLE `AGG_SHIPPING_COST` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -68,42 +69,42 @@ CREATE TABLE `AGG_SHIPPING_COST` (
 
 BEGIN;
 
-insert into CUSTOMER (erp_reference, label) values ('C00244/ACA', 'ASCII INFORMATIQUE');
-insert into CUSTOMER (erp_reference, label) values ('C00106',	'ADEFI'                          );
-insert into CUSTOMER (erp_reference, label) values ('C00775',	'FCC'                            );
-insert into CUSTOMER (erp_reference, label) values ('C00846',	'GIGAHERTZ22'                    );
-insert into CUSTOMER (erp_reference, label) values ('C01965',	'TATI MICRO'                     );
-insert into CUSTOMER (erp_reference, label) values ('C01728',	'RIS RESEAU'                     );
-insert into CUSTOMER (erp_reference, label) values ('C03105',	'ELECTRONIC PARTS'               );
-insert into CUSTOMER (erp_reference, label) values ('C01263',	'MACROSS INFORMATIQUE'           );
-insert into CUSTOMER (erp_reference, label) values ('C00569',	'DECLIC INFO'                    );
-insert into CUSTOMER (erp_reference, label) values ('C01055',	'ISICOM.COM'                     );
-insert into CUSTOMER (erp_reference, label) values ('C00149',	'ALBI TECHNOLOGIE SYSTEMES'      );
-insert into CUSTOMER (erp_reference, label) values ('C03102',	'HardwareModding'                );
-insert into CUSTOMER (erp_reference, label) values ('C01643',	'POINT MICRO DUNKERQUE'          );
-insert into CUSTOMER (erp_reference, label) values ('C02409',	'KW DISTRIBUTION'                );
-insert into CUSTOMER (erp_reference, label) values ('C00554',	'DAD INFORMATIQUE'               );
-insert into CUSTOMER (erp_reference, label) values ('C02049',	'UPDATE INFORMATIQUE'            );
-insert into CUSTOMER (erp_reference, label) values ('C00891',	'HARDWARE INFORMATIQUE'          );
-insert into CUSTOMER (erp_reference, label) values ('C00496',	'COOKIE'                         );
-insert into CUSTOMER (erp_reference, label) values ('C01651',	'PREMIUM-PC'                     );
-insert into CUSTOMER (erp_reference, label) values ('C00339',	'BFC'                            );
-insert into CUSTOMER (erp_reference, label) values ('C00794',	'FMS INFORMATIQUE'               );
-insert into CUSTOMER (erp_reference, label) values ('C00476',	'COMPUCITY ( 13 ) ST MITRE'      );
-insert into CUSTOMER (erp_reference, label) values ('C00622',	'DISTRI-ONE ( ATIS COMPUTER )'   );
-insert into CUSTOMER (erp_reference, label) values ('C01331',	'MICRO GATE'                     );
-insert into CUSTOMER (erp_reference, label) values ('C00963',	'INFO DISTRIB'                   );
-insert into CUSTOMER (erp_reference, label) values ('C02280',	'MC2IT'                          );
-insert into CUSTOMER (erp_reference, label) values ('C01145',	'LA PUCE INFORMATIQUE'           );
-insert into CUSTOMER (erp_reference, label) values ('C01329',	'MICRO DIRECT 34'                );
-insert into CUSTOMER (erp_reference, label) values ('C02045',	'UNICSTORE'                      );
-insert into CUSTOMER (erp_reference, label) values ('C00477',	'COMPUCITY 69'                   );
-insert into CUSTOMER (erp_reference, label) values ('C02389',	'MICRO INFO SERVICE'             );
-insert into CUSTOMER (erp_reference, label) values ('C00490',	'CONNECTPLUS'                    );
-insert into CUSTOMER (erp_reference, label) values ('C00276',	'ATID'                           );
-insert into CUSTOMER (erp_reference, label) values ('C01639',	'POINT CEDRIC INFORMATIQUE'      );
-insert into CUSTOMER (erp_reference, label) values ('C00989',	'INFORMAT'' SYSTEMS'             );
-insert into CUSTOMER (erp_reference, label) values ('C02369',	'MD INFORMATIQUE (38)'           );
-
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00244/ACA','ASCII INFORMATIQUE','SOPHANY');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00106','ADEFI','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00775','FCC',NULL);
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00846','GIGAHERTZ22',NULL);
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C01965','TATI MICRO','THIVAN');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C01728','RIS RESEAU',NULL);
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C03105','ELECTRONIC PARTS','MICHAEL');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C01263','MACROSS INFORMATIQUE','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00569','DECLIC INFO','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C01055','ISICOM.COM','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00149','ALBI TECHNOLOGIE SYSTEMES','THIVAN');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C03102','HardwareModding','SOPHANY');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C01643','POINT MICRO DUNKERQUE','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C02409','KW DISTRIBUTION','THIVAN');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00554','DAD INFORMATIQUE','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C02049','UPDATE INFORMATIQUE','SOPHANY');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00891','HARDWARE INFORMATIQUE','SOPHANY');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00496','COOKIE','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C01651','PREMIUM-PC','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00339','BFC','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00794','FMS INFORMATIQUE','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00476','COMPUCITY ( 13 ) ST MITRE','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00622','DISTRI-ONE ( ATIS COMPUTER )','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C01331','MICRO GATE','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00963','INFO DISTRIB','THIVAN');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C02280','MC2IT','THIVAN');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C01145','LA PUCE INFORMATIQUE','SOPHANY');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C01329','MICRO DIRECT 34','SOPHANY');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C02045','UNICSTORE','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00477','COMPUCITY 69','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C02389','MICRO INFO SERVICE','MICHAEL');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00490','CONNECTPLUS','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00276','ATID','THIVAN');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C01639','POINT CEDRIC INFORMATIQUE','ALAIN MANIVONG');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C00989','INFORMAT'' SYSTEMS','SOPHANY');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C02369','MD INFORMATIQUE (38)','SOPHANY');
+INSERT INTO CUSTOMER (erp_reference,label,salesrep) VALUES ('C03360','HYLAE','SOPHANY');
 
 COMMIT;

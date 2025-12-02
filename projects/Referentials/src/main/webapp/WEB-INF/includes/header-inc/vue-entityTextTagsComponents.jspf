@@ -87,6 +87,7 @@ var TextTagsComponent = {
 			this.isTagPaletteOpen = b;
 		},
 		addTextTag(textTag){
+			if (!this.editable) return;
 			textTag = textTag.substring(0, this.tagMaxLength);
 			this.textTagList.push(textTag);
 
@@ -95,6 +96,7 @@ var TextTagsComponent = {
 			this.textTagList = deduplicated;
 		},
 		removeTextTag(textTag){
+			if (!this.editable) return;
 			this.textTagList = this.textTagList.filter(t => t !== textTag);
 		},
 		tagStyleClass(textTag){
@@ -144,9 +146,10 @@ var TextTagsComponent = {
 <div>
 	<div v-for="textTag in textTagList"
 	  class="badge rounded-pill me-1 mb-1"
-	  :class="tagStyleClass(textTag)">
+	  :class="tagStyleClass(textTag)"
+	  @click="removeTextTag(textTag)" :role="editable?'button':''">
 		{{textTag}}
-		<i v-if="editable" class="bi bi-dash-circle-dotted" @click="removeTextTag(textTag)"></i>
+		<i v-if="editable" class="bi bi-dash-circle-dotted"></i>
 	</div>
 
 	<div v-if="editable" class="tag-palette">
@@ -155,14 +158,15 @@ var TextTagsComponent = {
 			<span v-if="!onlySelectables"
 			  ref="originalTagElement" class="pe-2"
 			  contenteditable spellcheck="false" @keyup.enter="addOriginalTextTag"></span>
-			<i class="bi bi-plus-circle-dotted" @click="addOriginalTextTag"></i>
+			<i class="bi bi-plus-circle-dotted" @click="addOriginalTextTag" role="button"></i>
 		</div>
 		<template v-if="areSelectablesShown">
 			<div v-for="textTag in tagStyleClassMap.keys()"
 			  class="badge rounded-pill me-1 mb-1"
-			  :class="tagStyleClass(textTag)">
+			  :class="tagStyleClass(textTag)"
+			  @click="addTextTag(textTag)" :role="editable?'button':''">
 				{{textTag}}
-				<i v-if="editable" class="bi bi-plus-circle-dotted" @click="addTextTag(textTag)"></i>
+				<i v-if="editable" class="bi bi-plus-circle-dotted"></i>
 			</div>
 		</template>
 	</div>
@@ -241,8 +245,8 @@ They can be used directly as Grid cell renderer/editors.
 		initSharedTags(selectables){
 			axios_backend.get("customers/*/tags")
 			.then(response => {
-				selectables["text-bg-danger"] = response.data["vip"];
-				selectables["text-bg-warning"] = response.data["system"];
+				selectables["text-bg-warning"] = response.data["vip"];
+				selectables["text-bg-danger"] = response.data["system"];
 				selectables["text-bg-primary"] = response.data["collected"];
 			})
 			.catch(error=>{

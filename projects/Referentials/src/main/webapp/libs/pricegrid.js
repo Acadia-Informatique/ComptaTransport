@@ -33,7 +33,8 @@ const POLICY_PROTOTYPES = [
 	{
 		type: "DelegatedPrice",
 		delegated_gridName: "B2B",
-		delegated_additiveAmount: 3
+		delegated_additiveAmount: 3,
+		delegated_additiveAmountType: "B2C" // optional, default to "MAIN"
 	},
 ];
 */
@@ -44,24 +45,36 @@ class PricingSystem {
 		//and plenty free space to add metadata !
 	}
 
-	/**
-	 * Hydration.
-	 * @param {*} v - JSON string or its parsed object
-	 */
+	clear(){
+		this.grids.splice(0);
+	}
+
+	isEmpty(){
+		return this.grids.length == 0;
+	}
+
 	static fromJSON(v) {
-		if (typeof v == "string") v = JSON.parse(v);
 		let obj = new PricingSystem();
-
-		for (const gridv of v.grids){
-			let newGrid = PricingGrid.fromJSON(gridv);
-			obj.grids.push(newGrid);
-		}
-
+		obj.fromJSON(v);
 		return obj;
 	}
 
 	/**
-	 * Create a pure data version.
+	 * Hydration.
+	 * @param {*} v - JSON string or its parsed object
+	 */
+	fromJSON(v) {
+		if (typeof v == "string") v = JSON.parse(v);
+
+		for (const gridv of v.grids){
+			let newGrid = PricingGrid.fromJSON(gridv);
+			this.grids.push(newGrid);
+		}
+	}
+
+	/**
+	 * Create a pure data version, for serialization.
+	 * Note : don't confuse with instance method clear() (which is related to isEmpty())
 	 */
 	static clean(systemObj) {
 		let clone = JSON.parse(JSON.stringify(systemObj));
@@ -93,9 +106,17 @@ class PricingSystem {
 				return {
 					gridName,
 					gridCell:returnVal.gridCell,
-					amount: nestedReturnVal.amount + policy.delegated_additiveAmount,
-					extra_info: returnVal.extra_info ? returnVal.extra_info : nestedReturnVal.extra_info, //meaning : non-cascading, 1st available info is kept and deeper ones are discarded
+					// Change of semantics : for DelegatedPrice, "amount" and "extra_info" are collected "as is".
+					// A static method (summarizeResult) will have to make all the additions and decisions.
+
+					//no more -> amount: nestedReturnVal.amount + policy.delegated_additiveAmount,
+					amount: policy.delegated_additiveAmount,
+					amountType: policy.delegated_additiveAmountType,
+
+					//not more -> extra_info: returnVal.extra_info ? returnVal.extra_info : nestedReturnVal.extra_info, //meaning : non-cascading, 1st available info is kept and deeper ones are discarded
+					extra_info: returnVal.extra_info,
 					nested: nestedReturnVal //<- chaining extension to grid.apply()'s return
+					//TODO since it has evolve to be less recursive (= less nesting, and more chaining), maybe just return a list instead of a ... linked list.
 				};
 			} else {
 				return {
@@ -108,6 +129,38 @@ class PricingSystem {
 			throw new Error(`Grid "${gridName}" not found in system.`);
 		}
 	}
+
+
+	/**
+	 * Make a flat total.
+	 * @argument res - result of applyGrid
+	 */
+	static summarizeResult(res){
+		let flatResult = {
+			total(){
+				return (this["MAIN"]??0) + (this["B2C"]??0) + (this["OPTS"]??0) + (this["UNK"]??0);
+			}
+		};
+
+		while (res){
+			// 1) handle amount
+			let amountType = res.amountType ?? 'MAIN';
+			if (res.amount === null){
+				// leave unchanged
+			} else if (isNaN(res.amount)){
+				flatResult[amountType] = NaN; // a single NaN in the chain destroys the total
+			} else {
+				if (!flatResult[amountType]) flatResult[amountType] = 0;
+				flatResult[amountType] += res.amount;
+			}
+			// 2) handle extra_info
+			if (!flatResult.extra_info) flatResult.extra_info = res.extra_info; //meaning : non-cascading, 1st available info is kept and deeper ones are discarded
+
+			res = res.nested;
+		}
+		return flatResult;
+	}
+
 
 	//---- Grid CRUD
 	findGridByName(name) {
@@ -250,7 +303,7 @@ class PricingGrid {
 				return applicableCells.pop();
 			}
 			default: {
-				console.warn(applicableCells);
+				console.warn("Overlapping cell definition !", applicableCells);
 				throw new Error("Overlapping cell definition !");
 			}
 		}

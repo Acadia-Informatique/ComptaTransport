@@ -1,5 +1,6 @@
 package com.acadiainfo.comptatransport.ws;
 
+import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -51,12 +52,11 @@ public class PriceGridWS {
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response getOne_WS(@PathParam("id") Long id) {
 		PriceGrid priceGrid = this.getOne(id);
-		if (priceGrid != null) {
+		if (priceGrid != null)
 			return Response.ok(priceGrid).build();
-		} else {
+		else
 			return WSUtils.response(Status.NOT_FOUND, servReq,
 			  "Grille Tarifaire non-trouvée avec cet identifiant.");
-		}
 	}
 
 	public PriceGrid getOne(Long id) {
@@ -98,24 +98,19 @@ public class PriceGridWS {
 	public PriceGrid add(PriceGrid priceGrid) {
 		PriceGridsRepository priceGridsRepo = PriceGridsRepository.getInstance(em);
 
-		if (priceGrid == null) {
+		if (priceGrid == null)
 			throw new IllegalArgumentException("Le corps du message n'a pas pu interprété comme une Grille Tarifaire.");
-		}
-		if ("".equals(priceGrid.getName())) {
+		if ("".equals(priceGrid.getName()))
 			throw new IllegalArgumentException("Le nom de la Grille Tarifaire ne peut pas être vide.");
-		}
 
 		// Unusual : id is not supposed to be provided
-		if (priceGrid.getId() != null) {
-			if (priceGridsRepo.find(priceGrid) != null){
+		if (priceGrid.getId() != null)
+			if (priceGridsRepo.find(priceGrid) != null)
 				throw new jakarta.persistence.EntityExistsException("Une Grille Tarifaire possède déjà le même identifiant."
 				  +" Il est recommandé de ne pas l'inclure dans le corps du message.");
-			}
-		}
 
-		if (priceGridsRepo.findByName(priceGrid.getName()) != null) {
+		if (priceGridsRepo.findByName(priceGrid.getName()) != null)
 			throw new jakarta.persistence.EntityExistsException("Une autre Grille Tarifaire possède déjà le même nom.");
-		}
 
 		return priceGridsRepo.insert(priceGrid);
 	}
@@ -127,18 +122,16 @@ public class PriceGridWS {
 		PriceGridsRepository priceGridsRepo = PriceGridsRepository.getInstance(em);
 
 		// payload check
-		if (priceGrid_payload.getId() != null && !priceGrid_payload.getId().equals(id)) {
+		if (priceGrid_payload.getId() != null && !priceGrid_payload.getId().equals(id))
 			return WSUtils.response(Status.BAD_REQUEST, servReq,
 			  "Identifiant incohérent dans l'URI et le corps du message."
 			 +" Il est possible (et recommandé) de ne pas l'inclure dans le corps du message.");
-		}
 
 		// constraint check
 		PriceGrid otherPriceGrid = priceGridsRepo.findByName(priceGrid_payload.getName());
-		if (otherPriceGrid != null && !otherPriceGrid.getId().equals(id)) {
+		if (otherPriceGrid != null && !otherPriceGrid.getId().equals(id))
 			return WSUtils.response(Status.CONFLICT, servReq,
 			  "Une autre Grille Tarifaire possède déjà le même nom.");
-		}
 
 		try {
 			/* invalidate tags cache */ TAGS_JSON_timestamp = 0L;
@@ -177,9 +170,8 @@ public class PriceGridWS {
 	 */
 	private PriceGrid ensureParentPricePrid(Long id) {
 		PriceGrid priceGrid = this.getOne(id);
-		if (priceGrid == null) {
+		if (priceGrid == null)
 			throw new NotFoundException("Aucune Grille Tarifaire avec cet id");
-		}
 		return priceGrid;
 	}
 
@@ -193,12 +185,10 @@ public class PriceGridWS {
 		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
 		PriceGridVersion priceGridVersion = priceGridVersionsRepo.findById(v_id);
 
-		if (priceGridVersion == null) {
+		if (priceGridVersion == null)
 			throw new NotFoundException("Version de Grille Tarifaire peut-être supprimée depuis.");
-		}
-		if (!priceGrid.getId().equals(priceGridVersion.getPriceGrid().getId())) {
+		if (!priceGrid.getId().equals(priceGridVersion.getPriceGrid().getId()))
 			throw new NotFoundException("Version de Grille Tarifaire incohérente avec la Grille.");
-		}
 		return priceGridVersion;
 	}
 
@@ -210,24 +200,24 @@ public class PriceGridWS {
 	@GET
 	@Path("/{id}/versions")
 	@Produces(MediaType.APPLICATION_JSON)
-	public StreamingOutput versions_getAll_WS(@PathParam("id") Long id, @QueryParam("publishedAt") String publishedAt) {
+	public StreamingOutput versions_getAll_WS(@PathParam("id") Long id,
+	    @QueryParam("published-at") String publishedAt) {
 		/* PriceGrid priceGrid = */ ensureParentPricePrid(id);
 
 		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
-		Stream<PriceGridVersion> versions;
-		if (publishedAt != null) {
+		List<PriceGridVersion> versions;
+		if (publishedAt != null)
 			try {
 				java.time.LocalDateTime dtPublishedAt = WSUtils.parseParamDate(publishedAt);
 				versions = priceGridVersionsRepo.findAllPublishedOfOnePriceGrid(id, dtPublishedAt);
 
 			} catch (java.time.format.DateTimeParseException exc) {
-				throw new IllegalArgumentException("Erreur d'analyse du paramètre \"publishedAt\" = " + publishedAt
+				throw new IllegalArgumentException("Erreur d'analyse du paramètre \"published-at\" = " + publishedAt
 				    + "\", détail: " + exc.getMessage());
 			}
-		} else {
+		else
 			versions = priceGridVersionsRepo.findAllOfOnePriceGrid(id);
-		}
-		return WSUtils.entityJsonStreamingOutput(versions);
+		return WSUtils.entityJsonStreamingOutput(versions.stream());
 	}
 
 	@POST
@@ -237,26 +227,21 @@ public class PriceGridWS {
 		PriceGrid priceGrid = ensureParentPricePrid(id);
 
 		try {
-			if (priceGridVersion == null) {
+			if (priceGridVersion == null)
 				throw new IllegalArgumentException("Le corps du message n'a pas pu interprété comme une Version de Grille Tarifaire (PriceGridVersion)");
-			}
-			if (priceGridVersion.getVersion() == null || priceGridVersion.getVersion().equals("")) {
+			if (priceGridVersion.getVersion() == null || priceGridVersion.getVersion().equals(""))
 				throw new IllegalArgumentException("La Version de Grille Tarifaire doit être renseignée (PriceGridVersion.version)");
-			}
-			if (priceGridVersion.getId() != null) {
+			if (priceGridVersion.getId() != null)
 				throw new IllegalArgumentException("L'identifiant de Version de Grille Tarifaire ne doit pas être incluse dans le corps du message.");
-			}
-			if (priceGridVersion.getPriceGrid() != null) {
+			if (priceGridVersion.getPriceGrid() != null)
 				throw new IllegalArgumentException("Le corps de la requête ne doit pas comporter de Grille (\"priceGrid\").");
-			}
 
 			PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
 			PriceGridVersion duplicatePriceGridVersion = priceGridVersionsRepo
 			  .findVersionOfOnePriceGrid(id, priceGridVersion.getVersion());
-			if (duplicatePriceGridVersion != null) {
+			if (duplicatePriceGridVersion != null)
 				return WSUtils.response(Status.CONFLICT, servReq,
 				  "La Version doit rester unique pour chaque Grille Tarifaire.");
-			}
 
 			priceGridVersion.setPriceGrid(priceGrid);
 			em.persist(priceGridVersion);
@@ -300,24 +285,21 @@ public class PriceGridWS {
 		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
 
 		// payload check
-		if (priceGridVersion_payload.getId() != null && !priceGridVersion_payload.getId().equals(v_id)) {
+		if (priceGridVersion_payload.getId() != null && !priceGridVersion_payload.getId().equals(v_id))
 			return WSUtils.response(Status.BAD_REQUEST, servReq,
 			  "Identifiant incohérent dans l'URI et le corps du message."
 			 +" Il est possible (et recommandé) de ne pas l'inclure dans le corps du message.");
-		}
-		if (priceGridVersion_payload.getPriceGrid() != null) {
+		if (priceGridVersion_payload.getPriceGrid() != null)
 			return WSUtils.response(Status.BAD_REQUEST, servReq,
 			  "Le corps de la requête ne doit pas comporter de Grille (\"priceGrid\"). Il est impossible de réattacher une Version à une autre Grille.");
-		}
 
 		// constraint check
 		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
 		PriceGridVersion duplicatePriceGridVersion = priceGridVersionsRepo
 		  .findVersionOfOnePriceGrid(id, priceGridVersion.getVersion());
-		if (!duplicatePriceGridVersion.getId().equals(v_id)) {
+		if (!duplicatePriceGridVersion.getId().equals(v_id))
 			return WSUtils.response(Status.CONFLICT, servReq,
 			  "La Version doit rester unique pour chaque Grille Tarifaire.");
-		}
 
 		try {
 			priceGridVersion_payload.setId(v_id);
@@ -353,13 +335,12 @@ public class PriceGridWS {
 		PriceGrid priceGrid = ensureParentPricePrid(id);
 		PriceGridVersion priceGridVersion = ensureConsistentGridVersion(v_id, priceGrid);
 
-		if (_v_lock == null) {
+		if (_v_lock == null)
 			return WSUtils.response(Status.BAD_REQUEST, servReq,
 			  "Un numéro de version doit être passé en paramètre de requête (_v_lock)");
-		} else if (!_v_lock.equals(priceGridVersion.get_v_lock())) {
+		else if (!_v_lock.equals(priceGridVersion.get_v_lock()))
 			return WSUtils.response(Status.CONFLICT, servReq,
 			  "Version de Grille Tarifaire peut-être modifiée depuis (\"_v_lock\" non-concordant).");
-		}
 
 		try {
 			priceGridVersion.setJsonContent(jsonContent);
@@ -379,12 +360,10 @@ public class PriceGridWS {
 
 
 		String newDescription = "COPIE DE " + priceGridVersion.getVersion();
-		if (priceGridVersion.getDescription() != null && !priceGridVersion.getDescription().equals("")) {
+		if (priceGridVersion.getDescription() != null && !priceGridVersion.getDescription().equals(""))
 			newDescription += " : \n" + priceGridVersion.getDescription();
-		}
-		if (newDescription.length() > 256) {
+		if (newDescription.length() > 256)
 			newDescription = newDescription.substring(0, 250) + "[...]";
-		}
 
 		PriceGridVersion priceGridVersionCopy = new PriceGridVersion();
 		// priceGridVersionCopy.setId();
@@ -406,6 +385,44 @@ public class PriceGridWS {
 		} catch (jakarta.persistence.PersistenceException exc) {
 			return ApplicationConfig.response(exc, servReq, PriceGridVersion.class);
 		}
+	}
+
+	/**
+	 * That service contains a shortcut to a published version, without having
+	 * to find a grid's ID by its name first.
+	 * @param gridName
+	 * @param gridName
+	 * @return
+	 */
+	@GET
+	@Path("/*/versions/latest-of")
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response versions_getLatestOf_WS(
+	  @QueryParam("grid-name") String gridName,
+	  @QueryParam("published-at") String publishedAt) {
+		if (gridName == null || gridName.equals(""))
+			return WSUtils.response(Status.BAD_REQUEST, servReq, "Le paramètre \"grid-name\" est obligatoire.");
+		if (publishedAt == null || publishedAt.equals(""))
+			return WSUtils.response(Status.BAD_REQUEST, servReq, "Le paramètre \"published-at\" est obligatoire.");
+
+		PriceGridsRepository priceGridsRepo = PriceGridsRepository.getInstance(em);
+		PriceGrid grid = priceGridsRepo.findByName(gridName);
+		if (grid == null)
+			return WSUtils.response(Status.NOT_FOUND, servReq, "Grille Tarifaire non-trouvée avec ce nom.");
+
+		PriceGridVersionsRepository priceGridVersionsRepo = PriceGridVersionsRepository.getInstance(em);
+		PriceGridVersion priceGridVersion;
+		try {
+			java.time.LocalDateTime dtPublishedAt = WSUtils.parseParamDate(publishedAt);
+			List<PriceGridVersion> versions = priceGridVersionsRepo.findAllPublishedOfOnePriceGrid(grid.getId(),
+			    dtPublishedAt);
+			priceGridVersion = versions.isEmpty() ? null : versions.get(0); // reliance on order by most recent
+		} catch (java.time.format.DateTimeParseException exc) {
+			throw new IllegalArgumentException(
+			    "Erreur d'analyse du paramètre \"published-at\" = " + publishedAt + "\", détail: " + exc.getMessage());
+		}
+
+		return Response.ok(priceGridVersion).build();
 	}
 
 	/**
@@ -442,17 +459,14 @@ public class PriceGridWS {
 			// build Json String to cache
 			JsonBuilderFactory factory = Json.createBuilderFactory(null);
 			JsonArrayBuilder internalTagsB = factory.createArrayBuilder();
-			for (String tag : INTERNAL_TAGS) {
+			for (String tag : INTERNAL_TAGS)
 				internalTagsB.add(tag);
-			}
 			JsonArrayBuilder externalTagsB = factory.createArrayBuilder();
-			for (String tag : EXTERNAL_TAGS) {
+			for (String tag : EXTERNAL_TAGS)
 				externalTagsB.add(tag);
-			}
 			JsonArrayBuilder collectedTagsB = factory.createArrayBuilder();
-			for (String tag : collectedTags) {
+			for (String tag : collectedTags)
 				collectedTagsB.add(tag);
-			}
 			String newValue = Json.createObjectBuilder()
 			    .add("internal", internalTagsB)
 				.add("external", externalTagsB)

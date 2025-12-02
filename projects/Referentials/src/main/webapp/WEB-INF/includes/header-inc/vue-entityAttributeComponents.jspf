@@ -10,6 +10,9 @@ but relies on an explicit "saving" action.
 Since as cell editors and renderers they cannot be directly configured,
 you may need to compose them in custom components, or subclass them.
 
+Utility Functions :
+- AcadiaX3 (global object)
+
 Components :
 - LinkToGrid (to be composed for parameterizing)
 - MoneyInput
@@ -31,6 +34,13 @@ Dependencies :
 --%>
 
 <script type="text/javascript">
+	var AcadiaX3 = {
+		shortInvoiceNumber: function(v){
+			return (v && v.startsWith("ACA-")) ? v.substring(4, v.length) : v;
+		}
+	};
+
+
 	/*
 	Exemple of grid cell renderer using LinkToGrid :
 	var LinkToCustomerGrid = {
@@ -53,7 +63,6 @@ Dependencies :
 					href.searchParams.set('show-attr', this.attr + ":" + this.value);
 					href = this.url +"?" + href.searchParams;
 					return href;
-
 				}
 			}
 		},

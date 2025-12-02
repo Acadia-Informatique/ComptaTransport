@@ -25,7 +25,7 @@
 		class CommandeALivrer {
 			constructor( poids, codePostal){
 				this.poids = poids;
-				this.pays = "France";
+				this.pays = "FR";
 				this.codePostal = codePostal;
 				this.size_length = null;
 				this.size_width = null;
@@ -36,22 +36,22 @@
 				this.isIntegration = false;
 			}
 			getPPGRawCoordinates(){
-				let departement = (this.pays=="France" && this.codePostal &&  this.codePostal.length==5) ? this.codePostal.substring(0,2) : "00";
+				let departement = (this.pays=="FR" && this.codePostal &&  this.codePostal.length==5) ? this.codePostal.substring(0,2) : "00";
 				return {
-						poids : this.poids,
-						poidsEntier: Math.ceil(this.poids),
-						poidsVolumique: Math.max(this.poids,
-						  (this.size_length * this.size_width * this.size_height) / 5000 // poids volumique d'après la fiche export
-						),
-						pays: this.pays, // TODO lookup ISO 3166-1 alpha-2 or alpha-3 codes
-						departement,
-						tailleHN :
-							((this.size_length + 2*this.size_width + 2*this.size_height) > 300)
-							|| (this.size_parcel_count > 10) ? "Oui" : "Non",
-						nbColis : this.size_parcel_count ?? 1,
-						transporteur100: this.transporteur100,
-						market: this.market,
-						integration: this.isIntegration ? "Oui" : "Non"
+					poids : this.poids,
+					poidsEntier: Math.ceil(this.poids),
+					poidsVolumique: Math.max(this.poids,
+					  (this.size_length * this.size_width * this.size_height) / 5000 // poids volumique d'après la fiche export
+					),
+					pays: this.pays, // TODO lookup ISO 3166-1 alpha-2 or alpha-3 codes
+					departement,
+					tailleHN :
+						((this.size_length + 2*this.size_width + 2*this.size_height) > 300)
+						|| (this.size_parcel_count > 10) ? "Oui" : "Non",
+					nbColis : this.size_parcel_count ?? 1,
+					transporteur100: this.transporteur100,
+					market: this.market,
+					integration: this.isIntegration ? "Oui" : "Non"
 				};
 			}
 		}
@@ -181,24 +181,6 @@
 			transition: all 0.3s ease-out;
 		}
 
-		/** List animations */
-		.list-move, /* apply transition to moving elements */
-		.list-enter-active,
-		.list-leave-active {
-			transition: all 0.5s ease;
-		}
-
-		.list-enter-from,
-		.list-leave-to {
-			opacity: 0;
-			transform: translateX(30px);
-		}
-
-		/* ensure leaving items are taken out of layout flow so that moving
-		animations can be calculated correctly. */
-		.list-leave-active {
-			position: absolute;
-		}
 	</style>
 
 </head>
@@ -653,8 +635,8 @@
 				<div class="input-group has-validation">
 					<span class="input-group-text">Prix au</span>
 					<select class="form-select" v-model="policy.attribute" required>
-						<option disabled value="">Coordonnée brute</option>
-						<option v-for="k in numericRawCoords" :value="k">
+						<option disabled value="">Attribut de volume</option>
+						<option v-for="k in numericProperties" :value="k">
 							{{ k }}
 						</option>
 					</select>
@@ -746,6 +728,11 @@
 				<div class="input-group has-validation mt-3">
 					<span class="input-group-text">Frais supplémentaire : </span>
 					<money-input class="form-control" v-model="policy.delegated_additiveAmount" />
+					<select class="form-select" v-model="policy.delegated_additiveAmountType">
+						<option value="MAIN">(Base)</option>
+						<option value="B2C">option B2C</option>
+						<option value="OPTS">Autres options</option>
+					</select>
 					<span class="input-group-text">€</span>
 					<i class="input-group-text">(optionnel)</i>
 					<div class="invalid-feedback">
@@ -761,6 +748,7 @@
 			<template v-else-if="editMode=='quick'">
 				voir grille "{{ policy.delegated_gridName }}"<br>
 				{{ policy.delegated_additiveAmount ? "+ ajout "+policy.delegated_additiveAmount+"€" : ""}}
+				{{ (!policy.delegated_additiveAmountType || policy.delegated_additiveAmountType=='MAIN') ? '' : policy.delegated_additiveAmountType }}
 				<!-- quick mode is no edit for now... may change -->
 				<div class="quick-extra-info" v-if="policy.extra_info">
 					{{ policy.extra_info }}
@@ -769,8 +757,7 @@
 			<template v-else>
 				voir grille "{{ policy.delegated_gridName }}"<br>
 				{{ policy.delegated_additiveAmount ? "+ ajout "+policy.delegated_additiveAmount+"€" : ""}}
-				<!-- TODO ajout mention "type de frais" ? genre "Livraison directe" -->
-				<!-- TODO ou mieux : ajout d'une composition additive/multiplicative générale -->
+				{{ (!policy.delegated_additiveAmountType || policy.delegated_additiveAmountType=='MAIN') ? '' : policy.delegated_additiveAmountType }}
 				<div v-if="policy.extra_info">
 					<hr>
 					Transporteur: {{policy.extra_info}}
@@ -832,32 +819,32 @@
 					  type="text" list="countryDatalist" autocomplete="on"
 					  v-model="testPricedObj.pays">
 					<datalist id="countryDatalist">
-						<option value="Allemagne"></option>
-						<option value="Autriche"></option>
-						<option value="Belgique"></option>
-						<option value="Bulgarie"></option>
-						<option value="Croatie"></option>
-						<option value="Danemark"></option>
-						<option value="Espagne (hors îles)"></option>
-						<option value="Estonie"></option>
-						<option value="Finlande"></option>
-						<option value="France"></option>
-						<option value="Grèce (hors îles)"></option>
-						<option value="Hongrie"></option>
-						<option value="Irlande"></option>
+						<option value="DE">Allemagne</option>
+						<option value="AT">Autriche</option>
+						<option value="BE">Belgique</option>
+						<option value="BG">Bulgarie</option>
+						<option value="HR">Croatie</option>
+						<option value="DK">Danemark</option>
+						<option value="ES">Espagne (hors îles)</option>
+						<option value="EE">Estonie</option>
+						<option value="FI">Finlande</option>
+						<option value="FR">France</option>
+						<option value="GR">Grèce (hors îles)</option>
+						<option value="HU">Hongrie</option>
+						<option value="IE">Irlande</option>
 						<option value="Islande"></option>
-						<option value="Italie"></option>
-						<option value="Lettonie"></option>
-						<option value="Luxembourg"></option>
-						<option value="Norvège"></option>
-						<option value="Pays-Bas"></option>
-						<option value="Pologne"></option>
-						<option value="Portugal"></option>
-						<option value="Rép. Tchèque"></option>
-						<option value="Roumanie"></option>
-						<option value="Suisse"></option>
-						<option value="Suède"></option>
-						<option value="Slovaquie"></option>
+						<option value="IT">Italie</option>
+						<option value="LV">Lettonie</option>
+						<option value="LU">Luxembourg</option>
+						<option value="NO">Norvège</option>
+						<option value="NL">Pays-Bas</option>
+						<option value="PL">Pologne</option>
+						<option value="PT">Portugal</option>
+						<option value="CZ">Rép. Tchèque</option>
+						<option value="RO">Roumanie</option>
+						<option value="CH">Suisse</option>
+						<option value="SE">Suède</option>
+						<option value="SK">Slovaquie</option>
 					</datalist>
 				</div>
 			</div>
@@ -886,11 +873,10 @@
 					  type="text" list="transporteur100Datalist" autocomplete="on"
 					  v-model="testPricedObj.transporteur100">
 					<datalist id="transporteur100Datalist">
-						<option value="Schenker Standard (MES)"></option>
-						<option value="Schenker Premium (MES)"></option>
-						<option value="MAZET"></option>
+						<option value="Schenker"></option>
+						<option value="Schenker Premium"></option>
+						<option value="Mazet"></option>
 						<option value="Geodis MES"></option>
-						<option value="Geodis ATX"></option>
 					</datalist>
 				</div>
 			</div>
@@ -901,7 +887,8 @@
 					<tr>
 						<th scope="col">Grille @ Case</th>
 						<th scope="col">Tarif</th>
-						<th scope="col">Cumul</th>
+						<th scope="col">Montant</th>
+						<th scope="col">Type</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -911,14 +898,17 @@
 					<tr>
 						<td colspan="3" class="fs-3">
 							Total:
-							<template v-if="!isNaN(testResult?.amount)">
-								{{testResult.amount.toFixed(2)}} €
+							<template v-if="grandTotal?.MAIN === null">
+								--
+							</template>
+							<template v-else-if="!isNaN(grandTotal?.MAIN)">
+								{{grandTotal.total().toFixed(2)}} €
 							</template>
 							<span v-else class="text-bg-danger">
 								&nbsp;???&nbsp;
 							</span>
-							<div class="fs-4" v-if="testResult.extra_info">
-								{{ testResult.extra_info }}
+							<div class="fs-4" v-if="grandTotal.extra_info">
+								{{ grandTotal.extra_info }}
 							</div>
 						</td>
 					</tr>
@@ -949,12 +939,18 @@
 				</template>
 			</td>
 			<td>
-				<template v-if="!isNaN(result.amount)">
+				<template v-if="result.amount === null">
+					--
+				</template>
+				<template v-else-if="!isNaN(result.amount)">
 					{{result.amount.toFixed(2)}}
 				</template>
 				<span v-else class="text-bg-danger">
 					&nbsp;???&nbsp;
 				</span>
+			</td>
+			<td>
+				{{ result.amountType }}
 			</td>
 		</tr>
 	</script>
@@ -962,8 +958,11 @@
 
 	<!-- ========== component logic ============== -->
 	<script type="module">
-		let typicalRawCoords = Object.entries(new CommandeALivrer(0, "01000").getPPGRawCoordinates()); //arguably typical ?...
+		let typicalPricedObj = new CommandeALivrer(0, "01000"); //arguably typical ?...
+		let typicalProperties = Object.entries(typicalPricedObj);
+		let typicalRawCoords = Object.entries(typicalPricedObj.getPPGRawCoordinates());
 
+		const numericProperties = typicalProperties.filter(([k,v]) => typeof v == "number").map(([k,v]) => k);
 		const numericRawCoords =  typicalRawCoords.filter(([k,v]) => typeof v == "number").map(([k,v]) => k);
 		const stringRawCoords =  typicalRawCoords.filter(([k,v]) =>typeof v == "string").map(([k,v]) => k);
 
@@ -1047,7 +1046,7 @@
 				this.apiGetMetadata();
 				this.apiGetJsonContent();
 
-				let saved = localStorage.getItem("save.system");
+				let saved = localStorage.getItem("priceGrids/save.system");
 				this.localStorage_hasSystem = !(saved == null || typeof saved == "undefined" || saved == "");
 
 				window.addEventListener('beforeunload',()=>{
@@ -1068,7 +1067,7 @@
 						this.needSaving = needSaving;
 					});
 				},
-				// write to jsonContent
+
 				buildPayload(){
 					return PricingSystem.clean(this.ui_state.system);
 				},
@@ -1146,8 +1145,8 @@
 				},
 				localStorage_saveSystem(useAlert = true){
 					let handler = ()=>{
-						let jsonContent = this.buildPayload(this.ui_state.system);
-						localStorage.setItem("save.system", jsonContent);
+						let jsonContent = JSON.stringify(this.buildPayload(this.ui_state.system));
+						localStorage.setItem("priceGrids/save.system", jsonContent);
 						this.localStorage_hasSystem = true;
 					};
 
@@ -1164,7 +1163,7 @@
 				},
 				localStorage_loadSystem(name, useAlert = true){
 					let handler = ()=>{
-						let data = localStorage.getItem("save.system");
+						let data = localStorage.getItem("priceGrids/save.system");
 						this.loadSystemFromString(data, true);
 					};
 
@@ -1183,7 +1182,7 @@
 					confirm_dialog("Stockage local","Supprimer la sauvegarde d'urgence ?",{
 						label:'Continuer', class: 'btn-primary', autofocus:true,
 						handler : ()=>{
-							localStorage.removeItem("save.system");
+							localStorage.removeItem("priceGrids/save.system");
 							this.localStorage_hasSystem = false;
 						}
 					}, {
@@ -1193,7 +1192,7 @@
 
 				downloadSystemByLink(){
 					console.info("Generating a lengthy download link from PricingSystem...");
-					let jsonContent = this.buildPayload(this.ui_state.system);
+					let jsonContent = JSON.stringify(this.buildPayload(this.ui_state.system));
 
 					const linkData = new Blob([jsonContent], { type: 'application/json' });
 					const linkHref =  URL.createObjectURL(linkData);
@@ -1782,7 +1781,7 @@
 								<template v-if="dim.name==ui_state.editingDimName">
 									<button type="button" class="btn btn-outline-primary mb-1" @click="editDimension_abort">Cancel</button>
 									<button type="button" class="btn btn-outline-primary mb-1" @click="removeDimension(dimIdx)">Delete</button>
-									<button type="button" class="btn btn-outline-primary mb-1" @click="editDimension_end">Save</button>
+									<button type="button" class="btn btn-outline-primary mb-1" @click="editDimension_end">OK</button>
 								</template>
 								<template v-else>
 									<button type="button" class="btn btn-secondary mb-1 bi bi-pencil" @click="editDimension_start($event, dim.name)"></button>
@@ -1851,6 +1850,7 @@
 			},
 			data(){
 				return {
+					numericProperties,
 					numericRawCoords,
 					stringRawCoords
 				}
@@ -2034,7 +2034,11 @@
 					const gridName = this.ui_state.currentGrid.name;
 					return this.ui_state.system.applyGrid(gridName, this.testPricedObj);
 					//return {amount:-1, extra_info:""} //TODO prévoir débrayage pour les références circulaires, au niveau GRID.JS
+				},
+				grandTotal(){
+					return PricingSystem.summarizeResult(this.testResult);
 				}
+
 			},
 			template: '#PricingTest-Form-template'
 		};

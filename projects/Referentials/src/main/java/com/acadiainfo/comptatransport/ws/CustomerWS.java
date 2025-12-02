@@ -1,11 +1,14 @@
 package com.acadiainfo.comptatransport.ws;
 
+import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
+import com.acadiainfo.comptatransport.data.AggShippingRevenueRepository;
 import com.acadiainfo.comptatransport.data.CustomersRepository;
 import com.acadiainfo.comptatransport.data.PriceGridsRepository;
+import com.acadiainfo.comptatransport.domain.AggShippingRevenue;
 import com.acadiainfo.comptatransport.domain.Customer;
 import com.acadiainfo.comptatransport.domain.CustomerShipPreferences;
 import com.acadiainfo.comptatransport.domain.PriceGrid;
@@ -66,22 +69,27 @@ public class CustomerWS {
 	 */
 	public Customer getOne(Long id) {
 		Customer customer = CustomersRepository.getInstance(em).findById(id);
-		if (customer != null) {
+		if (customer != null)
 			return customer;
-		} else {
+		else
 			throw new jakarta.persistence.EntityNotFoundException("(id=" + id + ")");
-		}
 	}
 
 	@GET
 	@Produces(value = MediaType.APPLICATION_JSON)
-	public StreamingOutput getAll_WS(@QueryParam("tag") Set<String> tags) {
-		Stream<Customer> customers = getAll(tags);
+	public StreamingOutput getAll_WS(
+	  @QueryParam("tag") Set<String> tags,
+	  @QueryParam("show-inactive") Boolean showInactive) {
+
+		Stream<Customer> customers = getAll(tags, showInactive != null && showInactive.booleanValue());
 		return WSUtils.entityJsonStreamingOutput(customers);
 	}
 
-	public Stream<Customer> getAll(Set<String> tags) {
+	public Stream<Customer> getAll(Set<String> tags, boolean showInactive) {
 		Stream<Customer> customers = CustomersRepository.getInstance(em).findAll();
+
+		if (!showInactive)
+			customers = customers.filter(c -> !c.getTags().contains("inactive"));
 
 		if (tags != null && !tags.isEmpty()) {
 			logger.finer("tags detected : " + tags);
@@ -108,34 +116,26 @@ public class CustomerWS {
 	public Customer add(Customer customer) {
 		CustomersRepository customersRepo = CustomersRepository.getInstance(em);
 
-		if (customer == null) {
+		if (customer == null)
 			throw new IllegalArgumentException("Le corps du message n'a pas pu interprété comme un Client");
-		}
-		if (customer.getErpReference() == null || customer.getErpReference().equals("")) {
+		if (customer.getErpReference() == null || customer.getErpReference().equals(""))
 			throw new IllegalArgumentException("La référence ERP du Client ne peut pas être vide.");
-		}
-		if (customer.getLabel() == null || customer.getLabel().equals("")) {
+		if (customer.getLabel() == null || customer.getLabel().equals(""))
 			throw new IllegalArgumentException("Le libellé du Client ne peut pas être vide.");
-		}
-		if (customer.getShipPreferences() != null) {
-			if (!customer.getShipPreferences().isEmpty()) {
+		if (customer.getShipPreferences() != null)
+			if (!customer.getShipPreferences().isEmpty())
 				throw new IllegalArgumentException("Les Préférences Transport du Client ne doivent pas être incluses."
 				  +"\n Utilisez le verb PATCH pour cela.");
-			}
-		}
 
 
 		// Unusual : id is not supposed to be provided
-		if (customer.getId() != null) {
-			if (customersRepo.find(customer) != null) {
+		if (customer.getId() != null)
+			if (customersRepo.find(customer) != null)
 				throw new jakarta.persistence.EntityExistsException("Un Client possède déjà le même identifiant."
 				  + " Il est recommandé de ne pas l'inclure dans le corps du message.");
-			}
-		}
 
-		if (customersRepo.findByErpReference(customer.getErpReference()) != null) {
+		if (customersRepo.findByErpReference(customer.getErpReference()) != null)
 			throw new jakarta.persistence.EntityExistsException("Un autre Client possède déjà la même référence ERP.");
-		}
 
 		return customersRepo.insert(customer);
 	}
@@ -157,30 +157,19 @@ public class CustomerWS {
 		CustomersRepository customersRepo = CustomersRepository.getInstance(em);
 
 		// payload check
-		if (customer_payload.getId() != null && !customer_payload.getId().equals(id)) {
+		if (customer_payload.getId() != null && !customer_payload.getId().equals(id))
 			return WSUtils.response(Status.BAD_REQUEST, servReq,
 			  "Identifiant incohérent dans l'URI et le corps du message."
 			 +" Il est possible (et recommandé) de ne pas l'inclure dans le corps du message.");
-		}
-		if (customer_payload.getErpReference() == null || customer_payload.getErpReference().equals("")) {
+		if (customer_payload.getErpReference() == null || customer_payload.getErpReference().equals(""))
 			return WSUtils.response(Status.BAD_REQUEST, servReq, "La référence ERP du Client ne peut pas être vide.");
-		}
-		if (customer_payload.getLabel() == null || customer_payload.getLabel().equals("")) {
+		if (customer_payload.getLabel() == null || customer_payload.getLabel().equals(""))
 			return WSUtils.response(Status.BAD_REQUEST, servReq, "Le libellé du Client ne peut pas être vide.");
-		}
-		/*
-		 * if (customer_payload.getShipPreferences() != null) { if
-		 * (!customer_payload.getShipPreferences().isEmpty()) { return
-		 * WSUtils.response(Status.BAD_REQUEST, servReq,
-		 * "Les Préférences Transport du Client ne doivent pas être incluses." +
-		 * "\n Utilisez le verb PATCH pour cela."); } }
-		 */
 
 		// constraint check
 		Customer otherCustomer = customersRepo.findByErpReference(customer_payload.getErpReference());
-		if (otherCustomer != null && !otherCustomer.getId().equals(id)) {
+		if (otherCustomer != null && !otherCustomer.getId().equals(id))
 			return WSUtils.response(Status.CONFLICT, servReq, "Un autre Client possède déjà la même référence ERP.");
-		}
 
 		try {
 			/* invalidate tags cache */ TAGS_JSON_timestamp = 0L;
@@ -196,9 +185,8 @@ public class CustomerWS {
 					// resolve Customer consistency in payload
 					if (preference_in_payload.getCustomer() != null
 					  && preference_in_payload.getCustomer().getId() != null
-					  && !customer.getId().equals(preference_in_payload.getCustomer().getId())) {
+					  && !customer.getId().equals(preference_in_payload.getCustomer().getId()))
 						return WSUtils.response(Status.BAD_REQUEST, servReq, "Les Préférences de Transport ne doivent pas spécifier un identifiant Client différent !");
-					}
 					preference_in_payload.setCustomer(customer);
 
 					// Try and find corresponding record in database :
@@ -213,9 +201,9 @@ public class CustomerWS {
 						em.persist(preference_in_payload);
 						// customer.getShipPreferences().add(preference_in_payload); bidi mapping
 
-					} else {
+					} else { // b) or Update existing ShipPreferences
 						// b) or Update existing ShipPreferences
-						patchShipPreference(preference_in_base, preference_in_payload, priceGridsRepo);
+												patchShipPreference(preference_in_base, preference_in_payload, priceGridsRepo);
 					}
 				}
 			}
@@ -251,6 +239,7 @@ public class CustomerWS {
 		//id and customer : out of scope
 		target.setApplicationDate(source.getApplicationDate());
 		target.setOverrideCarriers(source.getOverrideCarriers());
+		target.setTags(source.getTags());
 		target.setCarrierTagsWhitelist(source.getCarrierTagsWhitelist());
 		target.setCarrierTagsBlacklist(source.getCarrierTagsBlacklist());
 
@@ -267,13 +256,72 @@ public class CustomerWS {
 				overridePriceGrid = priceGridsRepo.findByName(pgname);
 			}
 
-			if (overridePriceGrid == null) {
+			if (overridePriceGrid == null)
 				throw new IllegalArgumentException("Dans Préférence Transport du Client, la Grille Tarifaire n'a été trouvée ni par l'id, ni par le nom fourni");
-			}
 			target.setOverridePriceGrid(overridePriceGrid);
 		} else {
 			target.setOverridePriceGrid(null);
 		}
+	}
+
+	@PUT
+	@Path("/{id_or_ref}/activate")
+	public Response activate_WS(@PathParam("id_or_ref") String idOrRef) {
+		try {
+			CustomersRepository customersRepo = CustomersRepository.getInstance(em);
+			Customer customer = customersRepo.findByErpReference(idOrRef);
+			if (customer == null) {
+				try {
+					long id = Long.parseLong(idOrRef);
+					customer = customersRepo.findById(id);
+				} catch (NumberFormatException exc) {
+					throw new IllegalArgumentException(
+					    idOrRef + " hasn't been found as ERP reference, not is parseable as a numeric id.");
+				}
+			}
+			if (customer == null)
+				return WSUtils.response(Status.NOT_FOUND, servReq,
+				    "Aucun Client trouvé avec [" + idOrRef + "] (ni par id ni par réf. ERP)");
+
+			/* invalidate tags cache */ TAGS_JSON_timestamp = 0L;
+			customer.getTags().remove("inactive");
+			em.detach(customer);
+			em.merge(customer); // TODO that doesn't seem right ...
+			em.flush();
+
+			return Response.noContent().build();
+		} catch (jakarta.persistence.PersistenceException exc) {
+			return ApplicationConfig.response(exc, servReq, Customer.class);
+		}
+	}
+
+	@GET
+	@Path("/*/agg-shipping-revenues")
+	@Produces(MediaType.APPLICATION_JSON)
+	public StreamingOutput getAll_ShippingRevenueAggregates_WS(
+	  @QueryParam("start-date") String startDate,
+	  @QueryParam("end-date") String endDate) {
+
+		LocalDateTime startDateObj, endDateObj;
+		if (startDate == null || startDate.equals("")) {
+			throw new IllegalArgumentException("Le paramètre \"start-date\" est une date obligatoire");
+		}
+		if (endDate == null || endDate.equals("")) {
+			throw new IllegalArgumentException("Le paramètre \"end-date\" est une date obligatoire");
+		}
+		try {
+			startDateObj = WSUtils.parseParamDate(startDate);
+			// end-date is optional, if not set use start-date + 1
+			endDateObj = (endDate == null) ? startDateObj.plusDays(1) : WSUtils.parseParamDate(endDate);
+		} catch (java.time.format.DateTimeParseException exc) {
+			throw new IllegalArgumentException(
+			    "Format de paramètres de date incorrect (\"start-date\" et/ou \"end-date\").");
+		}
+
+		AggShippingRevenueRepository aggShippingRevRepo = AggShippingRevenueRepository.getInstance(em);
+
+		Stream<AggShippingRevenue> aggs = aggShippingRevRepo.getAllBetween(startDateObj, endDateObj);
+		return WSUtils.entityJsonStreamingOutput(aggs);
 	}
 
 	/**
@@ -287,8 +335,9 @@ public class CustomerWS {
 	static {
 		VIP_TAGS = new java.util.ArrayList<String>();
 		VIP_TAGS.add("Grand Compte");
+		VIP_TAGS.add("Dropshipper");
 		SYS_TAGS = new java.util.ArrayList<String>();
-		SYS_TAGS.add("B2C");
+		SYS_TAGS.add("inactive");
 	}
 
 	@GET
@@ -302,7 +351,7 @@ public class CustomerWS {
 
 			// collect custom tags already set
 			Set<String> collectedTags = java.util.Collections.synchronizedSet(new java.util.TreeSet<String>());
-			this.getAll(null).forEach(t -> collectedTags.addAll(t.getTags()));
+			this.getAll(null, false).forEach(t -> collectedTags.addAll(t.getTags()));
 			collectedTags.removeAll(VIP_TAGS);
 			collectedTags.removeAll(SYS_TAGS);
 
@@ -320,7 +369,9 @@ public class CustomerWS {
 			for (String tag : collectedTags) {
 				collectedTagsB.add(tag);
 			}
-			String newValue = Json.createObjectBuilder().add("vip", vipTagsB).add("system", systemTagsB)
+			String newValue = Json.createObjectBuilder()
+				.add("vip", vipTagsB)
+				.add("system", systemTagsB)
 			    .add("collected", collectedTagsB)
 			    .build().toString();
 

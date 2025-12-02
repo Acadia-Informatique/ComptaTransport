@@ -3,6 +3,7 @@ package com.acadiainfo.comptatransport.fileimport;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.acadiainfo.comptatransport.domain.AggShippingRevenue;
 import com.acadiainfo.comptatransport.domain.Customer;
 
 import jakarta.persistence.Column;
@@ -17,28 +18,42 @@ import jakarta.persistence.NamedNativeQuery;
 import jakarta.persistence.NamedQuery;
 import jakarta.persistence.Table;
 
-@NamedQuery(name = "ImportTransportVendu.purgePrevious", query = """
-    DELETE FROM ImportTransportVendu imp
+@NamedQuery(name = "ImportForfaitTrspVendu.purgePrevious", query = """
+    DELETE FROM ImportForfaitTrspVendu imp
     where imp.docReference = :docReference
       and imp.importHeader <> :importHeader
     """)
-@NamedNativeQuery(name = "ImportTransportVendu_as_new_Customers", query = """
+@NamedNativeQuery(name = "ImportForfaitTrspVendu_as_new_Customers", query = """
     select
-        itv.customer_erp_reference as erp_reference,
-        MAX(itv.customer_label) as label,
-        MAX(itv.salesrep) as salesrep,
-    	MAX(all_customers.id) + min(itv.id) as id
-    from I_TRANSPORT_VENDU itv
-    left outer join CUSTOMER on itv.customer_erp_reference = CUSTOMER.erp_reference
+        iftv.customer_erp_reference as erp_reference,
+        MAX(iftv.customer_label) as label,
+        MAX(iftv.salesrep) as salesrep,
+    	MAX(all_customers.id) + min(iftv.id) as id
+    from I_FORFAIT_TRSP_VENDU iftv
+    left outer join CUSTOMER on iftv.customer_erp_reference = CUSTOMER.erp_reference
       inner join CUSTOMER all_customers
     where CUSTOMER.id is NULL
-      and itv.import_id = ?1
-    group by itv.customer_erp_reference
+      and iftv.import_id = ?1
+    group by iftv.customer_erp_reference
       """, resultClass = Customer.class)
 
+@NamedNativeQuery(name = "ImportForfaitTrspVendu_as_new_AggShippingRevenues", query = """
+    select
+    	max(iftv.id) as id,
+    	CUSTOMER.id as customer_id,
+    	'MONTHLY' as product,
+    	STR_TO_DATE(CONCAT(DATE_FORMAT(doc_date,'%Y-%m'),'-01 00'),'%Y-%m-%d %H') as date,
+    	sum(total_price) as amount
+    from I_FORFAIT_TRSP_VENDU iftv
+    inner join CUSTOMER on iftv.customer_erp_reference = CUSTOMER.erp_reference
+    where iftv.product_code = '3810514051' and iftv.product_desc = 'Frais de port mensuel France'
+      and iftv.import_id = ?1
+    group by CUSTOMER.id, date
+     """, resultClass = AggShippingRevenue.class)
+
 @Entity
-@Table(schema = "ComptaTransport", name = "I_TRANSPORT_VENDU")
-public class ImportTransportVendu {
+@Table(schema = "ComptaTransport", name = "I_FORFAIT_TRSP_VENDU")
+public class ImportForfaitTrspVendu {
 	/** Tech. PK */
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -52,9 +67,6 @@ public class ImportTransportVendu {
 	@Column(name = "code_societe")
 	private String codeSociete;
 
-	@Column(name = "order_reference")
-	private String orderReference;
-
 	@Column(name = "doc_reference")
 	private String docReference;
 
@@ -64,29 +76,17 @@ public class ImportTransportVendu {
 	@Column(name = "customer_label")
 	private String customerLabel;
 
+	@Column(name = "product_code")
+	private String productCode;
+
 	@Column(name = "product_desc")
 	private String productDesc;
-
-	@Column(name = "is_b2c")
-	private boolean b2c;
-
-	@Column(name = "carrier_name")
-	private String carrierName;
-
-	@Column(name = "ship_country")
-	private String shipCountry;
-
-	@Column(name = "ship_zipcode")
-	private String shipZipcode;
 
 	@Column(name = "doc_date")
 	private LocalDateTime docDate;
 
 	@Column(name = "salesrep")
 	private String salesrep;
-
-	@Column(name = "total_weight")
-	private BigDecimal totalWeight;
 
 	@Column(name = "total_price")
 	private BigDecimal totalPrice;
@@ -100,20 +100,20 @@ public class ImportTransportVendu {
 		this.importHeader = importHeader;
 	}
 
+	public Long getId() {
+		return id;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
+
 	public String getCodeSociete() {
 		return codeSociete;
 	}
 
 	public void setCodeSociete(String codeSociete) {
 		this.codeSociete = codeSociete;
-	}
-
-	public String getOrderReference() {
-		return orderReference;
-	}
-
-	public void setOrderReference(String orderReference) {
-		this.orderReference = orderReference;
 	}
 
 	public String getDocReference() {
@@ -140,44 +140,20 @@ public class ImportTransportVendu {
 		this.customerLabel = customerLabel;
 	}
 
+	public String getProductCode() {
+		return productCode;
+	}
+
+	public void setProductCode(String productCode) {
+		this.productCode = productCode;
+	}
+
 	public String getProductDesc() {
 		return productDesc;
 	}
 
 	public void setProductDesc(String productDesc) {
 		this.productDesc = productDesc;
-	}
-
-	public boolean isB2c() {
-		return b2c;
-	}
-
-	public void setB2c(boolean b2c) {
-		this.b2c = b2c;
-	}
-
-	public String getCarrierName() {
-		return carrierName;
-	}
-
-	public void setCarrierName(String carrierName) {
-		this.carrierName = carrierName;
-	}
-
-	public String getShipCountry() {
-		return shipCountry;
-	}
-
-	public void setShipCountry(String shipCountry) {
-		this.shipCountry = shipCountry;
-	}
-
-	public String getShipZipcode() {
-		return shipZipcode;
-	}
-
-	public void setShipZipcode(String shipZipcode) {
-		this.shipZipcode = shipZipcode;
 	}
 
 	public LocalDateTime getDocDate() {
@@ -194,14 +170,6 @@ public class ImportTransportVendu {
 
 	public void setSalesrep(String salesrep) {
 		this.salesrep = salesrep;
-	}
-
-	public BigDecimal getTotalWeight() {
-		return totalWeight;
-	}
-
-	public void setTotalWeight(BigDecimal totalWeight) {
-		this.totalWeight = totalWeight;
 	}
 
 	public BigDecimal getTotalPrice() {

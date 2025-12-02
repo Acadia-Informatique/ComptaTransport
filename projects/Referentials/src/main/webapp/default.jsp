@@ -4,13 +4,13 @@
 <html>
 <head>
 	<meta charset="UTF-8">
-	<title>(ComptaTransport)</title>
+	<title>Analyse Transport</title>
 	
 	<%@ include file="/WEB-INF/includes/header-inc/client-stack.jspf" %>
 	
 </head>
 <body>
-	<H1>(Titre à choisir ;-)</H1>
+	<H1>Analyse Transport</H1>
 
 	<H2>Référentiels</H2>
 	<ul>

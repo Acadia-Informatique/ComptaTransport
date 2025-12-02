@@ -1,6 +1,6 @@
 "use strict";
 
-/** Default grids a,d policies used in the "Referentials" database application.
+/** Default grids and policies used in the "Referentials" database application.
  * They are not needed for the JS PricingGrid engine.
  */
 

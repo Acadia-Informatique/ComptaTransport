@@ -16,7 +16,7 @@ public class WSRuntimeExceptionMapper implements ExceptionMapper<RuntimeExceptio
 
 	@Override
 	public Response toResponse(RuntimeException exc) {
-		logger.finer("Intercepted exception : " + exc.getClass() + " - message=" + exc.getMessage());
+		logger.warning("Intercepted exception : " + exc.getClass() + " - message=" + exc.getMessage());
 
 		int responseStatus;
 		String responseMessage;
