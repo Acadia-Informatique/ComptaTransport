@@ -32,7 +32,7 @@
 				this.size_height = null;
 				this.size_parcel_count = 1;
 				this.transporteur100 = "";
-				this.market = "BTB";
+				this.market = "B2B";
 				this.isIntegration = false;
 			}
 			getPPGRawCoordinates(){
@@ -413,7 +413,7 @@
 					<tr>
 						<td>
 							<pricinggrids-gridcell
-								@edit-grid-cell="(cell)=>editGridCell_start(cell)"
+								@edit-grid-cell="editGridCell_start"
 								:cell="grid.ensureCellAt({})">
 							</pricinggrids-gridcell>
 						</td>
@@ -435,7 +435,7 @@
 						<th class="gridHead">{{ categoryLabel(dim0, categ_dim0, categIdx_dim0) }}</th>
 						<td>
 							<pricinggrids-gridcell
-								@edit-grid-cell="(cell)=>editGridCell_start(cell)"
+								@edit-grid-cell="editGridCell_start"
 								:cell="grid.ensureCellAt({[dim0.name]: categ_dim0.value})">
 							</pricinggrids-gridcell>
 						</td>
@@ -467,7 +467,7 @@
 						</th>
 						<td v-for="categ_dim1 in dim1.categories">
 							<pricinggrids-gridcell
-								@edit-grid-cell="(cell)=>editGridCell_start(cell)"
+								@edit-grid-cell="editGridCell_start"
 								:cell="grid.ensureCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value})">
 							</pricinggrids-gridcell>
 						</td>
@@ -511,7 +511,7 @@
 						<template v-for="categ_dim2 in dim2.categories">
 						<td v-for="categ_dim1 in dim1.categories">
 							<pricinggrids-gridcell
-								@edit-grid-cell="(cell)=>editGridCell_start(cell)"
+								@edit-grid-cell="editGridCell_start"
 								:cell="grid.ensureCellAt({[dim0.name]: categ_dim0.value,[dim1.name]: categ_dim1.value, [dim2.name]: categ_dim2.value})">
 							</pricinggrids-gridcell>
 						</td>
@@ -747,7 +747,7 @@
 			</template>
 			<template v-else-if="editMode=='quick'">
 				voir grille "{{ policy.delegated_gridName }}"<br>
-				{{ policy.delegated_additiveAmount ? "+ ajout "+policy.delegated_additiveAmount+"€" : ""}}
+				{{ policy.delegated_additiveAmount != null ? "+ ajout "+policy.delegated_additiveAmount+"€" : ""}}
 				{{ (!policy.delegated_additiveAmountType || policy.delegated_additiveAmountType=='MAIN') ? '' : policy.delegated_additiveAmountType }}
 				<!-- quick mode is no edit for now... may change -->
 				<div class="quick-extra-info" v-if="policy.extra_info">
@@ -756,7 +756,7 @@
 			</template>
 			<template v-else>
 				voir grille "{{ policy.delegated_gridName }}"<br>
-				{{ policy.delegated_additiveAmount ? "+ ajout "+policy.delegated_additiveAmount+"€" : ""}}
+				{{ policy.delegated_additiveAmount != null ? "+ ajout "+policy.delegated_additiveAmount+"€" : ""}}
 				{{ (!policy.delegated_additiveAmountType || policy.delegated_additiveAmountType=='MAIN') ? '' : policy.delegated_additiveAmountType }}
 				<div v-if="policy.extra_info">
 					<hr>
@@ -786,8 +786,9 @@
 	<script type="text/x-template" id="PricingTest-Form-template">
 		<form>
 			<div class="d-flex column-gap-3">
-				<div><input type="radio" v-model="testPricedObj.market" value="BTB"> BTB</div>
-				<div><input type="radio" v-model="testPricedObj.market" value="BTC"> BTC</div>
+				<div><input type="radio" v-model="testPricedObj.market" value="B2B">BTB</div>
+				<div><input type="radio" v-model="testPricedObj.market" value="B2C">BTC</div>
+				<div><input type="radio" v-model="testPricedObj.market" value="B2C_as_B2B">BTC "prix BTB"</div>
 				<div><input type="checkbox" v-model="testPricedObj.isIntegration" value="true"> Integration</div>
 			</div>
 			<div class="row mb-3 mb-lg-1">

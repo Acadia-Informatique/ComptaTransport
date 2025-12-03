@@ -76,6 +76,10 @@
 			padding-left: 0.4em;<%-- closer text align with the edit version (html select) --%>
 		}
 
+		/* TODO NAM Q&D : assess Q&Dirtiness ;-) */
+		table#revenue-control-grid tr.highlighted td {
+			background-color: #ff9;
+		}
 
 	</style>
 </head>
@@ -89,6 +93,8 @@
 			<div class="d-flex h-50 align-items-baseline mt-1">
 				Date : <datepicker-day v-model="ctrlDate"></datepicker-day>
 				<button class="btn btn-sm bi bi-funnel btn-secondary ms-2" @click="clearGridFilters"></button>
+
+				<div v-if="dataRowCount" class="mx-2">{{ dataRowCount}} lignes</div>
 			</div>
 
 			<div v-if="pricingSystem['#pgv_metadata']" class="d-flex">
@@ -96,18 +102,19 @@
 					<audit-info class="small text-nowrap" v-model="pricingSystem['#pgv_metadata'].auditingInfo"></audit-info>
 			</div>
 		</div>
-		<revenue-control-grid :date="ctrlDate" v-if="sharedReady" ref="gridRoot"></revenue-control-grid>
+		<revenue-control-grid :date="ctrlDate" v-if="sharedReady" ref="gridRoot"
+		  @row-count="dataRowCountChange"></revenue-control-grid>
 	</div>
 
 	<script type="text/javascript">
 		// PricingSystem integration point
 		class PricedObject {
-			constructor(weight, country, zip, carrierObj, isB2C, isHN, isInteg){
+			constructor(weight, country, zip, carrierObj, market, isHN, isInteg){
 				this.weight = weight;
 				this.country = country;
 				this.zip = zip;
 				this.carrierObj = carrierObj;
-				this.isB2C = isB2C;
+				this.market = market;
 				this.isHN = isHN;
 				this.isInteg = isInteg;
 
@@ -131,7 +138,7 @@
 					tailleHN : this.isHN ? "Oui" : "Non",
 					nbColis : 1, // TODO maybe get this info, or remove it from grids
 					transporteur100: this.carrierObj?.groupName,
-					market: this.isB2C ? "BTC" : "BTB",
+					market: this.market,
 					integration: this.isInteg ? "Oui" : "Non"
 				};
 			}
@@ -184,13 +191,25 @@
 				"hideCarrierOKAbove", "hideFinalCarrOKAbove",
 				"hideAmountOKAbove", "hideFinalAmntOKAbove"
 			],
+			data(){
+				return {
+					highlighted: false
+				};
+			},
 			computed: {
 				// following a corporate habit
-				rowData_shortInvoice(){ return AcadiaX3.shortInvoiceNumber(this.rowData.invoice)}
-				,
+				rowData_shortInvoice(){ return AcadiaX3.shortInvoiceNumber(this.rowData.invoice)},
 				// mitigates 0.001 "dummy weight" in X3 (mandatory field there ;-)
-				rowData_truncatedWeight(){return Math.floor(this.rowData.weight * 100) / 100;}
-				,
+				rowData_truncatedWeight(){return Math.floor(this.rowData.weight * 100) / 100;},
+
+				rowData_customerShipPreferences(){
+					if (this.rowData.customer?.shipPreferences && this.rowData.customer.shipPreferences.length > 0){
+						return this.rowData.customer.shipPreferences[0];
+					} else {
+						return null;
+					}
+				},
+
 				rowData_carrierObj() {
 					return this.rowData.userInputs.carrier_override
 					  ?? this.reflist_carriers.get(this.rowData.carrier);
@@ -222,7 +241,7 @@
 						this.rowData["country"],
 						this.rowData["zip"],
 						this.rowData_carrierObj,
-						this.rowDataCached_final_b2c,
+						CustomerFunc.assessMarket(this.rowDataCached_final_b2c, this.rowData.customer, this.rowData_customerShipPreferences),
 						this.rowDataCached_nonstdPack,
 						this.rowData_carrierObj.name == "INTEGRATION"
 					);
@@ -262,24 +281,19 @@
 						  LEVEL_OK, "OK");
 					}
 
-					let customerShipPreferences;
-					if (this.rowData?.customer?.shipPreferences && this.rowData.customer.shipPreferences.length > 0){
-						customerShipPreferences = this.rowData.customer.shipPreferences[0];
-					}
-
-					if (customerShipPreferences){
-						if (customerShipPreferences.overrideCarriers?.includes(selectedCarrier.name)){
+					if (this.rowData_customerShipPreferences){
+						if (this.rowData_customerShipPreferences.overrideCarriers?.includes(selectedCarrier.name)){
 							return new Assessment("Le transport choisi \"" + selectedCarrier.name + "\" est un transport exclusif de ce client.",
 							  LEVEL_WARN, "OK Client");
 						}
 
-						if (selectedCarrier.tags.some(t => customerShipPreferences.carrierTagsWhitelist?.includes(t))) {
+						if (selectedCarrier.tags.some(t => this.rowData_customerShipPreferences.carrierTagsWhitelist?.includes(t))) {
 							return new Assessment("Le transport choisi \"" + selectedCarrier.name + "\" a été whitelisté par ce client.",
 							  LEVEL_WARN, "Préf. Client");
 						}
 
 						let recommendedObj = [...this.reflist_carriers.values()].filter(c => recommended.includes(c.groupName));
-						if (recommendedObj.length > 0 && recommendedObj.every(c => c.tags.some(t => customerShipPreferences?.carrierTagsBlacklist.includes(t)))){
+						if (recommendedObj.length > 0 && recommendedObj.every(c => c.tags.some(t => this.rowData_customerShipPreferences?.carrierTagsBlacklist.includes(t)))){
 							return new Assessment("Tous les transports recommandés ont été blacklistés par ce client : " + this.priceGridFlatResult_carrier,
 							  LEVEL_WARN, "Refus Client");
 						}
@@ -309,14 +323,8 @@
 						  LEVEL_OK, 0.0);
 					}
 
-					let customerShipPreferences;
-					if (this.rowData.customer?.shipPreferences && this.rowData.customer.shipPreferences.length > 0){
-						customerShipPreferences = this.rowData.customer.shipPreferences[0];
-					}
-
-
 					if (this.rowData.customer) {
-						let zeroFee =  CustomerFunc.assessZeroFee(this.rowDataCached_final_b2c, this.rowData.customer, customerShipPreferences, this.rowData.customer.aggShippingRevenues, this.reflist_carriers);
+						let zeroFee =  CustomerFunc.assessZeroFee(this.rowDataCached_final_b2c, this.rowData.customer, this.rowData_customerShipPreferences, this.rowData.customer.aggShippingRevenues, this.reflist_carriers);
 						if (zeroFee) {
 							return new Assessment("Client Franco de port - Raisons: " + zeroFee,
 							  LEVEL_OK, 0.0);
@@ -325,12 +333,12 @@
 
 
 					let alternatePriceGridResult;
-					if (customerShipPreferences?.overridePriceGrid){
-						let altSystem = this.otherPricingSystems.get(customerShipPreferences.overridePriceGrid.name);
+					if (this.rowData_customerShipPreferences?.overridePriceGrid){
+						let altSystem = this.otherPricingSystems.get(this.rowData_customerShipPreferences.overridePriceGrid.name);
 						try {
 							alternatePriceGridResult = altSystem.applyGrid("Toutes livraisons", this.pricedObject);
 						} catch (err) {
-							alert_dialog("Erreur Grille Tarifaire " + customerShipPreferences.overridePriceGrid.name,
+							alert_dialog("Erreur Grille Tarifaire " + this.rowData_customerShipPreferences.overridePriceGrid.name,
 							 "Une erreur s'est produite à l'application de la grille personnalisée du client "
 							 + "\"" + this.rowData.customerLabel + "\" ["+ this.rowData.customerRef + "] : " + err.message);
 						}
@@ -338,9 +346,9 @@
 
 					// customer B2C tag -> override PriceSystem computed value
 					let cust_b2cAmount_override = null;
-					if (this.rowDataCached_final_b2c && customerShipPreferences?.tags) {
+					if (this.rowDataCached_final_b2c && this.rowData_customerShipPreferences?.tags) {
 						const B2C_tag_regex = /^B2C\s*:\s*(\d+[,\.]?\d*).*$/;
-						for (let tag of customerShipPreferences.tags){
+						for (let tag of this.rowData_customerShipPreferences.tags){
 							let match = B2C_tag_regex.exec(tag);
 							if (match) {
 								cust_b2cAmount_override = Number.parseFloat(match[1].replace(",", "."));
@@ -356,14 +364,17 @@
 
 					let baseMessage = "";
 					if (alternatePriceGridResult) {
-						baseMessage += `Grille tarifaire personnalisée : "\${customerShipPreferences.overridePriceGrid.name}"`;
+						baseMessage += ` Grille tarifaire personnalisée : "\${this.rowData_customerShipPreferences.overridePriceGrid.name}"`;
+					}
+					if (this.pricedObject.market == "B2C_as_B2B"){
+						baseMessage += ` (+ option "B2C sur grille BTB")`;
 					}
 					if (cust_b2cAmount_override !== null){
 						baseFlatResult["B2C"] = cust_b2cAmount_override;
-						baseMessage += ` (avec supplém. B2C spécial du client à \${cust_b2cAmount_override})`;
+						baseMessage += ` (+ option "supplém. B2C à \${cust_b2cAmount_override}")`;
 					}
 
-					let baseFlatResult_total = Math.floor(100 * baseFlatResult.total()) / 100;
+					let baseFlatResult_total = Math.round(100 * baseFlatResult.total()) / 100;
 					let margin = Math.floor(100 * (this.rowData_overridden_price - baseFlatResult_total)) / 100;
 					return new Assessment(baseMessage,
 					  margin === 0 ? LEVEL_OK : (margin > 0 ? LEVEL_WARN : LEVEL_BAD),
@@ -533,6 +544,7 @@
 				},
 
 				activateCustomer(customerRef){
+					customerRef = encodeURIComponent(customerRef);
 					axios_backend.put(`customers/\${customerRef}/activate`)
 					.then(response => {
 						alert_dialog(`Client \"\${customerRef}\" réactivé`, "Pensez à rafraîchir la page !");
@@ -551,7 +563,8 @@
 		<tr v-if="assessCarrierOK.level <= hideCarrierOKAbove
 		       && assessFinalCarrOK_level <= hideFinalCarrOKAbove
 		       && assessAmountOK.level <= hideAmountOKAbove
-		       && assessFinalAmntOK_level <= hideFinalAmntOKAbove" >
+		       && assessFinalAmntOK_level <= hideFinalAmntOKAbove"
+		 @click="highlighted = !highlighted" :class="{'highlighted':highlighted}">
 			<td class="position-sticky">
 				<div>{{ rowData_shortInvoice }}</div>
 			</td>
@@ -571,7 +584,8 @@
 				</div>
 			</td>
 			<td class="cust lbl">
-				<div :title="rowData.customerLabel" class="text-truncate">
+				<div :title="rowData.customerLabel" class="text-truncate"
+				  @dblclick="$emit('filter-by-customer-label', rowData.customerLabel)">
 					{{ rowData.customerLabel }}
 				</div>
 			</td>
@@ -668,11 +682,13 @@
 				</div>
 			</td>
 
+<td>
+	<div :title="rowData_truncatedWeight" >{{ rowData.weight }}</div>
+</td>
+
 			<td class="price computed">
 				<div :title="'Prix originel dans X3 : ' + rowData.price">{{ rowData_overridden_price }}</div>
 			</td>
-
-
 			<td class="price computed">
 				<div :title="assessAmountOK.msg" :class="amountOKclass">
 					{{ assessAmountOK.cellValue }}
@@ -710,18 +726,22 @@
 					hideFinalCarrOKAbove: LEVEL_OK,
 					hideAmountOKAbove: LEVEL_OK,
 					hideFinalAmntOKAbove: LEVEL_OK,
+					filterCustomerLabel: "",
+					quick_and_dirty : null
 				};
 			},
 			watch:{
 				date:{
 					immediate: true,
 					handler(v){
+						this.$emit("rowCount", null);
 						if (!v) return; // fail silently for empty dates
 
 						let resource_uri = "transport-sales?start-date="+ v;
 						axios_backend.get(resource_uri)
 						.then(response => {
 							this.dataList = response.data;
+							this.$emit("rowCount", this.dataList.length);
 
 							for (let row of this.dataList){
 								// prepare user inputs
@@ -754,6 +774,18 @@
 							showAxiosErrorDialog(error);
 						});
 					}
+				},
+
+				//TODO NAM Q&D
+				filterCustomerLabel(){
+					if (this.filterCustomerLabel){
+						this.quick_and_dirty = this.dataList;
+						this.dataList = this.dataList.filter(row => row.customerLabel == this.filterCustomerLabel);
+					} else {
+						if (this.quick_and_dirty){
+							this.dataList = this.quick_and_dirty;
+						}
+					}
 				}
 			},
 			components:{
@@ -780,6 +812,7 @@
 					this["hideAmountOKAbove"] =
 					this["hideFinalAmntOKAbove"] = LEVEL_OK;
 
+					this.filterCustomerLabel = null;
 				},
 				cycleFilter(name){
 					let attributeName = "hide" + name +"Above";
@@ -788,6 +821,11 @@
 					else
 						this[attributeName] --;
 				},
+
+				//TODO NAM Q&D
+				filterByCustomerLabel(name){
+					this.filterCustomerLabel = name;
+				}
 			},
 			mounted(){
 				const tooltipTriggerList = this.$refs.rootElement.querySelectorAll('[data-bs-toggle="tooltip"]');
@@ -856,7 +894,7 @@
 					<th class="price" data-bs-toggle="tooltip" title="Diverses options (voir Article X3 dans la bulle d'aide)">
 						<div>Opt.</div>
 					</th>
-
+<th title="reprise du poids">Nam</th><%-- TODO NAM Q&D --%>
 					<th class="price computed" data-bs-toggle="tooltip" title="Montant total des frais de port payés, selon X3">
 						<div>Total</div>
 					</th>
@@ -875,6 +913,7 @@
 				<grid-row v-for="rowData in dataList" :key="rowData.id" :rowData="rowData"
 				  :hideCarrierOKAbove="hideCarrierOKAbove" :hideFinalCarrOKAbove="hideFinalCarrOKAbove"
 				  :hideAmountOKAbove="hideAmountOKAbove"   :hideFinalAmntOKAbove="hideFinalAmntOKAbove"
+				  @filter-by-customer-label="filterByCustomerLabel"
 				></grid-row>
 				</TransitionGroup>
 			</tbody>
@@ -940,6 +979,8 @@
 			data(){
 				return {
 					ctrlDate: this.init_ctrlDate(),
+					dataRowCount : null,
+
 					pricingSystem: new PricingSystem(),
 					otherPricingSystems: new Map(),
 					reflist_carriers: new Map(),
@@ -960,6 +1001,9 @@
 				},
 				clearGridFilters(){
 					this.$refs.gridRoot.clearFilters();
+				},
+				dataRowCountChange(rc){
+					this.dataRowCount = rc;
 				}
 			},
 			computed:{

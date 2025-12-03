@@ -9,18 +9,18 @@ var CustomerFunc = {
 /**
  * Filter a list of AggShippingRevenue, to find the "monthly" product (= "Forfait mensuel (B2B)")
  * @param arr_aggShippingRevenue - (optional) *applicable* array of objs, with product among "MONTHLY" and QUOTE_MONTHLY" at least
- * @returns the "best" applicable one 
+ * @returns the "best" applicable one
  */
 getMonthlyOne : function(arr_aggShippingRevenue){
 	let result = null;
-	
+
 	if (arr_aggShippingRevenue && arr_aggShippingRevenue.length > 0) {
 		loopAggs:
 		for (let aggRev of arr_aggShippingRevenue) {
 			switch(aggRev.product){
 			  case "QUOTE_MONTHLY" :
 				if (!result) result = aggRev;
-				break; 
+				break;
 			  case "MONTHLY" :
 				result = aggRev;
 				break loopAggs; // can't find better anyway
@@ -47,7 +47,6 @@ assessZeroFee: function(isB2C, customer, shipPreferences, arr_aggShippingRevenue
 		reasons.push(`Client "Grand Compte"`);
 	}
 
-
 	if (!isB2C && shipPreferences?.tags && shipPreferences.tags.includes("B2B: Franco")){
 		reasons.push("Client déclaré \"Franco de port B2B\" sur la période.");
 	}
@@ -62,7 +61,7 @@ assessZeroFee: function(isB2C, customer, shipPreferences, arr_aggShippingRevenue
 		}
 	}
 
-	
+
 	let monthlyAgg = CustomerFunc.getMonthlyOne(arr_aggShippingRevenue);
 	if (!isB2C && monthlyAgg) {
 		switch(monthlyAgg.product){
@@ -74,6 +73,20 @@ assessZeroFee: function(isB2C, customer, shipPreferences, arr_aggShippingRevenue
 	}
 
 	return (reasons.length > 0) ? reasons : null;
-}
+},
+
+assessMarket: function(isB2C, customer, shipPreferences){
+	if (isB2C){
+		if (shipPreferences?.tags.includes("B2C: tarif B2B")){
+			return "B2C_as_B2B";
+		} else {
+			return "B2C";
+		}
+	} else {
+		return "B2B";
+	}
+},
+
+
 
 };

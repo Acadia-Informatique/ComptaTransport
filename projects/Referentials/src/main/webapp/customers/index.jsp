@@ -14,7 +14,7 @@
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityAttributeComponents.jspf" %>
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityTextTagsComponents.jspf" %>
 	<%@ include file="/WEB-INF/includes/header-inc/vue-datepickers.jspf" %>
-	
+
 	<script src="${libsUrl}/customer.js"></script>
 
 	<style>
@@ -192,7 +192,7 @@
 						</td>
 					</template>
 					<template v-else>
-						<td colspan="6"><div><button class="btn btn-sm btn-primary" @click="initApplicablePref(editingCustomer)">Ajouter préférences spécifiques</button></div></td>
+						<td colspan="7"><div><button class="btn btn-sm btn-primary" @click="initApplicablePref(editingCustomer)">Ajouter préférences spécifiques</button></div></td>
 					</template>
 					<td>
 						<div>
@@ -242,7 +242,7 @@
 						</div>
 					</td>
 				</template>
-				<td> 
+				<td>
 					<div v-if="monthlyAggShippingRevenue(customer)"
 					  :class="monthlyAggShippingRevenue(customer)?.product=='MONTHLY' ? 'text-bg-success' : 'text-bg-warning'">
 						{{ monthlyAggShippingRevenue(customer)?.amount }}
@@ -360,12 +360,12 @@
 				monthlyAggShippingRevenue(customer){
 					return CustomerFunc.getMonthlyOne(this.aggShippingRevenues.get(customer.id));
 				},
-				
+
 				assessZeroFee(customer){
 					return CustomerFunc.assessZeroFee(false, customer, customer["#currPref"], this.aggShippingRevenues.get(customer.id), this.selectableCarriers);
 				},
-				
-				
+
+
 
 				isEditingRow(entity){
 					return entity["#key"] == (this.editingCustomer ? this.editingCustomer["#key"] : null);
@@ -519,7 +519,7 @@
 				CarrierTextTags.initSharedTags(this.sharedCarrierTextTags);
 
 				// cf. controls/revenue.jsp for how these tags are used:
-				this.sharedShipPreferencesTags["text-bg-warning"] = ["B2B: Franco"];
+				this.sharedShipPreferencesTags["text-bg-warning"] = ["B2B: Franco", "B2C: tarif B2B"];
 				this.sharedShipPreferencesTags["text-bg-primary"] = ["B2C: xxx €"]; //cf. B2C_tag_regex
 			},
 			provide(){
