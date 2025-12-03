@@ -277,6 +277,18 @@
 					  : [];
 
 					if (recommended.includes(selectedCarrier.groupName)){
+						let overrides = [];
+						if (this.rowData.userInputs.nonstdPack_override != null)
+							overrides.push("HN");
+						if (this.rowData.userInputs.b2c_override != null)
+							overrides.push("B2C⚠️");
+						if (this.rowData.userInputs.carrier_override != null)
+							overrides.push("Transp. choisi⚠️");
+						if (overrides.length > 0){
+							return new Assessment("En tenant compte des modifications ("+ overrides +"), le transport choisi \"" + selectedCarrier.name + "\" devient conforme à la grille tarifaire Acadia",
+							  LEVEL_OK, "OK (ajust.)");
+						}
+
 						return new Assessment("Le transport choisi \"" + selectedCarrier.name + "\" est recommandé dans la grille tarifaire Acadia",
 						  LEVEL_OK, "OK");
 					}
