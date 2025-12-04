@@ -1469,7 +1469,7 @@
 				removeDimension(idx){
 					let removedDim = this.ui_state.currentGrid.dimensions[idx];
 					confirm_dialog("Dimension",`Êtes-vous sûr de vouloir supprimer la dimension "\${removedDim.name}" ?
-									(Vous perdrez alors toutes les cellules correspondantes)`,{
+(Vous perdrez alors toutes les cellules correspondantes)`,{
 						label:'Continuer', class: 'btn-primary', autofocus:true,
 						handler : ()=>{
 							this.ui_state.currentGrid.removeDimension(idx);
