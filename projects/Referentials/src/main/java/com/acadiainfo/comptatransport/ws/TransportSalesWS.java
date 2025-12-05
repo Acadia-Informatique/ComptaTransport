@@ -3,6 +3,8 @@ package com.acadiainfo.comptatransport.ws;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
@@ -22,6 +24,7 @@ import jakarta.persistence.Query;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
@@ -189,6 +192,110 @@ public class TransportSalesWS {
 			return ApplicationConfig.response(exc, servReq, InputControlRevenue.class);
 		}
 	}
+
+
+
+	/**
+	 * Make even bigger TransportSalesHeader, grouping even more rows of ImportTransportVendu.
+	 *
+	 * Usually each consist in one Invoice/Order, but some sales are made of logically related
+	 * orders, even across several invoices, even across several days (they have to be from the
+	 * same Customer, though).
+	 *
+	 */
+	@POST
+	@Path("/*/group")
+	public Response groupDocRef(@QueryParam("invoice") Set<String> docReferences) {
+		// define a common "doc_reference" for the group
+		if (docReferences.size() < 2) {
+			return WSUtils.response(Status.BAD_REQUEST, servReq,
+			    "Il faut au moins 2 factures distinctes (query param \"invoice\")");
+		}
+		String groupReference;
+		Optional<String> oGroupReference = docReferences.stream()
+		  .filter(ref -> ref.startsWith(TransportSalesHeader.GROUPREF_PREFIX))
+		  .sorted().findFirst();
+		if (oGroupReference.isPresent()) {
+			groupReference = oGroupReference.get(); // keeping existing group name to preserve user inputs
+		} else {
+			groupReference = TransportSalesHeader.GROUPREF_PREFIX
+			    + new java.util.TreeSet<String>(docReferences).getLast();
+			// 1st, last, by date order ?...business decision ;-)
+		}
+
+		// batch change "doc_reference" to group name.
+		int updateCount = 0; // not necessarily docReferences.size(), if you group... existing groups !
+		for (String docRef : docReferences) {
+			Query updQuery = em.createNamedQuery("ImportTransportVendu.groupTo");
+			updQuery.setParameter("groupDocReference", groupReference);
+			updQuery.setParameter("docReference", docRef);
+			updateCount += updQuery.executeUpdate();
+		}
+
+		// add new comment, if not already exists.
+		Query query = em.createQuery("SELECT DISTINCT imp.origDocReference FROM ImportTransportVendu imp WHERE imp.docReference = :docReference");
+		query.setParameter("docReference", groupReference);
+		@SuppressWarnings("unchecked")
+		List<String> originalDocReferences = query.getResultList();
+
+		Query inputQuery = em.createQuery("SELECT i FROM InputControlRevenue i WHERE i.docReference = :docReference");
+		inputQuery.setParameter("docReference", groupReference);
+
+		try {
+			InputControlRevenue input = (InputControlRevenue) inputQuery.getSingleResult();
+			String comment = input.getAmountOK_comment(); // usually where grouping is signaled by users...
+			if (comment == null || comment.trim().equals("") || comment.trim().equals("???")) {
+				input.setAmountOK_comment("(" + originalDocReferences.size() + " factures groupées)");
+			}
+		} catch (jakarta.persistence.NoResultException exc) {
+			InputControlRevenue input = new InputControlRevenue();
+			input.setDocReference(groupReference);
+			input.setAmountOK_comment("(" + originalDocReferences.size() + " factures groupées)");
+			em.persist(input);
+		}
+		em.flush();
+
+		return Response.ok(updateCount + " modifiées pour grouper dans : " + groupReference).build();
+	}
+
+	@POST
+	@Path("/*/ungroup")
+	public Response ungroupDocRef(@QueryParam("invoice") String docReference) {
+		if (docReference == null || docReference.trim().equals("")) {
+			return WSUtils.response(Status.BAD_REQUEST, servReq,
+			    "Le numéro de facture du groupe doit être fourni (query param \"invoice\")");
+		}
+
+		// batch change "doc_reference" back to their original values.
+		Query updQuery = em.createNamedQuery("ImportTransportVendu.ungroup");
+		updQuery.setParameter("groupDocReference", docReference);
+		int updateCount = updQuery.executeUpdate();
+
+		return Response.ok(updateCount + " lignes dégroupées").build();
+	}
+//
+//
+//
+//		try {
+//
+//		}
+//
+//
+//			// purge previous
+
+//
+//		}
+//}
+
+//@NamedQuery(name = , query = """
+//	UPDATE ImportTransportVendu imp
+//	SET imp.docReference = :groupDocReference
+//	where imp.docReference = :docReference
+//""")
+//@NamedQuery(name = "ImportTransportVendu.ungroup", query = """
+//
+//
+//		}
 
 //
 //	@POST

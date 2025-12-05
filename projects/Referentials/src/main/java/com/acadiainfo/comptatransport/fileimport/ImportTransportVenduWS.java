@@ -130,6 +130,7 @@ public class ImportTransportVenduWS {
 					entity.setCodeSociete(row.getCellAsString(H2_SOC_CODE).orElse(null));
 					entity.setOrderReference(row.getCellAsString(H2_NUM_CMD).orElse(null));
 					entity.setDocReference(row.getCellAsString(H2_NUM_DOC).orElse(null));
+					entity.setOrigDocReference(entity.getDocReference()); // this setter's only call, as a pristine val.
 					entity.setCustomerErpReference(row.getCellAsString(H2_VENDU_A).orElse(null));
 					entity.setCustomerLabel(row.getCellAsString(H2_NOM_VENDU_A).orElse(null));
 					entity.setProductDesc(row.getCellAsString(H2_DESCRIPTION_1).orElse(null));

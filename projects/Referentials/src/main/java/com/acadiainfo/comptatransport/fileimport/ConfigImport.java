@@ -20,10 +20,16 @@ public class ConfigImport implements Auditable {
 		table, entity, custom
 	};
 
+	public enum ColumnDatatype {
+		STRING, NUMBER, DATE, BOOLEAN // TODO extend with specific parsers / transformers
+	};
+
+
 	public class ConfigColumn {
 		public String propertyName; // its semantics is related to;
-		public int colIndex;
-		public String colLabel; // for validity control
+		public String datatype; // standard type or specific parser
+		public int colIndex; // usually 0+ ; if -1 then colLabel will be interpreted as an expression (TBD)
+		public String colLabel; // for validity control ; except if colIndex = -1
 	}
 
 	/** PK, Value to be set in entity Import [header] */
