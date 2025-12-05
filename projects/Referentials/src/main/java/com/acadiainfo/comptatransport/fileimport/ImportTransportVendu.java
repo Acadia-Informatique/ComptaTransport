@@ -22,6 +22,7 @@ import jakarta.persistence.Table;
     where imp.docReference = :docReference
       and imp.importHeader <> :importHeader
     """)
+
 @NamedNativeQuery(name = "ImportTransportVendu_as_new_Customers", query = """
     select
         itv.customer_erp_reference as erp_reference,
@@ -35,6 +36,17 @@ import jakarta.persistence.Table;
       and itv.import_id = ?1
     group by itv.customer_erp_reference
       """, resultClass = Customer.class)
+
+@NamedQuery(name = "ImportTransportVendu.groupTo", query = """
+	UPDATE ImportTransportVendu imp
+	SET imp.docReference = :groupDocReference
+	where imp.docReference = :docReference
+""")
+@NamedQuery(name = "ImportTransportVendu.ungroup", query = """
+	UPDATE ImportTransportVendu imp
+	SET imp.docReference = imp.origDocReference
+	where imp.docReference = :groupDocReference
+""")
 
 @Entity
 @Table(schema = "ComptaTransport", name = "I_TRANSPORT_VENDU")
@@ -57,6 +69,9 @@ public class ImportTransportVendu {
 
 	@Column(name = "doc_reference")
 	private String docReference;
+
+	@Column(name = "orig_doc_reference")
+	private String origDocReference;
 
 	@Column(name = "customer_erp_reference")
 	private String customerErpReference;
@@ -122,6 +137,14 @@ public class ImportTransportVendu {
 
 	public void setDocReference(String docReference) {
 		this.docReference = docReference;
+	}
+
+	public String getOrigDocReference() {
+		return origDocReference;
+	}
+
+	public void setOrigDocReference(String origDocReference) {
+		this.origDocReference = origDocReference;
 	}
 
 	public String getCustomerErpReference() {

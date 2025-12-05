@@ -35,6 +35,15 @@
 			position: relative; /* for signal icons overlay */
 		}
 
+		table#revenue-control-grid td.erp-ref {
+			position : sticky;
+			left: 0;
+			border: dotted 1px black;
+			z-index: 500;
+		}
+		table#revenue-control-grid td > div.multiline {
+			white-space:pre-wrap;
+		}
 		table#revenue-control-grid th.carrier,
 		table#revenue-control-grid td.carrier {
 			background-color: rgb(230, 255, 255);
@@ -197,8 +206,20 @@
 				};
 			},
 			computed: {
-				// following a corporate habit
-				rowData_shortInvoice(){ return AcadiaX3.shortInvoiceNumber(this.rowData.invoice)},
+				// shortened following a corporate habit
+				rowData_invoice(){
+					if (this.rowData.isGroup){
+						return this.rowData.invoice_orig.split(";")
+						  .map(s => AcadiaX3.shortInvoiceNumber(s))
+						  .join("\n");
+					} else {
+						return AcadiaX3.shortInvoiceNumber(this.rowData.invoice);
+					}
+				},
+				rowData_order(){
+					return this.rowData.order.replaceAll(";","\n");
+				},
+
 				// mitigates 0.001 "dummy weight" in X3 (mandatory field there ;-)
 				rowData_truncatedWeight(){return Math.floor(this.rowData.weight * 100) / 100;},
 
@@ -577,11 +598,11 @@
 		       && assessAmountOK.level <= hideAmountOKAbove
 		       && assessFinalAmntOK_level <= hideFinalAmntOKAbove"
 		 @click="highlighted = !highlighted" :class="{'highlighted':highlighted}">
-			<td class="position-sticky">
-				<div>{{ rowData_shortInvoice }}</div>
+			<td class="erp-ref">
+				<div :title="rowData.invoice_orig??''" class="multiline" >{{ rowData_invoice }}</div>
 			</td>
 			<td>
-				<div>{{ rowData.order }}</div>
+				<div :title="rowData.order" class="multiline">{{ rowData_order }}</div>
 			</td>
 			<td class="cust">
 				<div v-if="rowData.customer">
@@ -770,7 +791,7 @@
 									if (row[entryKey]){
 										row[entryKey] = {
 											"price": row[entryKey].price + det.price,
-											"desc": row[entryKey].product + ";" + det.product
+											"desc": row[entryKey].desc + ";" + det.product
 										};
 									} else {
 										row[entryKey] = {

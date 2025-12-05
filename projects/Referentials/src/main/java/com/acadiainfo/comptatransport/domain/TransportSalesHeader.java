@@ -29,6 +29,7 @@ import jakarta.persistence.OneToOne;
     select
         max(vto.id) as id,
     	vto.doc_reference,
+      	group_concat(orig_doc_reference ORDER BY orig_doc_reference SEPARATOR ';' ) as orig_doc_reference,
         group_concat(vto.order_reference ORDER BY vto.order_reference SEPARATOR ';' ) as order_reference,
         max(CUSTOMER.id) as customer_id,
         max(vto.customer_erp_reference) as customer_erp_reference,
@@ -44,6 +45,7 @@ import jakarta.persistence.OneToOne;
     	select
     	max(id) as id,
     	doc_reference, order_reference,
+      	max(orig_doc_reference) as orig_doc_reference,
     	max(customer_erp_reference) as customer_erp_reference,
     	max(customer_label) as customer_label,
     	max(carrier_name) as carrier_name,
@@ -72,6 +74,12 @@ import jakarta.persistence.OneToOne;
  */
 @Entity
 public class TransportSalesHeader {
+
+	/**
+	 * Marks as "Group" the entities where "doc_reference" (= invoice) starts with this.
+	 */
+	public static final String GROUPREF_PREFIX = "{";
+
 	/** Virtual PK, "view" entity is never persisted as is.
 	 * Using it as identifier allow us to postpone the choice between instance being an Order or an Invoice... indefinitely. */
 	@Id
@@ -85,6 +93,10 @@ public class TransportSalesHeader {
 	@JsonbProperty("invoice")
 	@Column(name = "doc_reference", insertable = false, updatable = false)
 	private String docReference;
+
+	@JsonbProperty("invoice_orig")
+	@Column(name = "orig_doc_reference", insertable = false, updatable = false)
+	private String origDocReference;
 
 	/** Note : since CUSTOMER table contains only those with an "interesting" profile regarding Transport,
 	 * this relationship is mostly empty. */
@@ -166,6 +178,24 @@ public class TransportSalesHeader {
 
 	public void setDocReference(String docReference) {
 		this.docReference = docReference;
+	}
+
+	/** only serialize if useful */
+	public String getOrigDocReference() {
+		return !this.docReference.equals(this.origDocReference) ? this.origDocReference : null;
+	}
+
+	public void setOrigDocReference(String origDocReference) {
+		this.origDocReference = origDocReference;
+	}
+
+	/**
+	 * BTW, correlated with non-null getOrigDocReference.
+	 * @return true or null (for lighter JSON payload)
+	 */
+	@JsonbProperty("isGroup")
+	public Boolean isGroup() {
+		return (this.docReference.startsWith(GROUPREF_PREFIX)) ? Boolean.TRUE : null;
 	}
 
 	public Customer getCustomer() {
