@@ -5,10 +5,9 @@ CREATE TABLE `I_CONFIG_IMPORT` (
   `type` varchar(32) NOT NULL,
 
   `src_path` varchar(256) DEFAULT NULL,
-  `src_col_labels_rowid` int DEFAULT NULL,
-  `src_data_rowid` int DEFAULT NULL,
-  `src_col_condition` varchar(32) DEFAULT NULL,
-  
+  `src_col_labels_rowid` int DEFAULT NULL COMMENT 'Numéro de ligne des entêtes de colonnes (commence à 1)',
+  `src_data_rowid` int DEFAULT NULL COMMENT 'Numéro de ligne du début des données (commence à 1)',
+  `src_property_condition` varchar(32) DEFAULT NULL COMMENT 'Nom de propriété (tel que défini dans dst_mapping) dont la présence marque les lignes valides',  
   `dst_path` varchar(256) DEFAULT NULL,
   `dst_mapping` varchar(4096) DEFAULT NULL,
   
@@ -20,26 +19,19 @@ CREATE TABLE `I_CONFIG_IMPORT` (
 
 
 -- I_ARTICLE_TRANSPORT_ACHETE definition
-
+-- TODO build higher grouping on it, like "Carrier company", and/or relate to CARRIER ?... 
 CREATE TABLE `I_ARTICLE_TRANSPORT_ACHETE` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-
-	`carrier_name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Nom du transport associé',
 	
-	`company_name` varchar(64) NOT NULL DEFAULT '' COMMENT 'Nom du l''entreprise, libre',
-	`item_code` varchar(64) NOT NULL DEFAULT '' COMMENT 'Code produit, libre (alpha et/ou numérique)',
+	`article_path` varchar(256) NOT NULL DEFAULT '' COMMENT 'Nom canonique du produit de transport',
 
 	`pricegrid_path` varchar(128) NOT NULL DEFAULT '' COMMENT 'chemin de grille à appliquer, de la forme : [grille tarifaire]/[onglet]',
-	
-	
 	
 	`description` varchar(256) DEFAULT NULL COMMENT 'Commentaire libre du produit',
 
   PRIMARY KEY (`id`),
-  KEY `I_ARTICLE_TRANSPORT_ACHETE_CARRIER_FK` (`carrier_name`),
-  UNIQUE KEY `I_ARTICLE_TRANSPORT_UNIQUE` (`company_name`, `item_code`),
-  CONSTRAINT `I_ARTICLE_TRANSPORT_ACHETE_CARRIER_FK` FOREIGN KEY (`carrier_name`) REFERENCES `CARRIER` (`name`) 
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci  COMMENT='Table de référence, Mapping "Transporteur X3" - "Produits commerciaux des transporteurs"';
+  UNIQUE KEY `I_ARTICLE_TRANSPORT_UNIQUE` (`article_path`),
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci  COMMENT='Table de référence "Produits commerciaux des transporteurs"';
 
 
 
