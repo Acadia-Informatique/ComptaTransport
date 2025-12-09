@@ -38,8 +38,9 @@ public class ConfigImport implements Auditable {
 	@Column(name = "src_data_rowid")
 	public int src_dataRowid;
 
-	@Column(name = "src_property_condition")
-	public String src_property_condition;
+	/** zero-based column index tested for "valid rows" */
+	@Column(name = "src_col_condition")
+	public Integer src_col_condition;
 
 	/** TODO : NOT USED YET. Intended to be :  sort of URL, where "protocol" part corresponds to ... whatever */
 	@Column(name = "dst_path")

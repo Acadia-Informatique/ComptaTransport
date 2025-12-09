@@ -48,7 +48,6 @@ public class ImportTransportAcheteWS {
 	@Path("/{type}")
 	@Produces(value = MediaType.TEXT_PLAIN)
 	public String startBatch(@PathParam("type") String type) {
-		StringBuffer sb = new StringBuffer();
 		ConfigImport config = em.find(ConfigImport.class, type);
 		if (config == null) {
 			throw new IllegalArgumentException("No config with type=[" + type + "] found");
@@ -67,10 +66,10 @@ public class ImportTransportAcheteWS {
 			rowsProvider.walkRows(rowImporter::process);
 			em.flush();
 
-			importHeader.setRowCount(0);
+			importHeader.setRowCount(rowImporter.getImportedCount());
+			importHeader.setDateEnded(System.currentTimeMillis());
 
-			return sb.toString();
-			// return "rows imported : " + importHeader.getRowCount();
+			return "rows imported : " + importHeader.getRowCount();
 
 		} catch (Throwable exc) {
 			logger.log(java.util.logging.Level.SEVERE, "Error importing " + config.type, exc);

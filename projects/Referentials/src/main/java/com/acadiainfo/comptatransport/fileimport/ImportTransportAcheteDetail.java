@@ -26,8 +26,8 @@ public class ImportTransportAcheteDetail {
 	@JoinColumn(name = "tr_achete_id")
 	private ImportTransportAchete parent;
 
-	@Column(name = "ssarticle_name")
-	private String ssarticleName;
+	@Column(name = "subarticle_name")
+	private String subarticleName;
 
 	@Column(name = "amount")
 	private BigDecimal amount;
@@ -48,12 +48,12 @@ public class ImportTransportAcheteDetail {
 		this.parent = parent;
 	}
 
-	public String getSsarticleName() {
-		return ssarticleName;
+	public String getSubarticleName() {
+		return subarticleName;
 	}
 
-	public void setSsarticleName(String ssarticleName) {
-		this.ssarticleName = ssarticleName;
+	public void setSubarticleName(String subarticle_name) {
+		this.subarticleName = subarticle_name;
 	}
 
 	public BigDecimal getAmount() {
@@ -69,7 +69,7 @@ public class ImportTransportAcheteDetail {
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(ssarticleName);
+		return Objects.hash(subarticleName);
 	}
 
 	@Override
@@ -81,7 +81,7 @@ public class ImportTransportAcheteDetail {
 		if (getClass() != obj.getClass())
 			return false;
 		ImportTransportAcheteDetail other = (ImportTransportAcheteDetail) obj;
-		return Objects.equals(ssarticleName, other.ssarticleName);
+		return Objects.equals(subarticleName, other.subarticleName);
 	}
 
 }

@@ -1,20 +1,11 @@
 package com.acadiainfo.comptatransport.fileimport;
 
 import java.math.BigDecimal;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.regex.Matcher;
 
-import jakarta.persistence.Column;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 
 /**
  *
@@ -22,6 +13,8 @@ import jakarta.persistence.ManyToOne;
  * Quite Q&D... esp. the internal state.
  */
 public class RowImporter {
+
+	private int importedCount;
 
 	private EntityManager em;
 	private Import importHeader;
@@ -36,10 +29,12 @@ public class RowImporter {
 		this.em = em;
 		this.importHeader = importHeader;
 		this.refArticles = refArticles;
+
+		this.importedCount = 0;
 	}
 
-	private static final java.util.regex.Pattern SSARTICLE_PATTERN = java.util.regex.Pattern
-	    .compile("^SSARTICLE@(\\w+)$");
+	private static final java.util.regex.Pattern SUBARTICLE_PATTERN = java.util.regex.Pattern
+	    .compile("^SUBARTICLE@(\\w+)$");
 
 	public void process(Map<String, Object> rowData) {
 		ImportTransportAchete entity = new ImportTransportAchete();
@@ -72,16 +67,18 @@ public class RowImporter {
 		entity.setParcelCount(parcelCount == null ? null : parcelCount.intValue());
 
 		for (String key : rowData.keySet()) {
-			Matcher matcher = SSARTICLE_PATTERN.matcher(key);
+			Matcher matcher = SUBARTICLE_PATTERN.matcher(key);
 			if (matcher.matches()) {
 				String fragment = matcher.group(1);
 
-				String ssarticleName = (String) rowData.get(key);
+				String subarticleName = (String) rowData.get(key);
 				BigDecimal amount = (BigDecimal) rowData.get("AMOUNT@" + fragment);
+				if (amount.equals(BigDecimal.ZERO))
+					continue; // not inserting sub-article for zero amount
 
 				ImportTransportAcheteDetail detail = new ImportTransportAcheteDetail();
 				detail.setParent(entity);
-				detail.setSsarticleName(ssarticleName);
+				detail.setSubarticleName(subarticleName);
 				detail.setAmount(amount);
 
 				entity.getDetails().add(detail);
@@ -89,5 +86,11 @@ public class RowImporter {
 		}
 
 		this.em.persist(entity);
+		this.importedCount++;
 	}
+
+	public int getImportedCount() {
+		return importedCount;
+	}
+
 }

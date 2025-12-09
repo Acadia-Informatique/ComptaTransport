@@ -1,8 +1,10 @@
 package com.acadiainfo.comptatransport.fileimport;
 
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 import org.dhatim.fastexcel.reader.ReadableWorkbook;
@@ -29,19 +31,12 @@ public class ImportTransportVenduWS {
 	private static final Logger logger = Logger.getLogger(ImportTransportVenduWS.class.getName());
 
 	// TODO replace with import from email
-	public static final String IMPORT_FILE_PATH = "C:\\Users\\Robert.KWAN\\Documents\\ComptaTransport-input\\DAILY.xlsx";
 	public static final String IMPORT_TYPE = "Transport Vendu";
-
-	@Resource
-	private UserTransaction ut;
 
 	public static final long TRANSACTION_BATCH_SIZE = 20;
 
-	private static final int H1_SOCIETE = 0, H1_CLIENT = 3, H1_ARTICLE = 5, H1_TRANSPORTEUR = 6, H1_VENTES = 12,
-	    H1_VENTES_2 = 14;
-	private static final int H2_SOC_CODE = 0, H2_NUM_CMD = 1, H2_NUM_DOC = 2, H2_VENDU_A = 3, H2_NOM_VENDU_A = 4,
-	    H2_DESCRIPTION_1 = 5, H2_TRANSP_CODE = 6, H2_PAYS = 7, H2_ADR_FACTURATION = 8, H2_ADR_LIVRAISON = 9, H2_CP = 10,
-	    H2_DATE_COMPTA = 11, H2_SALESREP = 12, H2_POIDS = 13, H2_MONTANT = 14;
+	@Resource
+	private UserTransaction ut;
 
 	@PersistenceContext(unitName = "ComptaTransportPU")
 	private EntityManager em;
@@ -56,7 +51,6 @@ public class ImportTransportVenduWS {
 
 				return "rows imported : " + importHeader.getRowCount()
 				  + "\ncustomers created: " + customerCreated;
-
 			} catch (Exception e) {
 				ut.rollback();
 				throw e;
@@ -67,121 +61,85 @@ public class ImportTransportVenduWS {
 		}
 	}
 
-	public Import readExcel() throws Exception {
-		boolean validateHeader = true;
+	private Import readExcel() throws Exception {
+		ut.begin();
+		ConfigImport config = em.find(ConfigImport.class, IMPORT_TYPE);
+		if (config == null) {
+			throw new IllegalArgumentException("No config with type=[" + IMPORT_TYPE + "] found");
+		}
 
-		try (InputStream is = new java.io.FileInputStream(IMPORT_FILE_PATH);
-			ReadableWorkbook wb = new ReadableWorkbook(is)) {
-		    Sheet sheet = wb.getFirstSheet();
+		// 1) Create header
+		Import importHeader = new Import();
+		importHeader.setType(IMPORT_TYPE);
+		em.persist(importHeader);
+		em.flush();
+		ut.commit();
+		ut.begin();
 
-		    //1) Create header
-		    ut.begin();
-			Import importHeader = new Import();
-			importHeader.setType(IMPORT_TYPE);
-			em.persist(importHeader);
-			em.flush();
-			ut.commit();
+		// 2) iterate over rows
+		AtomicInteger rowCount = new AtomicInteger(0);
+		RowsProvider rowsProvider = new RowsProvider(config);
+		rowsProvider.walkRows(m -> {
+			ImportTransportVendu entity = new ImportTransportVendu();
 
-			ut.begin();
+			entity.setImportHeader(importHeader);
 
-			//2) iterate over rows
-		    java.util.List<Row> rows = sheet.read();
-		    Iterator<Row> rowsIterator = rows.iterator();
-			int iterationCount = -1, rowCount = 0;
-			while (rowsIterator.hasNext()) {
-		    	Row row = rowsIterator.next();
-				iterationCount++;
+			entity.setCodeSociete((String) m.get("SOC_CODE"));
+			entity.setOrderReference((String) m.get("NUM_CMD"));
+			entity.setDocReference((String) m.get("NUM_DOC"));
+			entity.setOrigDocReference(entity.getDocReference()); // this setter's only call, as a pristine val.
+			entity.setCustomerErpReference((String) m.get("VENDU_A"));
+			entity.setCustomerLabel((String) m.get("NOM_VENDU_A"));
+			entity.setProductDesc((String) m.get("DESCRIPTION_1"));
 
-		    	if (iterationCount == 0 && validateHeader) {//Note : row 0 is empty, so the lib already skips it
-				    if (!("Société".equals(row.getCell(H1_SOCIETE).asString())
-					&& "Client".equals(row.getCell(H1_CLIENT).asString())
-					&& "Article".equals(row.getCell(H1_ARTICLE).asString())
-					&& "Transporteur".equals(row.getCell(H1_TRANSPORTEUR).asString())
-					&& "Ventes".equals(row.getCell(H1_VENTES).asString())
-					&& "Ventes".equals(row.getCell(H1_VENTES_2).asString())))
-						throw new IllegalArgumentException("Row 2 is not the expected header : " + row);
-		    	} else if (iterationCount == 1 && validateHeader) {
-				    if (!("Code".equals(row.getCell(H2_SOC_CODE).asString())
-					&& "Numéro de commande".equals(row.getCell(H2_NUM_CMD).asString())
-					&& "N° Document".equals(row.getCell(H2_NUM_DOC).asString())
-					&& "Vendu-à".equals(row.getCell(H2_VENDU_A).asString())
-					&& "Nom Vendu-à".equals(row.getCell(H2_NOM_VENDU_A).asString())
-					&& "Description 1".equals(row.getCell(H2_DESCRIPTION_1).asString())
-					&& "Code".equals(row.getCell(H2_TRANSP_CODE).asString())
-					&& "Pays livraison".equals(row.getCell(H2_PAYS).asString())
-					&& "Adresse de Facture 0".equals(row.getCell(H2_ADR_FACTURATION).asString())
-					&& "Adresse de Livraison 0".equals(row.getCell(H2_ADR_LIVRAISON).asString())
-					&& "Code postal livraison".equals(row.getCell(H2_CP).asString())
-					&& "Date comptable".equals(row.getCell(H2_DATE_COMPTA).asString())
-					&& "Nom du représentant 1".equals(row.getCell(H2_SALESREP).asString())
-					&& "Cumul poids".equals(row.getCell(H2_POIDS).asString())
-					&& "Montant GL".equals(row.getCell(H2_MONTANT).asString())))
-						throw new IllegalArgumentException("Row 3 is not the expected header : " + row);
-		    	} else if ("".equals(row.getCellAsString(H2_SOC_CODE).orElse(null))
-		        	  && row.getCellAsNumber(H2_MONTANT).orElse(java.math.BigDecimal.ZERO).floatValue()>0) {
-	        		// - Grand total (final row)
-	        		//... ignore it
-	        	} else {
-	        		// - regular row
-					ImportTransportVendu entity = new ImportTransportVendu();
+			/* we don't store the street addresses anyway */
+			// String billing_addr = m.get("ADR_FACTURATION");
+			// String shipping_addr = m.get("ADR_LIVRAISON");
+			// entity.setB2c(!billing_addr.equals(shipping_addr)); heuristics not reliable.
+			entity.setB2c(false); // TODO find a better way to tell B2C orders from the others.
 
-					entity.setImportHeader(importHeader);
+			entity.setCarrierName((String) m.get("TRANSP_CODE"));
+			entity.setShipCountry((String) m.get("PAYS"));
+			entity.setShipZipcode((String) m.get("CP"));
 
-					entity.setCodeSociete(row.getCellAsString(H2_SOC_CODE).orElse(null));
-					entity.setOrderReference(row.getCellAsString(H2_NUM_CMD).orElse(null));
-					entity.setDocReference(row.getCellAsString(H2_NUM_DOC).orElse(null));
-					entity.setOrigDocReference(entity.getDocReference()); // this setter's only call, as a pristine val.
-					entity.setCustomerErpReference(row.getCellAsString(H2_VENDU_A).orElse(null));
-					entity.setCustomerLabel(row.getCellAsString(H2_NOM_VENDU_A).orElse(null));
-					entity.setProductDesc(row.getCellAsString(H2_DESCRIPTION_1).orElse(null));
+			entity.setDocDate((java.time.LocalDateTime) m.get("DATE_COMPTA"));
 
+			entity.setSalesrep((String) m.get("SALESREP"));
 
-					/* we don't store the street addresses anyway */
-					// String billing_addr = row.getCellAsString(H2_ADR_FACTURATION).orElse("");
-					// String shipping_addr = row.getCellAsString(H2_ADR_LIVRAISON).orElse("");
-					// entity.setB2c(!billing_addr.equals(shipping_addr)); heuristics not reliable.
-					entity.setB2c(false); // TODO find a better way to tell B2C orders from the others.
+			entity.setTotalWeight((BigDecimal) m.get("POIDS"));
 
-					entity.setCarrierName(row.getCellAsString(H2_TRANSP_CODE).orElse(null));
-					entity.setShipCountry(row.getCellAsString(H2_PAYS).orElse(null));
-					entity.setShipZipcode(row.getCellAsString(H2_CP).orElse(null));
+			entity.setTotalPrice((BigDecimal) m.get("MONTANT"));
 
-					entity.setDocDate(row.getCellAsDate(H2_DATE_COMPTA).orElse(null));
+			em.persist(entity);
 
-					entity.setSalesrep(row.getCellAsString(H2_SALESREP).orElse(null));
+			// purge previous
+			Query deleteDupesQuery = em.createNamedQuery("ImportTransportVendu.purgePrevious");
+			deleteDupesQuery.setParameter("docReference", entity.getDocReference());
+			deleteDupesQuery.setParameter("importHeader", importHeader);
+			deleteDupesQuery.executeUpdate(); // maybe record purged row count ?...
 
-					entity.setTotalWeight(row.getCellAsNumber(H2_POIDS).orElse(null));
+			if (rowCount.getAndIncrement() % TRANSACTION_BATCH_SIZE == 0) {
+				em.flush();
+				try {
+					ut.commit();
+					ut.begin(); // for next loop
+				} catch (Exception e) { // SecurityException, RollbackException, HeuristicMixedException,
+				                        // HeuristicRollbackException, SystemException, NotSupportedException
+					throw new RuntimeException(e);
+				}
+			}
+		});
 
-					entity.setTotalPrice(row.getCellAsNumber(H2_MONTANT).orElse(null));
+		// 3) close header
+		importHeader.setRowCount(rowCount.get());
+		importHeader.setDateEnded(System.currentTimeMillis());
+		em.merge(importHeader);
 
-					em.persist(entity);
-
-					// purge previous
-					Query deleteDupesQuery = em.createNamedQuery("ImportTransportVendu.purgePrevious");
-					deleteDupesQuery.setParameter("docReference", entity.getDocReference());
-					deleteDupesQuery.setParameter("importHeader", importHeader);
-					deleteDupesQuery.executeUpdate(); // maybe record purged row count ?...
-
-					rowCount++;
-					if (iterationCount % TRANSACTION_BATCH_SIZE == 0) {
-						em.flush();
-						ut.commit();
-						ut.begin(); // for next loop
-					}
-	        	}
-		    }
-
-		    //3) close header
-			importHeader.setRowCount(rowCount);
-			importHeader.setDateEnded(System.currentTimeMillis());
-			em.merge(importHeader);
-
-			em.flush();
-			ut.commit();
-			return importHeader;
-
-		} // end try with resources
+		em.flush();
+		ut.commit();
+		return importHeader;
 	}
+
 
 
 

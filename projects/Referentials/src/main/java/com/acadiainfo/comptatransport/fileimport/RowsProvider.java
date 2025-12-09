@@ -55,7 +55,6 @@ public class RowsProvider {
 	}
 
 	public void walkRows(Consumer<Map<String, Object>> callback) throws Exception {
-		logger.info("Start walk.");
 		try (InputStream is = this.open(); ReadableWorkbook wb = new ReadableWorkbook(is)) {
 			Sheet dataSheet;
 			if (this.excelSheet == null) {
@@ -87,6 +86,14 @@ public class RowsProvider {
 	private Map<String, Object> recycledMap = new java.util.HashMap<>(); // recycled as a flyw weight
 
 	private void processRow(Row row, Consumer<Map<String, Object>> callback) {
+		if (this.config.src_col_condition != null) {
+			String val_condition = row.getCellAsString(this.config.src_col_condition.intValue()).orElse(null);
+			if (val_condition == null || val_condition.equals("")) {
+				logger.fine("Row skipped because of empty src_col_condition");
+				return;
+			}
+		}
+
 		for (ConfigColumn columnConf : this.config.dst_mapping) {
 			Object colValue;
 
@@ -119,28 +126,19 @@ public class RowsProvider {
 					    throw new UnsupportedOperationException("Datatype not supported : " + columnConf.datatype);
 					};
 				} catch (org.dhatim.fastexcel.reader.ExcelReaderException exc) {
+
 					throw new UnsupportedOperationException(
-					    "Error reading column [propertyName=\"" + columnConf.propertyName + "\"]: " + exc.getMessage());
+					  "Error reading column [propertyName=\"" + columnConf.propertyName + "\"] at row #"
+					  + row.getRowNum() + ": " + exc.getMessage());
 				}
 			}
 			recycledMap.put(columnConf.propertyName, colValue);
 		}
 
-		if (this.config.src_property_condition != null
-		  && (recycledMap.get(this.config.src_property_condition) == null
-			 || recycledMap.get(this.config.src_property_condition).equals(""))) {
-			logger.fine("Row skipped because of empty " + this.config.src_property_condition);
-		} else {
-			callback.accept(recycledMap);
-		}
+		callback.accept(recycledMap);
 	}
 
 	private void validateColumnNames(Row row) {
-		int src_property_colIdx = -2; // = don't look
-		if (this.config.src_property_condition != null) {
-			src_property_colIdx = -1; // = not found yet
-		}
-
 		for (ConfigColumn columnConf : this.config.dst_mapping) {
 			if (columnConf.colIndex < 0) continue; // for e.g, -1 marks computed and constant values
 			int colIdx = columnConf.colIndex - 1; // fastexcel API uses zero-based index
@@ -149,23 +147,11 @@ public class RowsProvider {
 			String actualColName = (colIdx < row.getCellCount()) ? row.getCellAsString(colIdx).orElse("")
 			  : "";
 
-			if (src_property_colIdx == -1) {
-				if (columnConf.propertyName.equals(this.config.src_property_condition)) {
-					src_property_colIdx = columnConf.colIndex;
-				}
-			}
-
 			if (!expectedColName.equalsIgnoreCase(actualColName)) {
 				// equalsIgnoreCase() a bit more lenient that equals()...
 				throw new java.util.NoSuchElementException(
 				  "Expected column name : [" + expectedColName + "], got [" + actualColName + "] instead.");
 			}
-		}
-
-		if (src_property_colIdx == -1) {
-			throw new java.util.NoSuchElementException(
-			    "Config parameter \"src_property_condition\" doesn't correspond to a column mapping \"propertyName\" : "
-			        + this.config.src_property_condition);
 		}
 
 	}
@@ -176,38 +162,4 @@ public class RowsProvider {
 		LocalDate parsedDate = LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE);
 		return LocalDateTime.of(parsedDate, LocalTime.MIDNIGHT);
 	}
-
-//
-//	public Import readExcel(ConfigImport config) throws Exception {
-//		try (InputStream is = new java.io.FileInputStream(IMPORT_FILE_PATH);
-//			ReadableWorkbook wb = new ReadableWorkbook(is)) {
-//		    Sheet sheet = wb.getFirstSheet();
-//
-//		    //1) Create header
-//		    ut.begin();
-//			Import importHeader = new Import();
-//			importHeader.setType(IMPORT_TYPE);
-//			em.persist(importHeader);
-//			em.flush();
-//			ut.commit();
-//
-//			ut.begin();
-//
-//			//2) iterate over rows
-//		    java.util.List<Row> rows = sheet.read();
-//		    Iterator<Row> rows
-//
-//
-//		try {
-//			java.net.URI src_uri = new
-//		}
-//
-//		java.net.URISyntaxException
-//
-//		File srcPathFile = new File(config.src_path);
-//		logger.info(srcPathFile.getAbsolutePath());
-//		logger.info(srcPathFile.getCanonicalPath());
-//		return null;
-//	}
-//}
 }
