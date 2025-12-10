@@ -3,6 +3,8 @@ package com.acadiainfo.util;
 public class UniqueConstraintViolationException extends DataIntegrityViolationException {
 
 
+	private static final long serialVersionUID = 3698438244522696122L;
+
 	public UniqueConstraintViolationException() {
 		super();
 	}
