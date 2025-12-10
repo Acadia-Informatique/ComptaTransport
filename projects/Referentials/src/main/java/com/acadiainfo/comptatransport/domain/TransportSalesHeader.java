@@ -24,7 +24,6 @@ import jakarta.persistence.OneToOne;
  *
  * @see com.acadiainfo.comptatransport.fileimport.ImportTransportVendu
  */
-
 @NamedNativeQuery(name = "TransportSalesHeader_as_INVOICE", query = """
     select
         max(vto.id) as id,
@@ -66,7 +65,7 @@ import jakarta.persistence.OneToOne;
 @NamedNativeQuery(name = "findOne_TransportSalesHeader_as_INVOICE", query = """
     select
         max(vto.id) as id,
-    	vto.doc_reference,
+    	max(vto.doc_reference) as doc_reference,
       	orig_doc_reference as orig_doc_reference,
         group_concat(vto.order_reference ORDER BY vto.order_reference SEPARATOR ';' ) as order_reference,
         max(CUSTOMER.id) as customer_id,

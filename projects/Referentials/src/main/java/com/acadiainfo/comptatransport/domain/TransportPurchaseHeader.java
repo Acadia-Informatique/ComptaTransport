@@ -3,283 +3,201 @@ package com.acadiainfo.comptatransport.domain;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
-import jakarta.json.bind.annotation.JsonbProperty;
+import com.acadiainfo.comptatransport.fileimport.ArticleTransportAchete;
+import com.acadiainfo.comptatransport.fileimport.Import;
+import com.acadiainfo.comptatransport.fileimport.ImportTransportAcheteDetail;
+
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.NamedNativeQuery;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 
 /**
- * This is a read-only view of imported rows as Transport sales HEADERS.
- * The mapping of import (ImportTransportVendu) is split between this and {@link TransportSalesDetails}.
+ * This is a read-only view of imported rows as Transport purchase HEADERS.
  *
- * It consists on GROUP BY of the imported rows, from any of the TransportSalesHeader_as_XXX named queries.
+ * It could be dismissed as a mostly duplicate of ImportTransportAchete, but it was created
+ * for the sake of symmetry with the pair ImportTransportVendu (=file import) / TransportSalesHeader (=displayed).
  *
- * @see com.acadiainfo.comptatransport.fileimport.ImportTransportVendu
+ * @see com.acadiainfo.comptatransport.fileimport.ImportTransportAchete
  */
 
+@Table(schema = "ComptaTransport", name = "I_TRANSPORT_ACHETE")
+@Entity
 public class TransportPurchaseHeader {
 
-	/**
-	 * Marks as "Group" the entities where "doc_reference" (= invoice) starts with this.
-	 */
-	public static final String GROUPREF_PREFIX = "{";
-
-	/** Virtual PK, "view" entity is never persisted as is.
-	 * Using it as identifier allow us to postpone the choice between instance being an Order or an Invoice... indefinitely. */
+	/** Tech. PK */
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "id")
 	private Long id;
 
-	@JsonbProperty("order")
-	@Column(name = "order_reference", insertable = false, updatable = false)
-	private String orderReference;
+	@jakarta.json.bind.annotation.JsonbTransient
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "import_id", referencedColumnName = "id", nullable = false, updatable = false)
+	private Import importHeader;
 
-	@JsonbProperty("invoice")
-	@Column(name = "doc_reference", insertable = false, updatable = false)
-	private String docReference;
+	@jakarta.json.bind.annotation.JsonbTransient
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "article_id", referencedColumnName = "id", nullable = false, updatable = false)
+	private ArticleTransportAchete article;
 
-	@JsonbProperty("invoice_orig")
-	@Column(name = "orig_doc_reference", insertable = false, updatable = false)
-	private String origDocReference;
+	/* ===== Carrier Invoice references ======== */
+	// they are not really used, other for deduplicating and... human inferences.
 
-	/** Note : since CUSTOMER table contains only those with an "interesting" profile regarding Transport,
-	 * this relationship is mostly empty. */
-	@ManyToOne(fetch = FetchType.EAGER)
-	@JoinColumn(name = "customer_id", nullable = true, insertable = false, updatable = false)
-	private Customer customer;
+	@Column(name = "carrier_invoice_num")
+	private String carrierInvoiceNum;
 
-	@JsonbProperty("customerRef")
-	@Column(name = "customer_erp_reference", insertable = false, updatable = false)
-	private String customerErpReference;
+	@Column(name = "carrier_invoice_date")
+	private LocalDateTime carrierInvoiceDate;
 
-	@Column(name = "customer_label", insertable = false, updatable = false)
-	private String customerLabel;
+	@Column(name = "carrier_order_num")
+	private String carrierOrderNum;
 
-	@JsonbProperty("carrier")
-	@Column(name = "carrier_name", insertable = false, updatable = false)
-	private String carrierName;
+	@Column(name = "carrier_order_date")
+	private LocalDateTime carrierOrderDate;
 
-	@JsonbProperty("country")
-	@Column(name = "ship_country", insertable = false, updatable = false)
+	/* ===== link to "Transport Vendu" === */
+
+	/**
+	 * Can be one or more Invoice or Order reference from ERP, in a... hard to predict format.
+	 * Will be resolved later and persisted in "doc_reference_list" database column.
+	 */
+	@Column(name = "internal_reference")
+	private String internalReference;
+
+	/* ===== shipping address ========== */
+
+	@Column(name = "ship_customer_label")
+	private String shipCustomerLabel;
+
+	@Column(name = "ship_country")
 	private String shipCountry;
 
-	@JsonbProperty("zip")
-	@Column(name = "ship_zipcode", insertable = false, updatable = false)
+	@Column(name = "ship_zipcode")
 	private String shipZipcode;
 
-	@JsonbProperty("date")
-	@Column(name = "doc_date", insertable = false, updatable = false)
-	private LocalDateTime docDate;
+	@Column(name = "ship_comment")
+	private String shipComment;
 
-	@Column(name = "salesrep", insertable = false, updatable = false)
-	private String salesrep;
+	/* ====== Order packaging info ========= */
 
-	@Column(name = "is_b2c", insertable = false, updatable = false)
-	private Boolean b2c;
+	/**
+	 * Requested weight = what the customer (= ACADIA) declared.
+	 */
+	@Column(name = "req_total_weight")
+	private BigDecimal reqTotalWeight;
 
-	@JsonbProperty("weight")
-	@Column(name = "total_weight", insertable = false, updatable = false)
+	/**
+	 * Actual Weight = what the carrier used as reference for pricing (may be the same as declared).
+	 */
+	@Column(name = "total_weight")
 	private BigDecimal totalWeight;
 
-	/** All the Transport product details associated to the header (=Order/Invoice) */
-	@OneToMany(fetch = FetchType.EAGER)
-	@JoinColumn(name = "doc_reference", referencedColumnName = "doc_reference")
-	private Set<TransportSalesDetails> details = new HashSet<TransportSalesDetails>();
+	/**
+	 * Sometimes the carrier give that as feedback (or to justify the price).
+	 */
+	@Column(name = "parcel_count")
+	private Integer parcelCount;
 
-	/** The user inputs from Contrôle Quotidien (revenue control) */
-	@OneToOne(optional = true)
-	@JoinColumn(name = "doc_reference", referencedColumnName = "doc_reference")
-	// note : The Join columns *now* is the doc_reference, since the header
-	// represents an Invoice (it could have been an Order).
-	private InputControlRevenue userInputs;
+	/* ========== Amount details ========== */
+	@jakarta.json.bind.annotation.JsonbTransient
+	@OneToMany(fetch = FetchType.EAGER, cascade = jakarta.persistence.CascadeType.PERSIST, mappedBy = "parent")
+	private Set<ImportTransportAcheteDetail> details = new HashSet<ImportTransportAcheteDetail>();
 
+	/* ========== Invoice links ========== */
+	@Convert(disableConversion = true)
+	@ElementCollection
+	@CollectionTable(name = "MAP_TRANSPORT_INVOICE", joinColumns = @JoinColumn(name = "tr_achete_id"))
+	@Column(name = "doc_reference")
+	private List<String> resolvedDocReferences = new java.util.ArrayList<>();
 
-	// Note : even for this non-writable entity we still have setters.
-	// For instance, in TransportSalesWS.saveOne(), they are needed for :
-	// - parsing the JSON request payload
-	// - making the JSON response lighter
-
+	public java.util.Map<String, Object> getTestMap() {
+		var map = new java.util.HashMap<String, Object>();
+		map.put("arf", Integer.MAX_VALUE);
+		map.put("erf", new java.util.Date());
+		return map;
+	}
 
 	public Long getId() {
 		return id;
 	}
 
-	public void setId(Long id) {
-		this.id = id;
+	public Import getImportHeader() {
+		return importHeader;
 	}
 
-	public String getOrderReference() {
-		return orderReference;
+	public ArticleTransportAchete getArticle() {
+		return article;
 	}
 
-	public void setOrderReference(String orderReference) {
-		this.orderReference = orderReference;
+	public String getCarrierInvoiceNum() {
+		return carrierInvoiceNum;
 	}
 
-	public String getDocReference() {
-		return docReference;
+	public LocalDateTime getCarrierInvoiceDate() {
+		return carrierInvoiceDate;
 	}
 
-	public void setDocReference(String docReference) {
-		this.docReference = docReference;
+	public String getCarrierOrderNum() {
+		return carrierOrderNum;
 	}
 
-	/** only serialize if useful */
-	public String getOrigDocReference() {
-		return !this.docReference.equals(this.origDocReference) ? this.origDocReference : null;
+	public LocalDateTime getCarrierOrderDate() {
+		return carrierOrderDate;
 	}
 
-	public void setOrigDocReference(String origDocReference) {
-		this.origDocReference = origDocReference;
+	public String getInternalReference() {
+		return internalReference;
 	}
 
-	/**
-	 * BTW, correlated with non-null getOrigDocReference.
-	 * @return true or null (for lighter JSON payload)
-	 */
-	@JsonbProperty("isGroup")
-	public Boolean isGroup() {
-		return (this.docReference.startsWith(GROUPREF_PREFIX)) ? Boolean.TRUE : null;
-	}
-
-	public Customer getCustomer() {
-		return customer;
-	}
-
-	public void setCustomer(Customer customer) {
-		this.customer = customer;
-	}
-
-	public String getCustomerErpReference() {
-		return customerErpReference;
-	}
-
-	public void setCustomerErpReference(String customerErpReference) {
-		this.customerErpReference = customerErpReference;
-	}
-
-	public String getCustomerLabel() {
-		return customerLabel;
-	}
-
-	public void setCustomerLabel(String customerLabel) {
-		this.customerLabel = customerLabel;
-	}
-
-	public String getCarrierName() {
-		return carrierName;
-	}
-
-	public void setCarrierName(String carrierName) {
-		this.carrierName = carrierName;
+	public String getShipCustomerLabel() {
+		return shipCustomerLabel;
 	}
 
 	public String getShipCountry() {
 		return shipCountry;
 	}
 
-	public void setShipCountry(String shipCountry) {
-		this.shipCountry = shipCountry;
-	}
-
 	public String getShipZipcode() {
 		return shipZipcode;
 	}
 
-	public void setShipZipcode(String shipZipcode) {
-		this.shipZipcode = shipZipcode;
+	public String getShipComment() {
+		return shipComment;
 	}
 
-	public LocalDateTime getDocDate() {
-		return docDate;
-	}
-
-	public void setDocDate(LocalDateTime docDate) {
-		this.docDate = docDate;
-	}
-
-
-	public String getSalesrep() {
-		return salesrep;
-	}
-
-
-	public void setSalesrep(String salesrep) {
-		this.salesrep = salesrep;
-	}
-
-	/** TODO currently deemed unusable, need better qualification at source (from ERP X3 ? SEI report ?...)
-	 * Until we find a better way to qualify B2C orders from X3,
-	 * we are using the same heuristics from the original Excel spreadsheet.
-	 * So we cannot apply B2C price grids until the human users *are* applying it themselves,
-	 * which defeats the very meaning of a control ;-) */
-	public Boolean isB2c() {
-		// return b2c;
-
-		if (customer != null) {
-			boolean isCustomerB2C = customer.getTags().contains("Dropshipper");
-			// if a customer is a Dropshipping pure player,
-			// everything it sells is deemed B2C.
-			if (isCustomerB2C) return true;
-		}
-
-		if (details != null) {
-			boolean orderhasB2C = details.stream()
-			    .anyMatch(det -> det.getProductType() == TransportSalesDetails.ProductType.B2C);
-			return orderhasB2C;
-		}
-		return null;
-	}
-
-	public void setB2c(Boolean b2c) {
-		this.b2c = b2c;
+	public BigDecimal getReqTotalWeight() {
+		return reqTotalWeight;
 	}
 
 	public BigDecimal getTotalWeight() {
 		return totalWeight;
 	}
 
-	public void setTotalWeight(BigDecimal totalWeight) {
-		this.totalWeight = totalWeight;
+	public Integer getParcelCount() {
+		return parcelCount;
 	}
 
-	public Set<TransportSalesDetails> getDetails() {
+	public Set<ImportTransportAcheteDetail> getDetails() {
 		return details;
 	}
 
-	public void setDetails(Set<TransportSalesDetails> details) {
-		this.details = details;
+	public List<String> getResolvedDocReferences() {
+		return resolvedDocReferences;
 	}
 
-	public InputControlRevenue getUserInputs() {
-		return userInputs;
-	}
-
-	public void setUserInputs(InputControlRevenue userInputs) {
-		this.userInputs = userInputs;
-	}
-
-	/**
-	 * New computed property : total price of details
-	 * @return
-	 */
-	@JsonbProperty("price")
-	public BigDecimal getTotalPrice() {
-		if (this.details == null) return null;
-
-		BigDecimal sum = BigDecimal.ZERO;
-		for (TransportSalesDetails detailsItem : this.details) {
-			sum = sum.add(detailsItem.getTotalPrice());
-		}
-		return sum;
-	}
 
 }
+

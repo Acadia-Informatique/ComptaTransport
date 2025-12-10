@@ -67,7 +67,9 @@ CREATE TABLE `I_TRANSPORT_ACHETE` (
   CONSTRAINT `I_TRANSPORT_ACHETE_I_TR_ACH_ARTICLE_FK` FOREIGN KEY (`article_id`) REFERENCES `I_ARTICLE_TRANSPORT_ACHETE` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci  COMMENT='Lignes importées des factures Transporteurs, retravaillées';
 
-
+-- performance indexes (afterthought)
+CREATE INDEX I_TRANSPORT_ACHETE_carrier_invoice_num_IDX USING BTREE ON I_TRANSPORT_ACHETE (carrier_invoice_num);
+CREATE INDEX I_TRANSPORT_ACHETE_carrier_invoice_date_IDX USING BTREE ON I_TRANSPORT_ACHETE (carrier_invoice_date);
 
 
 -- I_TRANSPORT_ACHETE_DETAIL definition
