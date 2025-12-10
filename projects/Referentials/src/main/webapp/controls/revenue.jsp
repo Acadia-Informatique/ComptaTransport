@@ -275,6 +275,25 @@
 					console.debug("flatRes");
 					return PricingSystem.summarizeResult(this.priceGridResult);
 				},
+				priceGridFlatResult_zone(){
+					//TODO NAM Q&D
+					let resultObj = this.priceGridResult;
+					while (resultObj) {
+						switch(resultObj.gridName){
+							case "Toutes livraisons": {
+								if (resultObj?.gridCell?.coords?.c == "Dom-Tom") return "DOM-TOM";
+							} break;
+							case "Prix Europe": {
+								return "Europe " + resultObj?.gridCell?.coords?.c.replaceAll('Z', '');;
+							} break;
+							case "optim Transporteurs":{
+								return resultObj?.gridCell?.coords?.z?.replaceAll('Zone 0', '');
+							} break;
+							default: break;
+						}
+						resultObj = resultObj.nested;
+					}
+				},
 				priceGridFlatResult_carrier(){
 					let reco = this.priceGridFlatResult?.extra_info;
 					return reco ? reco + " ?" : "N/A";
@@ -593,7 +612,7 @@
 	</script>
 
 	<script type="text/x-template" id="RevenueControlGridRow-template">
-		<tr v-if="assessCarrierOK.level <= hideCarrierOKAbove
+		<tr v-show="assessCarrierOK.level <= hideCarrierOKAbove
 		       && assessFinalCarrOK_level <= hideFinalCarrOKAbove
 		       && assessAmountOK.level <= hideAmountOKAbove
 		       && assessFinalAmntOK_level <= hideFinalAmntOKAbove"
@@ -659,7 +678,7 @@
 					<override-signal />
 					<select v-model="rowData.$userInputs$carrier_override"
 					  :title="'(initialement ' + rowData.carrier + ')'"
-					  @blur="validate_carrier_override"
+					  @change="validate_carrier_override"
 					  @keyup.esc="$event.target.blur()">
 						<option v-for="carrierObj in reflist_carriers.values()" :value="carrierObj">
 							{{ carrierObj.name }}
@@ -714,7 +733,9 @@
 					</div>
 				</div>
 			</td>
-
+<td>
+	<div>{{ priceGridFlatResult_zone }}</div>
+</td>
 <td>
 	<div :title="rowData_truncatedWeight" >{{ rowData.weight }}</div>
 </td>
@@ -927,6 +948,7 @@
 					<th class="price" data-bs-toggle="tooltip" title="Diverses options (voir Article X3 dans la bulle d'aide)">
 						<div>Opt.</div>
 					</th>
+<th title="zone extraite aux forceps">Nam</th><%-- TODO NAM Q&D --%>
 <th title="reprise du poids">Nam</th><%-- TODO NAM Q&D --%>
 					<th class="price computed" data-bs-toggle="tooltip" title="Montant total des frais de port payés, selon X3">
 						<div>Total</div>

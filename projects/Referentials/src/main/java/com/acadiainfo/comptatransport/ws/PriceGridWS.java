@@ -9,6 +9,7 @@ import com.acadiainfo.comptatransport.data.PriceGridVersionsRepository;
 import com.acadiainfo.comptatransport.data.PriceGridsRepository;
 import com.acadiainfo.comptatransport.domain.PriceGrid;
 import com.acadiainfo.comptatransport.domain.PriceGridVersion;
+import com.acadiainfo.comptatransport.fileimport.RowsProvider;
 import com.acadiainfo.util.WSUtils;
 
 import jakarta.ejb.Stateless;
@@ -38,7 +39,7 @@ import jakarta.ws.rs.core.UriBuilder;
 @Stateless
 @Path("/price-grids")
 public class PriceGridWS {
-	private Logger logger = Logger.getLogger(getClass().getName());
+	private static final Logger logger = Logger.getLogger(PriceGridWS.class.getName());
 
 	@Context
 	private HttpServletRequest servReq;

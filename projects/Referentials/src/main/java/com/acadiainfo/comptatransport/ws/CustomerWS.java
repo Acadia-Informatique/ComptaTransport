@@ -41,7 +41,7 @@ import jakarta.ws.rs.core.UriBuilder;
 @Stateless
 @Path("/customers")
 public class CustomerWS {
-	private Logger logger = Logger.getLogger(getClass().getName());
+	private static final Logger logger = Logger.getLogger(CustomerWS.class.getName());
 
 	@Context
 	private HttpServletRequest servReq;

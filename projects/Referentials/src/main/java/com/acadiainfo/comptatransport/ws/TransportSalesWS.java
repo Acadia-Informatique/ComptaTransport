@@ -15,6 +15,7 @@ import com.acadiainfo.comptatransport.domain.Customer;
 import com.acadiainfo.comptatransport.domain.CustomerShipPreferences;
 import com.acadiainfo.comptatransport.domain.InputControlRevenue;
 import com.acadiainfo.comptatransport.domain.TransportSalesHeader;
+import com.acadiainfo.comptatransport.fileimport.RowsProvider;
 import com.acadiainfo.util.WSUtils;
 
 import jakarta.ejb.Stateless;
@@ -42,7 +43,7 @@ import jakarta.ws.rs.core.Response.Status;
 @Stateless
 @Path("/transport-sales")
 public class TransportSalesWS {
-	private Logger logger = Logger.getLogger(getClass().getName());
+	private static final Logger logger = Logger.getLogger(TransportSalesWS.class.getName());
 
 	@Context
 	private HttpServletRequest servReq;
@@ -219,7 +220,7 @@ public class TransportSalesWS {
 			groupReference = oGroupReference.get(); // keeping existing group name to preserve user inputs
 		} else {
 			groupReference = TransportSalesHeader.GROUPREF_PREFIX
-			    + new java.util.TreeSet<String>(docReferences).getLast();
+			    + new java.util.TreeSet<String>(docReferences).last();
 			// 1st, last, by date order ?...business decision ;-)
 		}
 

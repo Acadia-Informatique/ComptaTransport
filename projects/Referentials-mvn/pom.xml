@@ -16,8 +16,13 @@
 				<artifactId>flyway-maven-plugin</artifactId>
 				<version>7.8.1</version>
 				<configuration>
+<!--
+					<url>jdbc:mysql://pc_user39:3306/</url>
+					<user>exploitIT</user>
+-->
 					<url>jdbc:mysql://localhost:3306/</url>
 					<user>root</user>
+
 					<password>mysql-root-pwd</password>
 
 					<!-- new option, not used
