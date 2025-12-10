@@ -48,8 +48,6 @@ CREATE TABLE `I_TRANSPORT_ACHETE` (
   `carrier_order_date` datetime DEFAULT NULL COMMENT 'Date de commande (ou éq.) Fournisseur (=Transporteur)',
 
   `internal_reference` varchar(256) DEFAULT NULL COMMENT 'Référence Client (=ACADIA) fournie par Logistique au Transporteur : num facture parfois au pluriel, parfois num de commande, etc.',
-  `doc_reference_list` varchar(512) DEFAULT NULL COMMENT '"colon-separated list" des factures ACADIA résolues à partir de la colonne "internal_reference"',
-
 
   `ship_customer_label` varchar(64) DEFAULT NULL,
   `ship_country` varchar(2) DEFAULT NULL,
@@ -90,10 +88,20 @@ CREATE TABLE `I_TRANSPORT_ACHETE_DETAIL` (
   CONSTRAINT `I_TRANSPORT_ACHETE_DETAIL_I_TRANSPORT_ACHETE_FK` FOREIGN KEY (`tr_achete_id`) REFERENCES `I_TRANSPORT_ACHETE` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci  COMMENT='Lignes filles I_TRANSPORT_ACHETE, comportant tous les montants';
 
+-- MAP_TRANSPORT_INVOICE definition
+-- relationship table between 
+--   - Carrier invoices (I_TRANSPORT_ACHETE)
+--   - Acadia invoices (distinct doc_reference from I_TRANSPORT_VENDU)
+CREATE TABLE `MAP_TRANSPORT_INVOICE` (  
+  `tr_achete_id` bigint unsigned NOT NULL COMMENT 'pointe vers une ligne de facture Transporteur (une ligne de I_TRANSPORT_ACHETE)',
+  `doc_reference` varchar(32) NOT NULL COMMENT 'pointe vers une facture Acadia (une valeur distincte de I_TRANSPORT_VENDU.doc_reference)',
 
-
-
-
+  
+  UNIQUE KEY `MAP_TRANSPORT_INVOICE_UNIQUE` (`tr_achete_id`, `doc_reference`),
+    
+  CONSTRAINT `MAP_TRANSPORT_INVOICE_I_TRANSPORT_ACHETE_FK` FOREIGN KEY (`tr_achete_id`) REFERENCES `I_TRANSPORT_ACHETE` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+  
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci  COMMENT='relation entre  I_TRANSPORT_ACHETE et I_TRANSPORT_VENDU';
 
 
 /*

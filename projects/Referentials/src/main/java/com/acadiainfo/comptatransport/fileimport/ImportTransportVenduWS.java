@@ -1,15 +1,9 @@
 package com.acadiainfo.comptatransport.fileimport;
 
-import java.io.InputStream;
 import java.math.BigDecimal;
-import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
-
-import org.dhatim.fastexcel.reader.ReadableWorkbook;
-import org.dhatim.fastexcel.reader.Row;
-import org.dhatim.fastexcel.reader.Sheet;
 
 import com.acadiainfo.comptatransport.domain.Customer;
 
