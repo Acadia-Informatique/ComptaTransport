@@ -1,6 +1,7 @@
 package com.acadiainfo.util;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.stream.Stream;
 
@@ -67,8 +68,10 @@ public class WSUtils {
 	 * Transform a "human" local date indication to a proper LocalDateTime to be used in database queries.
 	 * The complete list of available formats is currently :
 	 * - "now" : current date time accurate to the second
+	 * - "tomorrow" : see "now"
 	 * - "dd/mm/yyyy" and "dd/mm/yyyy hh:mi:ss": commonly used formats in France
 	 * - "yyyy-mm-dd'T'hh:mi:ss": ISO8601 without timezone
+	 * - "yyyy-mm-dd'T'hh:mi:ssZ": ISO8601 UTC (as returned by Javascript Date.toISOString()
 	 * - "yyyy", "yyyy-mm, "yyyy-mm-dd": ISO8601-derived for years, months, dates, ...
 	 *   they are interpreted as the 1st day of the time span, starting as midnight.
 	 *
@@ -93,7 +96,11 @@ public class WSUtils {
 			return java.time.LocalDateTime.parse(paramDate + ":00", frenchLocalDTFormatter);
 		else if (localDateTimeSecPattern.matcher(paramDate).matches())
 			return java.time.LocalDateTime.parse(paramDate, frenchLocalDTFormatter);
-		else {
+		else if (isoDateTimePattern.matcher(paramDate).matches()) {
+			Instant instant = Instant.parse(paramDate);
+			return LocalDateTime.ofInstant(instant, java.time.ZoneId.systemDefault());
+			// expected default to "here in France"
+		} else {
 			String extendedTimeValue;
 			if (yearPattern.matcher(paramDate).matches()) {
 				extendedTimeValue = paramDate + "-01-01T00:00:00";
@@ -117,6 +124,8 @@ public class WSUtils {
 	    .compile("^\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}$");
 	private static final java.util.regex.Pattern localDateTimeSecPattern = java.util.regex.Pattern
 	    .compile("^\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2}$");
+	private static final java.util.regex.Pattern isoDateTimePattern = java.util.regex.Pattern
+	    .compile("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$");
 
 	private static final java.util.regex.Pattern yearPattern = java.util.regex.Pattern.compile("^\\d{4}$");
 	private static final java.util.regex.Pattern monthPattern = java.util.regex.Pattern.compile("^\\d{4}-\\d{2}$");
