@@ -46,7 +46,7 @@ public class TransportSalesRepository {
 
 
 	/**
-	 *
+	 * Find a TransportSalesHeader by invoice number.
 	 * @param docReference - more accurately,the *original* invoice number (before grouping)
 	 * @return
 	 */
@@ -60,6 +60,20 @@ public class TransportSalesRepository {
 		} catch (jakarta.persistence.NoResultException exc) {
 			return null;
 		}
+	}
+
+	/**
+	 * Find a TransportSalesHeader by order number.
+	 * @param orderNum
+	 * @return
+	 */
+	public TransportSalesHeader findByOrderNum(String orderNum) {
+		Query query = em
+		    .createNativeQuery("SELECT max(doc_reference) FROM I_TRANSPORT_VENDU WHERE order_reference = ?1");
+		query.setParameter(1, orderNum);
+		String docReference = (String) query.getSingleResult();
+		if (docReference == null) return null;
+		return this.getOne(docReference);
 	}
 
 }

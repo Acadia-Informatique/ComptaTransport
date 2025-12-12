@@ -96,12 +96,14 @@ public class ImportTransportAchete {
 	@Column(name = "parcel_count")
 	private Integer parcelCount;
 
-	/* ========== Amount details ========== */
+	/* ========== Amount total and details ========== */
+	@Column(name = "total_amount")
+	private BigDecimal totalAmount;
+
 	@OneToMany(fetch = FetchType.EAGER, cascade = jakarta.persistence.CascadeType.PERSIST, mappedBy = "parent")
 	private Set<ImportTransportAcheteDetail> details = new HashSet<ImportTransportAcheteDetail>();
 
 	/* ========== Invoice links ========== */
-
 	@Convert(disableConversion = true)
 	@ElementCollection
 	@CollectionTable(name = "MAP_TRANSPORT_INVOICE", joinColumns = @JoinColumn(name = "tr_achete_id"))
@@ -144,14 +146,17 @@ public class ImportTransportAchete {
 		ListIterator<String> iter = resolved.listIterator();
 		while (iter.hasNext()) {
 			String candidate = iter.next();
-			if (candidate.startsWith("ACA-")) {
-				// Almost never the case. Leave it alone.
+			if (candidate.startsWith("ACA-FC")) {
+				// "Complete" invoice number, almost never the case. Leave it alone.
+			} else if (candidate.startsWith("CMV")) {
+				// Order number, sometimes wrongly used (e.g. by newcomers). Leave it alone.
 			} else if (candidate.startsWith("FC")) {
 				// The common case. Add the prefix for conformity.
 				iter.set("ACA-" + candidate);
 			} else {
 				// we are doomed. Again.
-				// Or maybe it was another prefix well-formed one, with a different prefix.
+				// Or maybe it was another prefix well-formed one, with a different prefix (e.g.
+				// for Ittelix).
 			}
 		}
 
@@ -278,6 +283,14 @@ public class ImportTransportAchete {
 
 	public void setParcelCount(Integer parcelCount) {
 		this.parcelCount = parcelCount;
+	}
+
+	public BigDecimal getTotalAmount() {
+		return totalAmount;
+	}
+
+	public void setTotalAmount(BigDecimal totalAmount) {
+		this.totalAmount = totalAmount;
 	}
 
 	public Set<ImportTransportAcheteDetail> getDetails() {

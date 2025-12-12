@@ -26,6 +26,13 @@ public class TransportPurchaseRepository extends CrudRepositoryImpl<TransportPur
 		super(em);
 	}
 
+	/**
+	 * Get all rows of "Carrier invoices", regardless of  Company or Products,
+	 * based on the date of invoice
+	 * @param start_date - with .carrierInvoiceDate equals or after that
+	 * @param end_date - with .carrierInvoiceDate strictly before that
+	 * @return
+	 */
 	public Stream<TransportPurchaseHeader> getAllBetween(LocalDateTime start_date, LocalDateTime end_date) {
 		// Query query = em.createNamedQuery("TransportSalesHeader_as_ORDER");
 		/*

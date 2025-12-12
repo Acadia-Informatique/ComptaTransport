@@ -15,7 +15,6 @@ import com.acadiainfo.comptatransport.domain.Customer;
 import com.acadiainfo.comptatransport.domain.CustomerShipPreferences;
 import com.acadiainfo.comptatransport.domain.InputControlRevenue;
 import com.acadiainfo.comptatransport.domain.TransportSalesHeader;
-import com.acadiainfo.comptatransport.fileimport.RowsProvider;
 import com.acadiainfo.util.WSUtils;
 
 import jakarta.ejb.Stateless;
@@ -274,6 +273,39 @@ public class TransportSalesWS {
 
 		return Response.ok(updateCount + " lignes dégroupées").build();
 	}
+
+	@GET
+	@Path("/{mixedId}")
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response findOneBy(@PathParam("mixedId") String mixedId, @QueryParam("type") String idType) {
+		TransportSalesRepository repo = TransportSalesRepository.getInstance(em);
+		try {
+			TransportSalesHeader header;
+			if (idType == null || idType.equals(""))
+				idType = "doc";
+			switch (idType) {
+			case "order":
+				header = repo.findByOrderNum(mixedId);
+				break;
+			case "doc":
+				header = repo.getOne(mixedId);
+				break;
+			default:
+				return WSUtils.response(Status.BAD_REQUEST, servReq,
+				    "Paramètre de requête \"type\" inconnu, valeur attendue parmi \"doc\" (par défaut) ou \"order\" pour interpréter ID : "
+				        + mixedId);
+			}
+
+			if (header == null)
+				return WSUtils.response(Status.NOT_FOUND, servReq,
+				    "Aucune facture trouvée avec ce numéro (essayer avec le paramètre \"type\" ?).");
+			else
+				return Response.ok(header).build();
+		} catch (jakarta.persistence.PersistenceException exc) {
+			return ApplicationConfig.response(exc, servReq, TransportSalesRepository.class);
+		}
+	}
+
 //
 //
 //

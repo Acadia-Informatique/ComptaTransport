@@ -66,6 +66,7 @@ public class RowImporter {
 		BigDecimal parcelCount = (BigDecimal) rowData.get("PARCEL_COUNT");
 		entity.setParcelCount(parcelCount == null ? null : parcelCount.intValue());
 
+		entity.setTotalAmount((BigDecimal) rowData.get("TOTAL_AMOUNT"));
 		for (String key : rowData.keySet()) {
 			Matcher matcher = SUBARTICLE_PATTERN.matcher(key);
 			if (matcher.matches()) {

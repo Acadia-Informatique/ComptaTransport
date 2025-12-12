@@ -6,7 +6,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-	<title>Contrôle Quotidien Transport</title>
+	<title>Contrôle Mensuel Transport</title>
 
 	<%@ include file="/WEB-INF/includes/header-inc/client-stack.jspf" %>
 
@@ -17,7 +17,7 @@
 	<script src="${libsUrl}/customer.js"></script>
 
 	<style>
-		/** Table styling */
+		/** Table styling
 		table#revenue-control-grid th div {
 			height: 3em;
 		}
@@ -29,7 +29,7 @@
 		table#revenue-control-grid td.cust.lbl div {
 			width: 10em;
 		}
-
+ */
 		table#revenue-control-grid th,
 		table#revenue-control-grid td {
 			position: relative; /* for signal icons overlay */
@@ -97,19 +97,20 @@
 	<%@ include file="/WEB-INF/includes/body-inc/bs-confirmDialog.jspf" %>
 
 	<div id="app" class="container-fluid">
-		<h2>Contrôle quotidien des frais de transport facturés</h2>
+		<h2>Contrôle mensuel des factures Transporteur</h2>
 		<div class="d-flex justify-content-between align-items-end">
 			<div class="d-flex h-50 align-items-baseline mt-1">
-				Date : <datepicker-day v-model="ctrlDate"></datepicker-day>
+				Période : <datepicker-month v-model="ctrlDate"></datepicker-month>
 				<button class="btn btn-sm bi bi-funnel btn-secondary ms-2" @click="clearGridFilters"></button>
 
 				<div v-if="dataRowCount" class="mx-2">{{ dataRowCount}} lignes</div>
 			</div>
-
+<%--
 			<div v-if="pricingSystem['#pgv_metadata']" class="d-flex">
 					Grille tarifaire ACADIA : {{ pricingSystem["#pgv_metadata"].version }}
 					<audit-info class="small text-nowrap" v-model="pricingSystem['#pgv_metadata'].auditingInfo"></audit-info>
 			</div>
+--%>
 		</div>
 		<revenue-control-grid :date="ctrlDate" v-if="sharedReady" ref="gridRoot"
 		  @row-count="dataRowCountChange"></revenue-control-grid>
@@ -118,14 +119,11 @@
 	<script type="text/javascript">
 		// PricingSystem integration point
 		class PricedObject {
-			constructor(weight, country, zip, carrierObj, market, isHN, isInteg){
+			constructor(weight, country, zip){
 				this.weight = weight;
 				this.country = country;
 				this.zip = zip;
-				this.carrierObj = carrierObj;
-				this.market = market;
-				this.isHN = isHN;
-				this.isInteg = isInteg;
+
 
 				// Internals are exposed to pricing system, namely a "PerVolumePrice" policy,
 				// so we need this.poids as an equivalent to CommandeALivrer
@@ -144,18 +142,13 @@
 				return {
 					poids : this.weight,
 					poidsEntier: Math.ceil(this.weight),
-					poidsVolumique: this.weight, // TODO until we can do more... like :
 					// poidsVolumique: Math.max(this.weight,
 					//   (this.size_length * this.size_width * this.size_height) / 5000 // poids volumique d'après la fiche export
 					// ),
 
 					pays: this.country, //the whole chain uses ISO 3166-1 alpha-2
 					departement,
-					tailleHN : this.isHN ? "Oui" : "Non",
 					nbColis : 1, // TODO maybe get this info, or remove it from grids
-					transporteur100: this.carrierObj?.groupName,
-					market: this.market,
-					integration: this.isInteg ? "Oui" : "Non"
 				};
 			}
 		}
@@ -201,11 +194,12 @@
 
 
 		var RevenueControlGridRow = {
-			inject: ["reflist_carriers", "pricingSystem", "otherPricingSystems",
+			inject: ["priceGrids",
 			  "LEVEL_NULL", "LEVEL_BAD", "LEVEL_WARN", "LEVEL_OK", "COUNT_LEVELS"],
 			props: ["rowData",
-				"hideCarrierOKAbove", "hideFinalCarrOKAbove",
-				"hideAmountOKAbove", "hideFinalAmntOKAbove"
+					"hideWeightOKAbove",
+					"hideTheirAmountOKAbove",
+					"hideOurMarginOKAbove"
 			],
 			data(){
 				return {
@@ -213,245 +207,176 @@
 				};
 			},
 			computed: {
-				// shortened following a corporate habit
-				rowData_invoice(){
-					if (this.rowData.isGroup){
-						return this.rowData.invoice_orig.split(";")
-						  .map(s => AcadiaX3.shortInvoiceNumber(s))
-						  .join("\n");
-					} else {
-						return AcadiaX3.shortInvoiceNumber(this.rowData.invoice);
-					}
-				},
-				rowData_order(){
-					return this.rowData.order.replaceAll(";","\n");
-				},
-
-				// mitigates 0.001 "dummy weight" in X3 (mandatory field there ;-)
-				rowData_truncatedWeight(){return Math.floor(this.rowData.weight * 100) / 100;},
-
-				rowData_customerShipPreferences(){
-					if (this.rowData.customer?.shipPreferences && this.rowData.customer.shipPreferences.length > 0){
-						return this.rowData.customer.shipPreferences[0];
-					} else {
-						return null;
-					}
-				},
-
-				rowData_carrierObj() {
-					return this.rowData.userInputs.carrier_override
-					  ?? this.reflist_carriers.get(this.rowData.carrier);
-				},
-
-				rowDataCached_final_b2c(){ //to reduce priceGridResult reeval
-					return typeof this.rowData.userInputs.b2c_override != 'undefined'
-					  ? this.rowData.userInputs.b2c_override
-					  : this.rowData["b2c"];
-				},
-				rowDataCached_nonstdPack(){ //to reduce priceGridResult reeval
-					return this.rowData.userInputs.nonstdPack_override;
-				},
-				rowData_overridden_price(){
-					//return this.rowData.price;  is much better, since it adds all products regardless of categorization
-					// But in order to support partial override, we have to mimic the way our recommended
-					// price is added up (cf. priceGridFlatResult_overridden_total and priceGridFlatResult.total())
-
-					let sum = //for an unknown reason, i couldn't return it without assigning it to a temp var 1st.
-						(this.rowData.userInputs.price_MAIN_override ?? ((this.rowData['P_MAIN']?.price) ?? 0))
-					  + ((this.rowData['P_B2C']?.price) ?? 0)
-					  + ((this.rowData['P_OPTS']?.price) ?? 0)
-					  + ((this.rowData['P_UNK']?.price) ?? 0);
-					return sum;
-				},
-				pricedObject(){
-					return new PricedObject (
-						this.rowData_truncatedWeight,
-						this.rowData["country"],
-						this.rowData["zip"],
-						this.rowData_carrierObj,
-						CustomerFunc.assessMarket(this.rowDataCached_final_b2c, this.rowData.customer, this.rowData_customerShipPreferences),
-						this.rowDataCached_nonstdPack,
-						this.rowData_carrierObj.name == "INTEGRATION"
-					);
-				},
 				priceGridResult(){
-					console.debug("res", this.pricedObject);
-					return this.pricingSystem.applyGrid("Toutes livraisons", this.pricedObject);
+					let pgpath_items = this.rowData.article.pricegridPath.split("/");
+					let dbGridName = pgpath_items[0]; // database entity PriceGrid name (home of a list of PriceGridVersion, each containing a JS PricingSystem...)
+					let jsGridName = pgpath_items[1]; // entry key for a PricingGrid JS instance inside a PricingSystem JS object (a tab in the grid-edit.jsp).
+					
+					let dbGrid = this.priceGrids.find(pg => pg.name == dbGridName);
+					let applicableVersion = dbGrid["#versions"].find(v => v.publishedDate <= this.rowData.carrierOrderDate);
+					
+					if (!applicableVersion) return null;
+					
+					let system = applicableVersion["#system"];
+										
+					let pricedObject = new PricedObject(
+						this.rowData.totalWeight,
+						this.rowData.shipCountry,
+						this.rowData.shipZipcode
+					);
+	
+					return system.applyGrid(jsGridName, pricedObject);
 				},
-				priceGridFlatResult(){
-					console.debug("flatRes");
-					return PricingSystem.summarizeResult(this.priceGridResult);
-				},
-				priceGridFlatResult_zone(){
-					//TODO NAM Q&D
-					let resultObj = this.priceGridResult;
-					while (resultObj) {
-						switch(resultObj.gridName){
-							case "Toutes livraisons": {
-								if (resultObj?.gridCell?.coords?.c == "Dom-Tom") return "DOM-TOM";
-							} break;
-							case "Prix Europe": {
-								return "Europe " + resultObj?.gridCell?.coords?.c.replaceAll('Z', '');;
-							} break;
-							case "optim Transporteurs":{
-								return resultObj?.gridCell?.coords?.z?.replaceAll('Zone 0', '');
-							} break;
-							default: break;
-						}
-						resultObj = resultObj.nested;
+				// shortened following a corporate habit
+
+				// rowData_invoice(){
+				// 	if (this.rowData.isGroup){
+				// 		return this.rowData.invoice_orig.split(";")
+				// 		  .map(s => AcadiaX3.shortInvoiceNumber(s))
+				// 		  .join("\n");
+				// 	} else {
+				// 		return AcadiaX3.shortInvoiceNumber(this.rowData.invoice);
+				// 	}
+				// },
+				// rowData_order(){
+				// 	return this.rowData.order.replaceAll(";","\n");
+				// },
+
+				// // mitigates 0.001 "dummy weight" in X3 (mandatory field there ;-)
+				// rowData_truncatedWeight(){return Math.floor(this.rowData.weight * 100) / 100;},
+
+				// rowData_customerShipPreferences(){
+				// 	if (this.rowData.customer?.shipPreferences && this.rowData.customer.shipPreferences.length > 0){
+				// 		return this.rowData.customer.shipPreferences[0];
+				// 	} else {
+				// 		return null;
+				// 	}
+				// },
+
+				// rowDataCached_final_b2c(){ //to reduce priceGridResult reeval
+				// 	return typeof this.rowData.userInputs.b2c_override != 'undefined'
+				// 	  ? this.rowData.userInputs.b2c_override
+				// 	  : this.rowData["b2c"];
+				// },
+				// rowDataCached_nonstdPack(){ //to reduce priceGridResult reeval
+				// 	return this.rowData.userInputs.nonstdPack_override;
+				// },
+				// rowData_overridden_price(){
+				// 	//return this.rowData.price;  is much better, since it adds all products regardless of categorization
+				// 	// But in order to support partial override, we have to mimic the way our recommended
+				// 	// price is added up (cf. priceGridFlatResult_overridden_total and priceGridFlatResult.total())
+
+				// 	let sum = //for an unknown reason, i couldn't return it without assigning it to a temp var 1st.
+				// 		(this.rowData.userInputs.price_MAIN_override ?? ((this.rowData['P_MAIN']?.price) ?? 0))
+				// 	  + ((this.rowData['P_B2C']?.price) ?? 0)
+				// 	  + ((this.rowData['P_OPTS']?.price) ?? 0)
+				// 	  + ((this.rowData['P_UNK']?.price) ?? 0);
+				// 	return sum;
+				// },
+				// pricedObject(){
+				// 	return new PricedObject (
+				// 		this.rowData_truncatedWeight,
+				// 		this.rowData["country"],
+				// 		this.rowData["zip"],
+				// 		this.rowData_carrierObj,
+				// 		CustomerFunc.assessMarket(this.rowDataCached_final_b2c, this.rowData.customer, this.rowData_customerShipPreferences),
+				// 		this.rowDataCached_nonstdPack,
+				// 		this.rowData_carrierObj.name == "INTEGRATION"
+				// 	);
+				// },
+				// priceGridResult(){
+				// 	console.debug("res", this.pricedObject);
+				// 	return this.pricingSystem.applyGrid("Toutes livraisons", this.pricedObject);
+				// },
+				// priceGridFlatResult(){
+				// 	console.debug("flatRes");
+				// 	return PricingSystem.summarizeResult(this.priceGridResult);
+				// },
+				// priceGridFlatResult_zone(){
+				// 	//TODO NAM Q&D
+				// 	let resultObj = this.priceGridResult;
+				// 	while (resultObj) {
+				// 		switch(resultObj.gridName){
+				// 			case "Toutes livraisons": {
+				// 				if (resultObj?.gridCell?.coords?.c == "Dom-Tom") return "DOM-TOM";
+				// 			} break;
+				// 			case "Prix Europe": {
+				// 				return "Europe " + resultObj?.gridCell?.coords?.c.replaceAll('Z', '');;
+				// 			} break;
+				// 			case "optim Transporteurs":{
+				// 				return resultObj?.gridCell?.coords?.z?.replaceAll('Zone 0', '');
+				// 			} break;
+				// 			default: break;
+				// 		}
+				// 		resultObj = resultObj.nested;
+				// 	}
+				// },
+				// priceGridFlatResult_carrier(){
+				// 	let reco = this.priceGridFlatResult?.extra_info;
+				// 	return reco ? reco + " ?" : "N/A";
+				// },
+
+
+				//Related ACADIA Invoices (note: this.rowData.invoices is an old-school Map-like object )
+				amount_from_our_sales(){
+					let total = 0;
+					for (let invoiceNum in this.rowData.invoices){
+						//TODO define behavior for missing
+						let invoice = this.rowData.invoices[invoiceNum];
+						console.log(invoice);
+						if (invoice) total += invoice.price;
 					}
-				},
-				priceGridFlatResult_carrier(){
-					let reco = this.priceGridFlatResult?.extra_info;
-					return reco ? reco + " ?" : "N/A";
-				},
-
-				assessCarrierOK(){
-					console.debug("carrierOK");
-					let selectedCarrier = this.rowData_carrierObj;
-					if (selectedCarrier.warningMessage) {
-						return new Assessment("Le transport choisi a été signalé comme problématique : \"" + selectedCarrier.warningMessage + "\"",
-						  LEVEL_BAD, this.priceGridFlatResult_carrier);
+					return total;
+				},				
+				weight_from_our_sales(){					
+					let total = 0;					
+					for (let invoiceNum in this.rowData.invoices){
+						let invoice = this.rowData.invoices[invoiceNum];
+						if (invoice) total += invoice.weight;
 					}
-
-					if (!selectedCarrier.groupName) {
-						return new Assessment("Sans \"groupe de contrôle\", le transport choisi \"" + selectedCarrier.name + "\" est toujours considéré comme OK.",
-						  LEVEL_OK, "Non vérif.");
-					}
-
-					let recommended = (this.priceGridFlatResult.extra_info)
-					  ? this.priceGridFlatResult.extra_info.split("/").map(s => s.trim())
-					  : [];
-
-					if (recommended.includes(selectedCarrier.groupName)){
-						let overrides = [];
-						if (this.rowData.userInputs.nonstdPack_override != null)
-							overrides.push("HN");
-						if (this.rowData.userInputs.b2c_override != null)
-							overrides.push("B2C⚠️");
-						if (this.rowData.userInputs.carrier_override != null)
-							overrides.push("Transp. choisi⚠️");
-						if (overrides.length > 0){
-							return new Assessment("En tenant compte des modifications ("+ overrides +"), le transport choisi \"" + selectedCarrier.name + "\" devient conforme à la grille tarifaire Acadia",
-							  LEVEL_OK, "OK (ajust.)");
-						}
-
-						return new Assessment("Le transport choisi \"" + selectedCarrier.name + "\" est recommandé dans la grille tarifaire Acadia",
-						  LEVEL_OK, "OK");
-					}
-
-					if (this.rowData_customerShipPreferences){
-						if (this.rowData_customerShipPreferences.overrideCarriers?.includes(selectedCarrier.name)){
-							return new Assessment("Le transport choisi \"" + selectedCarrier.name + "\" est un transport exclusif de ce client.",
-							  LEVEL_WARN, "OK Client");
-						}
-
-						if (selectedCarrier.tags.some(t => this.rowData_customerShipPreferences.carrierTagsWhitelist?.includes(t))) {
-							return new Assessment("Le transport choisi \"" + selectedCarrier.name + "\" a été whitelisté par ce client.",
-							  LEVEL_WARN, "Préf. Client");
-						}
-
-						let recommendedObj = [...this.reflist_carriers.values()].filter(c => recommended.includes(c.groupName));
-						if (recommendedObj.length > 0 && recommendedObj.every(c => c.tags.some(t => this.rowData_customerShipPreferences?.carrierTagsBlacklist.includes(t)))){
-							return new Assessment("Tous les transports recommandés ont été blacklistés par ce client : " + this.priceGridFlatResult_carrier,
-							  LEVEL_WARN, "Refus Client");
-						}
-					}
-
-					return new Assessment("Le transport choisi \"" + selectedCarrier.name + "\" n'a pas trouvé de justification automatique.",
-					  LEVEL_BAD, this.priceGridFlatResult_carrier);
-				},
-				carrierOKclass(){
-					return _generic_OKclass(this.assessCarrierOK.level, true);
-				},
-
-				assessFinalCarrOK_level(){
-					return (this.rowData.userInputs.carrierOK_override > 0)
-					  ? this.rowData.userInputs.carrierOK_override
-					  : this.assessCarrierOK.level;
-				},
-				finalCarrOKclass(){
-					return _generic_OKclass(this.assessFinalCarrOK_level, true);
-				},
-
-				assessAmountOK(){
-					// do special cases 1st
-					let selectedCarrier = this.rowData_carrierObj;
-					if (selectedCarrier.tags.includes("Sans frais")) {
-						return new Assessment("\"" + selectedCarrier.name + "\" est un transport sans frais",
-						  LEVEL_OK, 0.0);
-					}
-
-					if (this.rowData.customer) {
-						let zeroFee =  CustomerFunc.assessZeroFee(this.rowDataCached_final_b2c, this.rowData.customer, this.rowData_customerShipPreferences, this.rowData.customer.aggShippingRevenues, this.reflist_carriers);
-						if (zeroFee) {
-							return new Assessment("Client Franco de port - Raisons: " + zeroFee,
-							  LEVEL_OK, 0.0);
-						}
-					}
-
-
-					let alternatePriceGridResult;
-					if (this.rowData_customerShipPreferences?.overridePriceGrid){
-						let altSystem = this.otherPricingSystems.get(this.rowData_customerShipPreferences.overridePriceGrid.name);
-						try {
-							alternatePriceGridResult = altSystem.applyGrid("Toutes livraisons", this.pricedObject);
-						} catch (err) {
-							alert_dialog("Erreur Grille Tarifaire " + this.rowData_customerShipPreferences.overridePriceGrid.name,
-							 "Une erreur s'est produite à l'application de la grille personnalisée du client "
-							 + "\"" + this.rowData.customerLabel + "\" ["+ this.rowData.customerRef + "] : " + err.message);
-						}
-					}
-
-					// customer B2C tag -> override PriceSystem computed value
-					let cust_b2cAmount_override = null;
-					if (this.rowDataCached_final_b2c && this.rowData_customerShipPreferences?.tags) {
-						const B2C_tag_regex = /^B2C\s*:\s*(\d+[,\.]?\d*).*$/;
-						for (let tag of this.rowData_customerShipPreferences.tags){
-							let match = B2C_tag_regex.exec(tag);
-							if (match) {
-								cust_b2cAmount_override = Number.parseFloat(match[1].replace(",", "."));
-								if (cust_b2cAmount_override) break;
-							}
-						}
-					}
-
-					// common case
-					let baseFlatResult = PricingSystem.summarizeResult(alternatePriceGridResult ?? this.priceGridResult); // this rule may change, we could display ALL alternative results.
-					// note: baseFlatResult may be equal to this.priceGridFlatResult at this stage,
-					// but we may need to *alter* it - so better not share it.
-
-					let baseMessage = "";
-					if (alternatePriceGridResult) {
-						baseMessage += ` Grille tarifaire personnalisée : "\${this.rowData_customerShipPreferences.overridePriceGrid.name}"`;
-					}
-					if (this.pricedObject.market == "B2C_as_B2B"){
-						baseMessage += ` (+ option "B2C sur grille BTB")`;
-					}
-					if (cust_b2cAmount_override !== null){
-						baseFlatResult["B2C"] = cust_b2cAmount_override;
-						baseMessage += ` (+ option "supplém. B2C à \${cust_b2cAmount_override}")`;
-					}
-
-					let baseFlatResult_total = Math.round(100 * baseFlatResult.total()) / 100;
-					let margin = Math.floor(100 * (this.rowData_overridden_price - baseFlatResult_total)) / 100;
-					return new Assessment(baseMessage,
-					  margin === 0 ? LEVEL_OK : (margin > 0 ? LEVEL_WARN : LEVEL_BAD),
-					  isNaN(baseFlatResult_total) ? "N/A" : baseFlatResult_total);
+					return total;
 				},
 
-				amountOKclass(){
-					return _generic_OKclass(this.assessAmountOK.level, true);
+				
+				// Comparison columns
+				weight_delta(){
+					return this.weight_from_our_sales - this.rowData.totalWeight;
+				},
+			    assessWeightOK(){
+					return new Assessment(this.rowData.shipComment, (this.weight_delta > 0) ? LEVEL_OK : LEVEL_BAD, this.weight_delta);
+				},
+				weightOKclass(){
+					return _generic_OKclass(this.assessWeightOK.level, true);
 				},
 
-				assessFinalAmntOK_level(){
-					return (this.rowData.userInputs.amountOK_override > 0)
-					  ? this.rowData.userInputs.amountOK_override
-					  : this.assessAmountOK.level;
+
+				rowData_sumDetailAmount(){
+					return 4444;
 				},
-				finalAmntOKclass(){
-					return _generic_OKclass(this.assessFinalAmntOK_level, true);
+	
+				
+				estimatedAmount_delta(){
+					return this.priceGridResult.amount - this.rowData.totalAmount;
+				},	
+				assessTheirAmountOK(){
+					return new Assessment("TODO tiré de nos calculs", (this.amount_from_our_sales) ? LEVEL_OK : LEVEL_BAD, this.estimatedAmount_delta);
 				},
+
+				theirAmountOKclass(){
+					return _generic_OKclass(this.assessTheirAmountOK.level, true);
+				},
+
+				
+				margin(){
+					return this.amount_from_our_sales - this.rowData.totalAmount;
+				},	
+				assessOurMarginOK(){
+					return new Assessment("TODO à voir", (this.margin > 0) ? LEVEL_OK : LEVEL_BAD, this.margin);
+				},
+				ourMarginOKclass(){
+					return _generic_OKclass(this.assessOurMarginOK.level, true);
+				},				
+
 			},
 			watch:{
 				"rowData.userInputs":{
@@ -522,13 +447,6 @@
 				},
 
 
-				init_carrier_override(ev){
-					this.rowData.$userInputs$carrier_override = this.reflist_carriers.get(this.rowData.carrier);
-					const parentCell = ev.target.closest("td");
-					this.$nextTick(()=>{
-						parentCell.getElementsByTagName("select")[0].focus();
-					});
-				},
 				validate_carrier_override(){
 					let trueVal = this.rowData.carrier
 					let newVal = this.rowData.$userInputs$carrier_override?.name ?? null;
@@ -619,17 +537,83 @@
 	</script>
 
 	<script type="text/x-template" id="RevenueControlGridRow-template">
-		<tr v-show="assessCarrierOK.level <= hideCarrierOKAbove
-		       && assessFinalCarrOK_level <= hideFinalCarrOKAbove
-		       && assessAmountOK.level <= hideAmountOKAbove
-		       && assessFinalAmntOK_level <= hideFinalAmntOKAbove"
+		<tr v-show="assessWeightOK.level <= hideWeightOKAbove
+		       && assessTheirAmountOK.level <= hideTheirAmountOKAbove
+		       && assessOurMarginOK.level <= hideOurMarginOKAbove"
 		 @click="highlighted = !highlighted" :class="{'highlighted':highlighted}">
-			<td class="erp-ref">
-				<div :title="rowData.invoice" class="multiline" >{{ rowData_invoice }}</div>
+		 	<td>
+				<div>{{ rowData.id }}</div>
+			</td>
+		 	<td>
+				<div :title="rowData.article.pricegridPath">{{ rowData.article.articlePath }}</div>
+			</td>
+		 	<td>
+				<div>{{ rowData.carrierInvoiceNum }}</div>
 			</td>
 			<td>
-				<div class="multiline">{{ rowData_order }}</div>
+				<div @click="debug_PricingSystem"><datedisplay-day :value="rowData.carrierInvoiceDate"></datedisplay-day></div>
 			</td>
+			<td>
+				<div>{{ rowData.carrierOrderNum }}</div>
+			</td>
+			<td>
+				<div><datedisplay-day :value="rowData.carrierOrderDate"></datedisplay-day></div>
+			</td>
+			<td>
+				<div>{{ rowData.shipCustomerLabel }}</div>
+			</td>
+			<td>
+				<div>{{ rowData.shipCountry }}</div>
+			</td>
+			<td>
+				<div>{{ rowData.shipZipcode }}</div>
+			</td>
+			<td>
+				<div> extracted_zone </div>
+			</td>
+			<td>
+				<div class="text-truncate" :title="rowData.internalReference">
+					{{ rowData.internalReference }}
+				</div>
+			</td>
+			<td class="erp-ref">
+				<invoices-map :value="rowData.invoices"></invoices-map>
+			</td>
+
+			<td>
+				<div>{{ rowData.parcelCount }}</div>
+			</td>
+
+
+			<td>
+				<div>{{ weight_from_our_sales }}</div>
+			</td>
+			<td>
+				<div :title="'Demandés: '+ rowData.reqTotalWeight ">{{ rowData.totalWeight }}</div>
+			</td>
+			<td>
+				<div :title="assessWeightOK.msg" :class="weightOKclass">{{ assessWeightOK.cellValue }}</div>
+			</td>
+
+			<td>
+				<div :title="rowData_sumDetailAmount">{{ rowData.totalAmount}}</div>
+			</td>
+			<td>
+				{{ priceGridResult.amount }}
+			</td>
+			<td>
+				<div :title="assessTheirAmountOK.msg" :class="theirAmountOKclass">{{ assessTheirAmountOK.cellValue }}</div>
+			</td>
+
+			<td>
+				{{ amount_from_our_sales }}
+			</td>
+			<td>
+				<div :title="assessOurMarginOK.msg" :class="ourMarginclass">{{ assessOurMarginOK.cellValue }}</div>
+			</td>
+
+
+<%--
 			<td class="cust">
 				<div v-if="rowData.customer">
 					<div v-if="rowData.customer.tags.includes('inactive')">
@@ -648,17 +632,7 @@
 					{{ rowData.customerLabel }}
 				</div>
 			</td>
-			<td>
-				<div>{{ rowData.country }}</div>
-			</td>
-			<td>
-				<div>{{ rowData.zip }}</div>
-			</td>
-			<td>
-				<div @click="debug_PricingSystem"> <%-- hidden debug feature --%>
-					<datedisplay-day :value="rowData.date"></datedisplay-day>
-				</div>
-			</td>
+
 			<td class="salesrep">
 				<div :title="rowData.salesrep" class="text-truncate">{{ rowData.salesrep }}</div>
 			</td>
@@ -681,18 +655,7 @@
 				</div>
 			</td>
 			<td class="carrier name" :title="rowData_carrierObj.groupName ? 'Contrôlé comme : '+ rowData_carrierObj.groupName : 'Transporteur non-vérifié'">
-				<div v-if="rowData.$userInputs$carrier_override">
-					<override-signal />
-					<select v-model="rowData.$userInputs$carrier_override"
-					  :title="'(initialement ' + rowData.carrier + ')'"
-					  @change="validate_carrier_override"
-					  @keyup.esc="$event.target.blur()">
-						<option v-for="carrierObj in reflist_carriers.values()" :value="carrierObj">
-							{{ carrierObj.name }}
-						</option>
-					</select>
-				</div>
-				<div v-else role="button" @click="init_carrier_override">
+				<div>
 					{{ rowData.carrier }}
 				</div>
 			</td>
@@ -771,11 +734,35 @@
 				</div>
 			</td>
 
+			--%>
 
 		</tr>
 	</script>
 
 	<script type="text/javascript">
+		var InvoiceMapRenderer = {
+			props: {
+				value: Object
+			},
+			template: "
+				<ul v-for="">
+					<li></li>
+				</ul>
+			"
+		};
+	invoices_from_our_sales(){
+		let str = "";
+		for (let invoiceNum in this.rowData.invoices){
+			str += "\n* " + invoiceNum + " : ";
+			
+			let invoice = this.rowData.invoices[invoiceNum];
+			if (invoice) str += invoice.id;
+		}
+		return str;					
+	},
+	
+	
+	
 		var RevenueControlGrid = {
 			props: {
 				date:String
@@ -783,12 +770,10 @@
 			data() {
 				return {
 					dataList: [],
-					hideCarrierOKAbove: LEVEL_OK,
-					hideFinalCarrOKAbove: LEVEL_OK,
-					hideAmountOKAbove: LEVEL_OK,
-					hideFinalAmntOKAbove: LEVEL_OK,
-					filterCustomerLabel: "",
-					quick_and_dirty : null
+
+					hideWeightOKAbove: LEVEL_OK,
+					hideTheirAmountOKAbove: LEVEL_OK,
+					hideOurMarginOKAbove: LEVEL_OK,
 				};
 			},
 			watch:{
@@ -798,12 +783,16 @@
 						this.$emit("rowCount", null);
 						if (!v) return; // fail silently for empty dates
 
-						let resource_uri = "transport-sales?start-date="+ v;
+						let startDate = new Date(v);
+						let endDate = new Date(v);
+						endDate.setMonth(startDate.getMonth() + 1);
+
+						let resource_uri = "transport-purchase?start-date="+ startDate.toLocaleDateString() + "&end-date=" + endDate.toLocaleDateString();
 						axios_backend.get(resource_uri)
 						.then(response => {
 							this.dataList = response.data;
 							this.$emit("rowCount", this.dataList.length);
-
+/*
 							for (let row of this.dataList){
 								// prepare user inputs
 								if (!row.userInputs){
@@ -812,68 +801,35 @@
 									row.$userInputs$price_MAIN_override = row.userInputs.price_MAIN_override;
 									row.$userInputs$carrier_override = row.userInputs.carrier_override;
 								}
-
-								// flattening of row.details
-								for (let det of row.details){
-									let entryKey = "P_" + det.type;
-									if (row[entryKey]){
-										row[entryKey] = {
-											"price": row[entryKey].price + det.price,
-											"desc": row[entryKey].desc + ";" + det.product
-										};
-									} else {
-										row[entryKey] = {
-											"price": det.price,
-											"desc": det.product
-										};
-									}
-								}
-								delete row.details;
 							}
+*/
 						})
 						.catch(error => {
 							showAxiosErrorDialog(error);
 						});
 					}
 				},
-
-				//TODO NAM Q&D
-				filterCustomerLabel(){
-					if (this.filterCustomerLabel){
-						this.quick_and_dirty = this.dataList;
-						this.dataList = this.dataList.filter(row => row.customerLabel == this.filterCustomerLabel);
-					} else {
-						if (this.quick_and_dirty){
-							this.dataList = this.quick_and_dirty;
-						}
-					}
-				}
 			},
 			components:{
 				"grid-row": RevenueControlGridRow,
 			},
 			computed:{
-				hideCarrierOKAboveclass(){
-					return _filterBtn_OKclass(this.hideCarrierOKAbove);
+
+				hideWeightOKAboveclass(){
+					return _filterBtn_OKclass(this.hideWeightOKAbove);
 				},
-				hideFinalCarrOKAboveclass(){
-					return _filterBtn_OKclass(this.hideFinalCarrOKAbove);
+				hideTheirAmountAboveclass(){
+					return _filterBtn_OKclass(this.hideTheirAmountOKAbove);
 				},
-				hideAmountOKAboveclass(){
-					return _filterBtn_OKclass(this.hideAmountOKAbove);
+				hideOurMarginOKAboveclass(){
+					return _filterBtn_OKclass(this.hideOurMarginOKAbove);
 				},
-				hideFinalAmntOKAboveclass(){
-					return _filterBtn_OKclass(this.hideFinalAmntOKAbove);
-				}
 			},
 			methods: {
 				clearFilters(){
-					this["hideCarrierOKAbove"] =
-					this["hideFinalCarrOKAbove"] =
-					this["hideAmountOKAbove"] =
-					this["hideFinalAmntOKAbove"] = LEVEL_OK;
-
-					this.filterCustomerLabel = null;
+					this["hideWeightOKAbove"] =
+					this["hideTheirAmountOKAbove"] =
+					this["hideOurMarginOKAbove"] = LEVEL_OK;
 				},
 				cycleFilter(name){
 					let attributeName = "hide" + name +"Above";
@@ -900,27 +856,85 @@
 		<table id="revenue-control-grid" class="table table-bordered table-sm table-striped table-hover" ref="rootElement">
 			<thead class="shadow sticky-top">
 				<tr>
-					<th data-bs-toggle="tooltip" title="Numéro de facture X3">
+					<th data-bs-toggle="tooltip" title="ID système (caché)">
+						<div>ID</div>
+					</th>
+					<th data-bs-toggle="tooltip" title="Transporteur/Produit">
+						<div>Produit</div>
+					</th>
+					<th data-bs-toggle="tooltip" title="Numéro de facture Transporteur">
 						<div>N° de facture</div>
 					</th>
-					<th data-bs-toggle="tooltip" title="Numéro Commande(s) correspondante(s) X3">
-						<div>N° de commande</div>
-					</th>
-					<th class="cust" data-bs-toggle="tooltip" title="Numéro client X3">
-						<div>N° Client</div>
-					</th>
-					<th class="cust lbl" data-bs-toggle="tooltip" title="Raison sociale du client X3">
-						<div>Nom du client</div>
-					</th>
-					<th data-bs-toggle="tooltip" title="Pays de l'adresse d'expédition">
-						<div>Pays</div>
-					</th>
-					<th data-bs-toggle="tooltip" title="Code postal de l'adresse d'expédition">
-						<div>CP</div>
-					</th>
-					<th data-bs-toggle="tooltip" title="Date de facture X3">
+					<th data-bs-toggle="tooltip" title="Date de facture Transporteur">
 						<div>Date de facture</div>
 					</th>
+					<th data-bs-toggle="tooltip" title="Numéro de récépissé (commande ACADIA)">
+						<div>N° récépissé</div>
+					</th>
+					<th data-bs-toggle="tooltip" title="Date de récépissé (commande ACADIA)">
+						<div>Date récépissé</div>
+					</th>
+
+					<th data-bs-toggle="tooltip" title="Nom du destinataire">
+						<div>Destinataire</div>
+					</th>
+					<th class="cust" data-bs-toggle="tooltip" title="Pays de l'adresse d'expédition">
+						<div>Pays</div>
+					</th>
+					<th class="cust lbl" data-bs-toggle="tooltip" title="Code postal de l'adresse d'expédition">
+						<div>CP</div>
+					</th>
+					<th data-bs-toggle="tooltip" title="Zone géographique tarifaire (spécfique à la grille du Transporteur)">
+						<div>Zone</div>
+					</th>
+
+					<th data-bs-toggle="tooltip" title="Référence Client sur l'étiquette d'expédition (= numéro(s) de facture ACADIA)">
+						<div>Référence interne</div>
+					</th>
+					<th data-bs-toggle="tooltip" title="Factures ACADIA correspondantes">
+						<div>Factures ACADIA</div>
+					</th>
+
+					<th data-bs-toggle="tooltip" title="Nombre de colis (issu de la facture Transporteur)">
+						<div>Colis</div>
+					</th>
+
+
+					<th data-bs-toggle="tooltip" title="Total des poids sur les factures X3">
+						<div>Poids ACADIA </div>
+					</th>
+					<th data-bs-toggle="tooltip" title="Poids noté sur la facture Transporteur (dans la bulle d'aide, le poids déclaré par ACADIA si présent)">
+						<div>Poids Transporteur</div>
+					</th>
+					<th data-bs-toggle="tooltip" title="Écart de Poids (= poids ACADIA - poids Transp.)">
+						<div>Δ Poids</div>
+						<i @click="cycleFilter('WeightOK')" role="button" :class="hideWeightOKAboveclass"></i>
+					</th>
+
+
+					<th data-bs-toggle="tooltip" title="Montant TTC noté sur la facture Transporteur">
+						<div>Prix Transporteur</div>
+					</th>
+					<th data-bs-toggle="tooltip" title="Notre estimation du montant, par application de la grille tarifaire Transporteur">
+						<div>Estim. Transporteur</div>
+					</th>
+					<th data-bs-toggle="tooltip" title="Écart de prix (= prix ACADIA - prix Transp.)">
+						<div>Δ Prix estimé</div>
+						<i @click="cycleFilter('TheirAmountOK')" role="button" :class="hideTheirAmountOKAboveclass"></i>
+					</th>
+
+					<th data-bs-toggle="tooltip" title="Total des montants de factures X3">
+						<div>Prix ACADIA </div>
+					</th>
+					<th data-bs-toggle="tooltip" title="Écart de prix (= prix ACADIA - prix Transp.)">
+						<div>Marge ACADIA</div>
+						<i @click="cycleFilter('OurMarginOK')" role="button" :class="hideOurMarginOKAboveclass"></i>
+					</th>
+<%--
+					<th class="salesrep" data-bs-toggle="tooltip" title="Commercial ayant réalisé la vente">
+						<div>Commercial</div>
+					</th>
+
 					<th class="salesrep" data-bs-toggle="tooltip" title="Commercial ayant réalisé la vente">
 						<div>Commercial</div>
 					</th>
@@ -939,11 +953,11 @@
 					</th>
 					<th class="carrier computed" data-bs-toggle="tooltip" title="Transport recommandé (pour ce client ou par la grille standard)">
 						<div>Transp. reco.</div>
-						<i @click="cycleFilter('CarrierOK')" role="button" :class="hideCarrierOKAboveclass"></i>
+ 						<i @click="cycleFilter('CarrierOK')" role="button" :class="hideCarrierOKAboveclass"></i>
 					</th>
 					<th class="carrier comment" data-bs-toggle="tooltip" title="Le transport choisi est-il conforme ?">
 						<div>Transport OK ? <override-signal /></div>
-						<i @click="cycleFilter('FinalCarrOK')" role="button" :class="hideFinalCarrOKAboveclass"></i>
+ 						<i @click="cycleFilter('FinalCarrOK')" role="button" :class="hideFinalCarrOKAboveclass"></i>
 					</th>
 
 					<th class="price" data-bs-toggle="tooltip" title="Frais de port de base (voir Article X3 dans la bulle d'aide)">
@@ -955,26 +969,26 @@
 					<th class="price" data-bs-toggle="tooltip" title="Diverses options (voir Article X3 dans la bulle d'aide)">
 						<div>Opt.</div>
 					</th>
-<th title="zone extraite aux forceps">Nam</th><%-- TODO NAM Q&D --%>
-<th title="reprise du poids">Nam</th><%-- TODO NAM Q&D --%>
 					<th class="price computed" data-bs-toggle="tooltip" title="Montant total des frais de port payés, selon X3">
 						<div>Total</div>
 					</th>
 					<th class="price computed" data-bs-toggle="tooltip" title="Prix recommandé">
 						<div>Prix reco</div>
-						<i @click="cycleFilter('AmountOK')" role="button" :class="hideAmountOKAboveclass"></i>
+					<i @click="cycleFilter('AmountOK')" role="button" :class="hideAmountOKAboveclass"></i>
 					</th>
 					<th class="price comment" data-bs-toggle="tooltip" title="Le prix recommandé est-il appliqué ?(voir la justification donnée dans la bulle d'aide)">
 						<div>Prix OK ? <override-signal /></div>
 						<i @click="cycleFilter('FinalAmntOK')" role="button" :class="hideFinalAmntOKAboveclass"></i>
 					</th>
+--%>
 				</tr>
 			</thead>
 			<tbody>
 				<TransitionGroup name="list">
 				<grid-row v-for="rowData in dataList" :key="rowData.id" :rowData="rowData"
-				  :hideCarrierOKAbove="hideCarrierOKAbove" :hideFinalCarrOKAbove="hideFinalCarrOKAbove"
-				  :hideAmountOKAbove="hideAmountOKAbove"   :hideFinalAmntOKAbove="hideFinalAmntOKAbove"
+				  :hide-weightOK-above = "hideWeightOKAbove"
+				  :hide-theirAmountOK-above = "hideTheirAmountOKAbove"
+				  :hide-ourMarginOK-above = "hideOurMarginOKAbove"
 				  @filter-by-customer-label="filterByCustomerLabel"
 				></grid-row>
 				</TransitionGroup>
@@ -983,58 +997,11 @@
 	</script>
 
 	<script type="module">
-		function _updatePricingSystem(gridName, dt, system){
-			let pgv_metadata_uri = "price-grids/*/versions/latest-of?grid-name="+ gridName +"&published-at=" + dt;
-			axios_backend.get(pgv_metadata_uri)
-			.then(response => {
-				let pgv_metadata = response.data;
-
-				if (!(pgv_metadata?.id)) {
-					delete(system["#pgv_metadata"]);
-					system.clear();
-
-					throw new Error("Aucune grille publiée à la date demandée");
-				}
-
-				if (system["#pgv_metadata"]
-				&& system["#pgv_metadata"]["id"] == pgv_metadata["id"]
-					&& system["#pgv_metadata"]["_v_lock"] == pgv_metadata["_v_lock"]
-				) {
-					return; // pricingSystem already OK
-				} else {
-					delete(system["#pgv_metadata"]);
-					system.clear();
-				}
-
-
-				let PRICE_GRID_ID = pgv_metadata.priceGrid.id;
-				let PRICE_GRID_VERSION_ID = pgv_metadata.id;
-				let dataUri =`price-grids/\${PRICE_GRID_ID}/versions/\${PRICE_GRID_VERSION_ID}/jsonContent`;
-
-				axios_backend.get(dataUri)
-				.then(response => {
-					system.fromJSON(response.data);
-					// note : pgv_metadata kept for display and browser cache invalidation
-					system["#pgv_metadata"] = pgv_metadata;
-				})
-				.catch(error => {
-					alert_dialog(`Récupération de la grille tarifaire \"\${gridName}\"`, error.message);
-				});
-			})
-			.catch(error => {
-				//showAxiosErrorDialog(error);
-				alert_dialog(`Récupération de la grille tarifaire \"\${gridName}\" (entête)`, error.message);
-			});
-		};
-
-
 		/* shared state for the page */
 		const app = Vue.createApp({
 			provide(){
 				return {
-					"reflist_carriers": this.reflist_carriers,
-					"pricingSystem": Vue.reactive(this.pricingSystem),
-					"otherPricingSystems": this.otherPricingSystems,
+					"priceGrids": this.carrierPriceGrids,
 					LEVEL_NULL, LEVEL_BAD, LEVEL_WARN, LEVEL_OK, COUNT_LEVELS
 				};
 			},
@@ -1043,24 +1010,44 @@
 					ctrlDate: this.init_ctrlDate(),
 					dataRowCount : null,
 
-					pricingSystem: new PricingSystem(),
-					otherPricingSystems: new Map(),
-					reflist_carriers: new Map(),
+					carrierPriceGrids: [],
 				};
 			},
 			methods:{
 				init_ctrlDate(){
-					let storedDate = localStorage.getItem("controls/revenue/ctrlDate");
+					let storedDate = localStorage.getItem("controls/costs/ctrlDate");
 					return storedDate ?? Datepicker.currentDate();
 				},
-				loadRef_MainPricingSystem(dt){
-					_updatePricingSystem("Acadia", dt, this.pricingSystem);
-				},
-				loadRef_OtherPricingSystem(dt){
-					this.otherPricingSystems.forEach((system, pgname) => {
-						_updatePricingSystem(pgname, dt, system)
+				loadRef_allCarrierGrids(){
+					axios_backend.get("price-grids?tag=Transporteur")
+					.then(response => {
+						this.carrierPriceGrids.push(... response.data);
+						for (let pg of this.carrierPriceGrids) {
+							this.loadRef_allVersionsOfGrid(pg);
+						}
+					}).catch(error => {
+						showAxiosErrorDialog(error);
 					});
 				},
+				loadRef_allVersionsOfGrid(pg){
+					axios_backend.get("price-grids/" + pg.id +"/versions?published-at="+ this.ctrlDate)
+					.then(response => {
+						let versionsMetaList = response.data;
+						for (let pgv of versionsMetaList) {
+							this.loadRef_contentOfGridVersion(pgv);
+						}
+						pg["#versions"] = versionsMetaList;
+					});
+				},
+				loadRef_contentOfGridVersion(pgv){
+					axios_backend.get("price-grids/" + pgv.priceGrid.id +"/versions/" + pgv.id + "/jsonContent")
+					.then(response => {
+						let system = new PricingSystem();
+						system.fromJSON(response.data);
+						pgv["#system"] = system;
+					});
+				},
+
 				clearGridFilters(){
 					this.$refs.gridRoot.clearFilters();
 				},
@@ -1070,38 +1057,22 @@
 			},
 			computed:{
 				sharedReady(){ // almost a reactivity hack
-					console.debug("shared ready");
-					return !this.pricingSystem.isEmpty() > 0
-					  && ![...this.otherPricingSystems.values()].some(system => system.isEmpty())
-					  && this.reflist_carriers.size > 0;
+					console.debug("shared ready TODO");
+					return true;
 				}
 			},
 			watch:{
 				ctrlDate: {
 					handler(v){
-						localStorage.setItem("controls/revenue/ctrlDate", v);
-						this.loadRef_MainPricingSystem(v);
-						this.loadRef_OtherPricingSystem(v);
+						localStorage.setItem("controls/costs/ctrlDate", v);
+						// this.loadRef_MainPricingSystem(v);
+						// this.loadRef_OtherPricingSystem(v);
 					},
 					immediate: true
-				}
+				},
 			},
 			created(){
-				axios_backend.get("carriers")
-				.then(response => {
-					for (let carrier of response.data){
-						this.reflist_carriers.set(carrier.name, carrier);
-					}
-				});
-
-				axios_backend.get("price-grids?tag=Tarif+Spécial")
-				.then(response => {
-					for (let pricegrid of response.data){
-						this.otherPricingSystems.set(pricegrid.name, new PricingSystem());
-					}
-
-					this.loadRef_OtherPricingSystem(this.ctrlDate);
-				});
+				this.loadRef_allCarrierGrids();
 			}
 		});
 
@@ -1109,8 +1080,10 @@
 			template:"<span class=\"text-warning position-absolute top-0 end-0 me-1 opacity-75 pe-none\">⚠️</span>"
 			//template:"<i class=\"text-warning bi bi-exclamation-octagon-fill position-absolute top-0 end-0 me-1 opacity-75 pe-none\"></i>"
 		});
+		app.component("invoice-map", InvoiceMapRenderer);
 
-		app.component("datepicker-day", Datepicker_Day);
+
+		app.component("datepicker-month", Datepicker_Month);
 		app.component("audit-info", AuditingInfoRenderer);
 
 		app.component("link-to-grid", LinkToGrid);

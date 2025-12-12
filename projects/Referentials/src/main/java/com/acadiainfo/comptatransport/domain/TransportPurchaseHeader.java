@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.acadiainfo.comptatransport.fileimport.ArticleTransportAchete;
@@ -43,12 +44,10 @@ public class TransportPurchaseHeader {
 	@Column(name = "id")
 	private Long id;
 
-	@jakarta.json.bind.annotation.JsonbTransient
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "import_id", referencedColumnName = "id", nullable = false, updatable = false)
 	private Import importHeader;
 
-	@jakarta.json.bind.annotation.JsonbTransient
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "article_id", referencedColumnName = "id", nullable = false, updatable = false)
 	private ArticleTransportAchete article;
@@ -111,8 +110,10 @@ public class TransportPurchaseHeader {
 	@Column(name = "parcel_count")
 	private Integer parcelCount;
 
-	/* ========== Amount details ========== */
-	@jakarta.json.bind.annotation.JsonbTransient
+	/* ========== Amount total and details ========== */
+	@Column(name = "total_amount")
+	private BigDecimal totalAmount;
+
 	@OneToMany(fetch = FetchType.EAGER, cascade = jakarta.persistence.CascadeType.PERSIST, mappedBy = "parent")
 	private Set<ImportTransportAcheteDetail> details = new HashSet<ImportTransportAcheteDetail>();
 
@@ -121,19 +122,14 @@ public class TransportPurchaseHeader {
 	@ElementCollection
 	@CollectionTable(name = "MAP_TRANSPORT_INVOICE", joinColumns = @JoinColumn(name = "tr_achete_id"))
 	@Column(name = "doc_reference")
-	private List<String> resolvedDocReferences = new java.util.ArrayList<>();
+	private List<String> resolvedDocReferences;
 
-	public java.util.Map<String, Object> getTestMap() {
-		var map = new java.util.HashMap<String, Object>();
-		map.put("arf", Integer.MAX_VALUE);
-		map.put("erf", new java.util.Date());
-		return map;
-	}
 
 	public Long getId() {
 		return id;
 	}
 
+	@jakarta.json.bind.annotation.JsonbTransient
 	public Import getImportHeader() {
 		return importHeader;
 	}
@@ -190,14 +186,48 @@ public class TransportPurchaseHeader {
 		return parcelCount;
 	}
 
+	public BigDecimal getTotalAmount() {
+		return totalAmount;
+	}
+
+	@jakarta.json.bind.annotation.JsonbTransient
 	public Set<ImportTransportAcheteDetail> getDetails() {
 		return details;
 	}
 
+	@jakarta.json.bind.annotation.JsonbTransient
 	public List<String> getResolvedDocReferences() {
 		return resolvedDocReferences;
 	}
 
+	// ============================
+	// Serializing from ImportTransportAcheteDetail to amounts...
+
+	public java.util.Map<String, BigDecimal> getDetailAmounts() {
+		var detailAmounts = new java.util.HashMap<String, BigDecimal>();
+		for (ImportTransportAcheteDetail detail : this.details) {
+			detailAmounts.put(detail.getSubarticleName(), detail.getAmount());
+		}
+		return detailAmounts;
+	}
+
+	// ============================
+	// Serializing from invoice numbers to TransportSalesHeader...
+	@jakarta.persistence.Transient
+	private Map<String, TransportSalesHeader> invoices = new java.util.HashMap<>();
+
+	/**
+	 * Add an entry to the serialized Map "invoices".
+	 * @param mixedRef - the [invoice or order] reference used as source
+	 * @param salesHeader - the "Acadia invoice" object, in fact
+	 */
+	public void putInvoice(String mixedRef, TransportSalesHeader salesHeader) {
+		invoices.put(mixedRef, salesHeader);
+	}
+
+	public java.util.Map<String, TransportSalesHeader> getInvoices() {
+		return this.invoices;
+	}
 
 }
 

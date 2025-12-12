@@ -59,6 +59,7 @@ CREATE TABLE `I_TRANSPORT_ACHETE` (
   `total_weight` decimal(10,3) NOT NULL COMMENT 'le poids utilisé par le Fournisseur (=Transporteur) comme base de facturation. Peut être un "poids volumique".',
   `parcel_count` int DEFAULT NULL COMMENT '(optionnel) le nombre de colis utilisé par le Fournisseur (=Transporteur) comme base de facturation.',
 
+  `total_amount` DECIMAL(10,3) NULL COMMENT 'Montant TTC fourni sur la facture transporteur',
 
   PRIMARY KEY (`id`),
   KEY `I_TRANSPORT_ACHETE_I_IMPORT_FK` (`import_id`),
@@ -78,33 +79,14 @@ CREATE TABLE `I_TRANSPORT_ACHETE_DETAIL` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `tr_achete_id` bigint unsigned NOT NULL,
 
-
   `subarticle_name` varchar(64) NOT NULL COMMENT 'le sous-article, c''est typiquement la décomposition en principal, option, taxes, frais gasoil, etc., défini librement par le transporteur',
 
   amount decimal(10,3) DEFAULT NULL COMMENT 'le montant au sens le plus basique, HT et TTC mélangés.',
-
-
 
   PRIMARY KEY (`id`),
   KEY `I_TRANSPORT_ACHETE_DETAIL_I_TRANSPORT_ACHETE_FK` (`tr_achete_id`),
   CONSTRAINT `I_TRANSPORT_ACHETE_DETAIL_I_TRANSPORT_ACHETE_FK` FOREIGN KEY (`tr_achete_id`) REFERENCES `I_TRANSPORT_ACHETE` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci  COMMENT='Lignes filles I_TRANSPORT_ACHETE, comportant tous les montants';
-
--- MAP_TRANSPORT_INVOICE definition
--- relationship table between 
---   - Carrier invoices (I_TRANSPORT_ACHETE)
---   - Acadia invoices (distinct doc_reference from I_TRANSPORT_VENDU)
-CREATE TABLE `MAP_TRANSPORT_INVOICE` (  
-  `tr_achete_id` bigint unsigned NOT NULL COMMENT 'pointe vers une ligne de facture Transporteur (une ligne de I_TRANSPORT_ACHETE)',
-  `doc_reference` varchar(32) NOT NULL COMMENT 'pointe vers une facture Acadia (une valeur distincte de I_TRANSPORT_VENDU.doc_reference)',
-
-  
-  UNIQUE KEY `MAP_TRANSPORT_INVOICE_UNIQUE` (`tr_achete_id`, `doc_reference`),
-    
-  CONSTRAINT `MAP_TRANSPORT_INVOICE_I_TRANSPORT_ACHETE_FK` FOREIGN KEY (`tr_achete_id`) REFERENCES `I_TRANSPORT_ACHETE` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-  
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci  COMMENT='relation entre  I_TRANSPORT_ACHETE et I_TRANSPORT_VENDU';
-
 
 /*
 

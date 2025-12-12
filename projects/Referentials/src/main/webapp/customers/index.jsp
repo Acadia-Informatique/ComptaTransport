@@ -285,7 +285,7 @@
 							{
 								name: "description",
 								label: "Description",
-								renderer: "textarea",
+								renderer: "textarea",		
 								description: "Commentaire libre"
 							},
 							{
@@ -442,9 +442,10 @@
 								name: "description",
 								label: "Description",
 
-								/* since we need fixed height here...
-								renderer: "textarea",
 								editor: "textarea",
+
+								/* since we need fixed height here, in readonly mode...
+								renderer: "textarea",
 								format: {pattern:/^(?:.|\n|\r){0,256}$/, errorMsg:"Longueur max: 256"}, */
 								description: "Commentaire libre"
 							},

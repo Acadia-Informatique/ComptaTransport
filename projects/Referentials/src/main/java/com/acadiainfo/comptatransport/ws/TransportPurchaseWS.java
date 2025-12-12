@@ -87,27 +87,20 @@ public class TransportPurchaseWS {
 
 		List<TransportPurchaseHeader> headers = purchaseRepo.getAllBetween(startDate, endDate).toList();
 		for (TransportPurchaseHeader header : headers) {
-			for (String docReference : header.getResolvedDocReferences()) {
-				TransportSalesHeader sales = salesRepo.getOne(docReference);
-				//
+			//
+
+			// get linked Invoices
+			for (String mixedReference : header.getResolvedDocReferences()) {
+				TransportSalesHeader salesHeader;
+				if (mixedReference.startsWith("ACA-FC"))
+					salesHeader = salesRepo.getOne(mixedReference);
+				else if (mixedReference.startsWith("CMV"))
+					salesHeader = salesRepo.findByOrderNum(mixedReference);
+				else
+					salesHeader = null;
+
+				header.putInvoice(mixedReference, salesHeader);
 			}
-
-			// Simplify and enrich Customer, if any, to make it contain only pricing details
-
-//			Customer customer = header.getCustomer();
-//			if (customer == null)
-//				continue;
-//
-//			// - disconnect Customer entity before manipulating it for serialization
-//			em.detach(customer);
-//			// ... we mainly need customer.getTags();
-//			customer.setDescription(null);
-//			customer.setErpReference(null); // useful, but redundant with TransportSalesHeader.customerRef
-//			customer.setLabel(null);
-//			customer.setSalesrep(null);
-//			customer.set_v_lock(null);
-//			customer.emptyAuditingInfo();
-
 		}
 
 		return headers.stream();

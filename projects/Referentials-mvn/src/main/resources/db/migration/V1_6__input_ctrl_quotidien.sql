@@ -1,5 +1,5 @@
 
--- I_FORFAIT_TRSP_VENDU definition
+-- INPUT_CTRL_REVENUE definition
 
 CREATE TABLE `INPUT_CTRL_REVENUE` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -9,8 +9,8 @@ CREATE TABLE `INPUT_CTRL_REVENUE` (
 -- override computation result
   `carrierOK_comment` varchar(256) NULL DEFAULT NULL COMMENT 'Commentaire Transport définitif : libre, pour info',
   `amountOK_comment` varchar(256) NULL DEFAULT NULL COMMENT 'Commentaire Montant définitif : libre, pour info',
-  `carrierOK_override` TINYINT(2) NULL DEFAULT NULL COMMENT 'OK Transport définitif : valeur de 0 (KO) à 2 (OK), cf. mapping JPA',
-  `amountOK_override` TINYINT(2) NULL DEFAULT NULL COMMENT 'OK Montant définitif : valeur de 0 (KO) à 2 (OK), cf. mapping JPA',
+  `carrierOK_override` TINYINT(2) NULL DEFAULT NULL COMMENT 'OK Transport définitif : valeur de 0 (KO) à 3 (OK), cf. LEVEL_OK dans revenue.jsp',
+  `amountOK_override` TINYINT(2) NULL DEFAULT NULL COMMENT 'OK Montant définitif : valeur de 0 (KO) à 3 (OK), cf. LEVEL_OK dans revenue.jsp',
 
 -- override computation input
   `is_b2c_override`             bool   NULL DEFAULT NULL COMMENT 'override Commande B2C',
@@ -31,7 +31,6 @@ CREATE TABLE `INPUT_CTRL_REVENUE` (
 
 
 /*
-
 BEGIN;
 COMMIT;
 */
