@@ -15,14 +15,7 @@
 	<%@ include file="/WEB-INF/includes/header-inc/vue-entityTextTagsComponents.jspf" %>
 
 	<style>
-
 		/* Some table column styling */
-		table#carrier-grid th.identifier-col::after {
-			position: absolute;
-			top: 2px; left: 5px;
-			content: "\01F511"; /* emoji "Key" */
-		}
-
 		table#carrier-grid tr td.mandatory-col {
 			background-color: rgb(255, 255, 200);
 		}
@@ -69,6 +62,7 @@
 								updatable: false,
 								mandatory: true,
 								format: {pattern:/^[\w/-]{1,32}$/, errorMsg:"Jusqu'à 32 lettres et chiffres"},
+								descriptionIcon : "key",
 								description:"Identifiant du transporteur"
 							},
 							{
@@ -88,7 +82,7 @@
 							{
 								name: "groupName",
 								label: "Groupe de contrôle",
-								width: "8em",
+								//width: "8em",
 								format: {pattern:/^.{0,32}$/, errorMsg:"Longueur max: 32"},
 								descriptionIcon : "2-circle-fill",
 								description: "Référence pour les Grilles Tarifaires, les Contrôles, etc. Mais attention, si le champ est vide, le transport n'est plus contrôlé !"
@@ -136,7 +130,7 @@
 						],
 						inferColumns: true,
 						confirmDelete: true,
-						selectRowAction: "edit"
+						//selectRowAction: "edit" - nice, but sort of confusing
 					},
 					selectableTags : {}
 				};
