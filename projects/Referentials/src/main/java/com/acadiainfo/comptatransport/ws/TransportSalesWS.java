@@ -92,7 +92,7 @@ public class TransportSalesWS {
 			// - disconnect Customer entity before manipulating it for serialization
 			em.detach(customer);
 			// ... we mainly need customer.getTags();
-			customer.setDescription(null);
+			// customer.setDescription(null); requested by users
 			customer.setErpReference(null); // useful, but redundant with TransportSalesHeader.customerRef
 			customer.setLabel(null);
 			customer.setSalesrep(null);

@@ -271,7 +271,7 @@
 						this.rowData_carrierObj,
 						CustomerFunc.assessMarket(this.rowDataCached_final_b2c, this.rowData.customer, this.rowData_customerShipPreferences),
 						this.rowDataCached_nonstdPack,
-						this.rowData_carrierObj.name == "INTEGRATION"
+						this.rowData["carrier"] == "INTEGRATION" //instead of the overridden version : this.rowData_carrierObj.name == "INTEGRATION"
 					);
 				},
 				priceGridResult(){
@@ -632,11 +632,14 @@
 			</td>
 			<td class="cust">
 				<div v-if="rowData.customer">
-					<div v-if="rowData.customer.tags.includes('inactive')">
+					<template v-if="rowData.customer.tags.includes('inactive')">
 						{{ rowData.customerRef }}
 						<i role="button" class="bi bi-activity" title="Réactiver" @click="activateCustomer(rowData.customerRef)"></i>
-					</div>
-					<link-to-grid v-else url="../customers" attr="erpReference" :value="rowData.customerRef"></link-to-grid>
+					</template>
+					<template v-else>
+						<link-to-grid url="../customers" attr="erpReference" :value="rowData.customerRef"></link-to-grid>
+ 						<span v-if="rowData.customer.description" :title="rowData.customer.description">ℹ️</span>
+					</template>
 				</div>
 				<div v-else>
 					{{ rowData.customerRef }}
@@ -717,6 +720,14 @@
 				</div>
 			</td>
 
+<td><%-- TODO NAM Q&D --%>
+	<div>{{ priceGridFlatResult_zone }}</div>
+</td>
+<td><%-- TODO NAM Q&D --%>
+	<div :title="rowData_truncatedWeight" >{{ rowData.weight }}</div>
+</td>
+
+
 			<td class="price">
 				<div v-if="Number.isFinite(rowData.$userInputs$price_MAIN_override)" >
 					<override-signal />
@@ -740,13 +751,6 @@
 					</div>
 				</div>
 			</td>
-<td>
-	<div>{{ priceGridFlatResult_zone }}</div>
-</td>
-<td>
-	<div :title="rowData_truncatedWeight" >{{ rowData.weight }}</div>
-</td>
-
 			<td class="price computed">
 				<div :title="'Prix originel dans X3 : ' + rowData.price">{{ rowData_overridden_price }}</div>
 			</td>
@@ -945,7 +949,8 @@
 						<div>Transport OK ? <override-signal /></div>
 						<i @click="cycleFilter('FinalCarrOK')" role="button" :class="hideFinalCarrOKAboveclass"></i>
 					</th>
-
+<th title="zone extraite aux forceps">Zone</th><%-- TODO NAM Q&D --%>
+<th title="reprise du poids">Poids</th><%-- TODO NAM Q&D --%>
 					<th class="price" data-bs-toggle="tooltip" title="Frais de port de base (voir Article X3 dans la bulle d'aide)">
 						<div>Base <override-signal /></div>
 					</th>
@@ -955,8 +960,6 @@
 					<th class="price" data-bs-toggle="tooltip" title="Diverses options (voir Article X3 dans la bulle d'aide)">
 						<div>Opt.</div>
 					</th>
-<th title="zone extraite aux forceps">Nam</th><%-- TODO NAM Q&D --%>
-<th title="reprise du poids">Nam</th><%-- TODO NAM Q&D --%>
 					<th class="price computed" data-bs-toggle="tooltip" title="Montant total des frais de port payés, selon X3">
 						<div>Total</div>
 					</th>
