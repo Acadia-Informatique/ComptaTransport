@@ -41,7 +41,7 @@
 			border: dotted 1px black;
 			z-index: 500;
 		}
-		table#revenue-control-grid td > div.multiline {
+		table#revenue-control-grid td div.multiline {
 			white-space:pre-wrap;
 		}
 		table#revenue-control-grid th.carrier,
@@ -105,6 +105,17 @@
 
 				<div v-if="dataRowCount" class="mx-2">{{ dataRowCount}} lignes</div>
 			</div>
+
+			<table class="mx-3 fst-italic">
+				<tr>
+					<td>Grilles spécifiques : </td>
+					<td v-for="[name, system] in otherPricingSystems">
+					 {{name}}
+						<span v-if="system['#pgv_metadata'] == 'NO_VERSION_AVAILABLE'">🔴<%-- emoji "red dot" --%></span> 						
+						<span v-else :title="system['#pgv_metadata']?.auditingInfo.dateModified">🟢<%-- emoji "green dot" --%></span>
+					</td>
+				</tr>
+			</table>
 
 			<div v-if="pricingSystem['#pgv_metadata']" class="d-flex">
 					Grille tarifaire ACADIA : {{ pricingSystem["#pgv_metadata"].version }}
@@ -657,6 +668,10 @@
 			<td>
 				<div>{{ rowData.zip }}</div>
 			</td>
+<td><%-- TODO NAM Q&D --%>
+	<div>{{ priceGridFlatResult_zone }}</div>
+</td>
+
 			<td>
 				<div @click="debug_PricingSystem"> <%-- hidden debug feature --%>
 					<datedisplay-day :value="rowData.date"></datedisplay-day>
@@ -708,7 +723,7 @@
 				<div :class="finalCarrOKclass">
 					<textarea rows="1" v-if="rowData.userInputs.carrierOK_comment"
 					      v-model.lazy.trim="rowData.userInputs.carrierOK_comment"
-					  @keyup.esc="$event.target.blur()">>
+					  @keyup.esc="$event.target.blur()">
 					</textarea>
 					<div v-else role="button" @click="init_carrierOK_comment">
 						✏️
@@ -719,14 +734,6 @@
 					<override-signal v-if="rowData.userInputs.carrierOK_override" />
 				</div>
 			</td>
-
-<td><%-- TODO NAM Q&D --%>
-	<div>{{ priceGridFlatResult_zone }}</div>
-</td>
-<td><%-- TODO NAM Q&D --%>
-	<div :title="rowData_truncatedWeight" >{{ rowData.weight }}</div>
-</td>
-
 
 			<td class="price">
 				<div v-if="Number.isFinite(rowData.$userInputs$price_MAIN_override)" >
@@ -922,6 +929,10 @@
 					<th data-bs-toggle="tooltip" title="Code postal de l'adresse d'expédition">
 						<div>CP</div>
 					</th>
+					<th data-bs-toggle="tooltip" title="Zone géographique tarifaire. N'est disponible que quand lorsqu'une grille est applicable.">
+						<div>Zone</div>
+					</th><%-- TODO NAM Q&D --%>
+
 					<th data-bs-toggle="tooltip" title="Date de facture X3">
 						<div>Date de facture</div>
 					</th>
@@ -949,8 +960,7 @@
 						<div>Transport OK ? <override-signal /></div>
 						<i @click="cycleFilter('FinalCarrOK')" role="button" :class="hideFinalCarrOKAboveclass"></i>
 					</th>
-<th title="zone extraite aux forceps">Zone</th><%-- TODO NAM Q&D --%>
-<th title="reprise du poids">Poids</th><%-- TODO NAM Q&D --%>
+
 					<th class="price" data-bs-toggle="tooltip" title="Frais de port de base (voir Article X3 dans la bulle d'aide)">
 						<div>Base <override-signal /></div>
 					</th>
@@ -987,24 +997,28 @@
 
 	<script type="module">
 		function _updatePricingSystem(gridName, dt, system){
+			if (dt == null) return; // transient state while using datepicker
+
 			let pgv_metadata_uri = "price-grids/*/versions/latest-of?grid-name="+ gridName +"&published-at=" + dt;
 			axios_backend.get(pgv_metadata_uri)
 			.then(response => {
 				let pgv_metadata = response.data;
 
 				if (!(pgv_metadata?.id)) {
-					delete(system["#pgv_metadata"]);
+					//delete(system["#pgv_metadata"]);
+					system["#pgv_metadata"] = "NO_VERSION_AVAILABLE";
 					system.clear();
-
-					throw new Error("Aucune grille publiée à la date demandée");
+					return;
 				}
 
 				if (system["#pgv_metadata"]
 				&& system["#pgv_metadata"]["id"] == pgv_metadata["id"]
 					&& system["#pgv_metadata"]["_v_lock"] == pgv_metadata["_v_lock"]
 				) {
-					return; // pricingSystem already OK
+					// pricingSystem already cached
+					return;
 				} else {
+					// clean before loading
 					delete(system["#pgv_metadata"]);
 					system.clear();
 				}
@@ -1075,7 +1089,7 @@
 				sharedReady(){ // almost a reactivity hack
 					console.debug("shared ready");
 					return !this.pricingSystem.isEmpty() > 0
-					  && ![...this.otherPricingSystems.values()].some(system => system.isEmpty())
+					  && ![...this.otherPricingSystems.values()].some(system => system.isEmpty() && system["#pgv_metadata"] != "NO_VERSION_AVAILABLE")
 					  && this.reflist_carriers.size > 0;
 				}
 			},

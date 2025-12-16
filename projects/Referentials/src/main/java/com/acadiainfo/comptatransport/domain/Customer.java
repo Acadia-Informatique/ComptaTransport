@@ -11,6 +11,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.NamedNativeQuery;
 import jakarta.persistence.NamedQuery;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -21,6 +22,13 @@ import jakarta.persistence.Version;
 @Entity
 @Table(schema = "ComptaTransport", name = "CUSTOMER")
 @NamedQuery(name = "Customer.findAll", query = "SELECT c FROM Customer c ORDER BY c.label")
+@NamedQuery(name = "Customer.findByErpRef", query = "SELECT c FROM Customer c WHERE c.erpReference = :erpReference")
+@NamedNativeQuery(name = "Customer.findClosestByLabel", query = """
+    select c.*
+    from CUSTOMER c
+    where RANK_CUSTOMER_MATCH(c.label, ?1) < 20
+    order by RANK_CUSTOMER_MATCH(c.label, ?1), c.label
+	""", resultClass = Customer.class)
 public class Customer implements Auditable, VersionLockable {
 
 	/** Tech. PK */

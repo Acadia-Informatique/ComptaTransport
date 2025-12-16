@@ -1,33 +1,27 @@
 package com.acadiainfo.comptatransport.ws;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.Map.Entry;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
+import com.acadiainfo.comptatransport.data.CustomersRepository;
 import com.acadiainfo.comptatransport.data.TransportPurchaseRepository;
 import com.acadiainfo.comptatransport.data.TransportSalesRepository;
-import com.acadiainfo.comptatransport.domain.AggShippingRevenue;
-import com.acadiainfo.comptatransport.domain.Carrier;
 import com.acadiainfo.comptatransport.domain.Customer;
-import com.acadiainfo.comptatransport.domain.CustomerShipPreferences;
+import com.acadiainfo.comptatransport.domain.InputControlCosts;
 import com.acadiainfo.comptatransport.domain.InputControlRevenue;
 import com.acadiainfo.comptatransport.domain.TransportPurchaseHeader;
 import com.acadiainfo.comptatransport.domain.TransportSalesHeader;
-import com.acadiainfo.comptatransport.fileimport.RowsProvider;
 import com.acadiainfo.util.WSUtils;
 
 import jakarta.ejb.Stateless;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.Query;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
@@ -87,8 +81,6 @@ public class TransportPurchaseWS {
 
 		List<TransportPurchaseHeader> headers = purchaseRepo.getAllBetween(startDate, endDate).toList();
 		for (TransportPurchaseHeader header : headers) {
-			//
-
 			// get linked Invoices
 			for (String mixedReference : header.getResolvedDocReferences()) {
 				TransportSalesHeader salesHeader;
@@ -101,69 +93,73 @@ public class TransportPurchaseWS {
 
 				header.putInvoice(mixedReference, salesHeader);
 			}
+
+			// infer Customer from already matched invoices
+			String customerErpReference = null;
+			for (Entry<String, TransportSalesHeader> entry : header.getInvoices().entrySet()) {
+				TransportSalesHeader salesHeader = entry.getValue();
+
+				// for every invoice present in system...
+				if (salesHeader != null) {
+					if (customerErpReference == null) {
+						customerErpReference = salesHeader.getCustomerErpReference();
+					} else {
+						// if customer already found, check consistency
+						if (!customerErpReference.equals(salesHeader.getCustomerErpReference()))
+							customerErpReference = "(???)";
+					}
+				}
+			}
+			header.setCustomerErpReference(customerErpReference);
 		}
 
 		return headers.stream();
 	}
 
-//	/**
-//	 *
-//	 * Persist the user entry on one row of Transport Revenue Control.
-//	 * @param id - ignored, dummy id in view !
-//	 * @param row - TransportSalesHeader is never saved per-se, so it is really a convenient
-//	 *              wrapper for *saving* its 1-to-1 writable counterpart, InputControlRevenue.
-//	 * @return
-//	 */
-//	@PUT
-//	@Path("/{id}")
-//	@Consumes(value = MediaType.APPLICATION_JSON)
-//	@Produces(value = MediaType.APPLICATION_JSON)
-//	public Response saveOne(@PathParam("id") Long id, TransportPurchaseHeader row) {
-//		try {
-//			// TransportSalesHeader will NOT be retrieved by its id,
-//			// since it is a view Object.
-//			// Nor will it be persisted... (hence no cascading between them).
-//
-//			InputControlRevenue realPayload = row.getUserInputs();
-//			if (realPayload == null) return Response.noContent().build();
-//
-//			// linking is through docReference(=invoice number)
-//			// because current choice is : a row represents an Invoice (and not an Order).
-//			if (row.getDocReference() == null) throw new IllegalArgumentException("Numéro de facture obligatoire dans le bloc \"userInputs\" (attribut \"invoice\")");
-//			realPayload.setDocReference(row.getDocReference());
-//
-//			InputControlRevenue saved;
-//			if (realPayload.getId() == null) {
-//				em.persist(realPayload);
-//				saved = realPayload;
-//			} else {
-//				// "manual merge" of related entities in payload (find by id instead, in fact)
-//				Carrier carrierOverride = realPayload.getCarrier_override();
-//				if (carrierOverride != null) {
-//					carrierOverride = em.find(Carrier.class, carrierOverride.getName());
-//					if (carrierOverride != null) {
-//						realPayload.setCarrier_override(carrierOverride);
-//					} else {
-//						throw new IllegalArgumentException(
-//						    "Transport de nom inconnu dans le bloc \"userInputs\" (attribut \"carrier_override\")");
-//					}
-//				}
-//
-//				saved = em.merge(realPayload);
-//			}
-//			em.flush();
-//
-//			row.setUserInputs(saved);
-//			// all others are just irrelevent, we send them back unchanged.
-//			row.setDetails(null); // except details is nullified
-//
-//			return Response.ok(row).build();
-//		} catch (IllegalArgumentException exc) {
-//			return WSUtils.response(Status.BAD_REQUEST, servReq, exc.getMessage());
-//		} catch (jakarta.persistence.PersistenceException exc) {
-//			return ApplicationConfig.response(exc, servReq, InputControlRevenue.class);
-//		}
-//	}
+	/**
+	 *
+	 * Persist the user entry on one row of Transport Costs Control.
+	 * @param id - the one on TransportPurchaseHeader
+	 * @param row - TransportPurchaseHeader is never saved per-se, so it is really a convenient
+	 *              wrapper for *saving* its 1-to-1 writable counterpart, InputControlCosts.
+	 * @return
+	 */
+	@PUT
+	@Path("/{id}")
+	@Consumes(value = MediaType.APPLICATION_JSON)
+	@Produces(value = MediaType.APPLICATION_JSON)
+	public Response saveOne(@PathParam("id") Long id, TransportPurchaseHeader row) {
+		try {
+			TransportPurchaseRepository repo = TransportPurchaseRepository.getInstance(em);
+			TransportPurchaseHeader header = repo.findById(id);
+
+			// As a wrapper, TransportSalesHeader itself will not be updated.
+
+			InputControlCosts realPayload = row.getUserInputs();
+			if (realPayload == null)
+				return Response.noContent().build();
+			else
+				realPayload.setHeader(header);
+
+			InputControlCosts saved;
+			if (realPayload.getId() == null) {
+				em.persist(realPayload);
+				saved = realPayload;
+			} else {
+				saved = em.merge(realPayload);
+			}
+			em.flush();
+
+			row.setUserInputs(saved);
+			// all others are just irrelevent, we send them back unchanged.
+
+			return Response.ok(row).build();
+		} catch (IllegalArgumentException exc) {
+			return WSUtils.response(Status.BAD_REQUEST, servReq, exc.getMessage());
+		} catch (jakarta.persistence.PersistenceException exc) {
+			return ApplicationConfig.response(exc, servReq, InputControlRevenue.class);
+		}
+	}
 
 
 }

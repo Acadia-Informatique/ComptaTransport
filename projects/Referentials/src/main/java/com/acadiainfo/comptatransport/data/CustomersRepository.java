@@ -1,5 +1,7 @@
 package com.acadiainfo.comptatransport.data;
 
+import java.util.stream.Stream;
+
 import com.acadiainfo.comptatransport.domain.Customer;
 import com.acadiainfo.util.persistence.CrudRepositoryImpl;
 
@@ -47,10 +49,22 @@ public class CustomersRepository extends CrudRepositoryImpl<Customer, Long> {
 	 */
 	@SuppressWarnings("unchecked")
 	public Customer findByErpReference(String erpReference) {
-		Query query = em.createQuery("SELECT c FROM Customer c WHERE c.erpReference = :erpReference");
+		Query query = em.createNamedQuery("Customer.findByErpRef");
 		query.setParameter("erpReference", erpReference);
-
 		return (Customer) query.getResultStream().findFirst().orElse(null);
 	}
 
+	/**
+	 * Find Customers matching given label (=name), some even remotely.
+	 * @param label
+	 * @return
+	 */
+	public Stream<Customer> findAllByLabel(String label) {
+		Query query = em.createNamedQuery("Customer.findClosestByLabel");
+		query.setParameter(1, label);
+
+		@SuppressWarnings("unchecked")
+		Stream<Customer> resultStream = query.getResultStream();
+		return resultStream;
+	}
 }

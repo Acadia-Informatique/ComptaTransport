@@ -91,6 +91,7 @@ public class TransportSalesWS {
 
 			// - disconnect Customer entity before manipulating it for serialization
 			em.detach(customer);
+
 			// ... we mainly need customer.getTags();
 			// customer.setDescription(null); requested by users
 			customer.setErpReference(null); // useful, but redundant with TransportSalesHeader.customerRef
@@ -181,6 +182,7 @@ public class TransportSalesWS {
 			}
 			em.flush();
 
+			// prepare response payload
 			row.setUserInputs(saved);
 			// all others are just irrelevent, we send them back unchanged.
 			row.setDetails(null); // except details is nullified
@@ -296,11 +298,27 @@ public class TransportSalesWS {
 				        + mixedId);
 			}
 
-			if (header == null)
+			if (header == null) {
 				return WSUtils.response(Status.NOT_FOUND, servReq,
 				    "Aucune facture trouvée avec ce numéro (essayer avec le paramètre \"type\" ?).");
-			else
+			} else {
+				// simplify JSON payload
+				em.detach(header);
+
+				Customer customer = header.getCustomer();
+				if (customer != null) {
+					em.detach(customer);
+					customer.setShipPreferences(null); // deemed a bit overkill
+					customer.setAggShippingRevenues(null); // should already be null, since not mapped in JPA
+					customer.setSalesrep(null);
+					customer.set_v_lock(null);
+					customer.emptyAuditingInfo();
+				}
+
 				return Response.ok(header).build();
+			}
+
+			// TODO
 		} catch (jakarta.persistence.PersistenceException exc) {
 			return ApplicationConfig.response(exc, servReq, TransportSalesRepository.class);
 		}

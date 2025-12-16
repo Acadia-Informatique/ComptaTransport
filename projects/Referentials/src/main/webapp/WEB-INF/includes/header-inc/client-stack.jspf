@@ -21,7 +21,7 @@
 <style>
 	/** Bootstrap global overrides */
 	html {
-	  font-size: 0.7em;
+	  font-size: 0.8em;
 	}
 	
 	/** List animations */

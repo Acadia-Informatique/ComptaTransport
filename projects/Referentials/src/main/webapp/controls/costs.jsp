@@ -17,77 +17,73 @@
 	<script src="${libsUrl}/customer.js"></script>
 
 	<style>
-		/** Table styling
-		table#revenue-control-grid th div {
+		/** Table styling */
+		table#costs-control-grid th div {
 			height: 3em;
 		}
 
-		table#revenue-control-grid td.salesrep div {
-			width: 6em;
-		}
-		table#revenue-control-grid th.cust.lbl div,
-		table#revenue-control-grid td.cust.lbl div {
-			width: 10em;
-		}
- */
-		table#revenue-control-grid th,
-		table#revenue-control-grid td {
+		table#costs-control-grid th,
+		table#costs-control-grid td {
 			position: relative; /* for signal icons overlay */
+			padding-left: 0.3em;
+			padding-right: 0.4em;
 		}
 
-		table#revenue-control-grid td.erp-ref {
-			position : sticky;
-			left: 0;
-			border: dotted 1px black;
-			z-index: 500;
+		table#costs-control-grid td.intern-ref > div {
+			width: 8em;
 		}
-		table#revenue-control-grid td > div.multiline {
-			white-space:pre-wrap;
+		table#costs-control-grid td  div.multiline {
+			white-space: pre-wrap;
 		}
-		table#revenue-control-grid th.carrier,
-		table#revenue-control-grid td.carrier {
+
+		table#costs-control-grid th.weight,
+		table#costs-control-grid td.weight {
 			background-color: rgb(230, 255, 255);
 		}
-
-		table#revenue-control-grid th.price,
-		table#revenue-control-grid td.price {
-			background-color: rgb(255, 230, 230);
+		table#costs-control-grid th.costs,
+		table#costs-control-grid td.costs {
+			background-color: rgb(255, 255, 230);
+		}
+		table#costs-control-grid th.margin,
+		table#costs-control-grid td.margin {
+			background-color: rgb(255, 230, 255);
 		}
 
-		table#revenue-control-grid td.price.computed > div,
-		table#revenue-control-grid td.carrier.computed > div {
+		table#costs-control-grid td.weight.computed > div,
+		table#costs-control-grid td.costs.computed > div,
+		table#costs-control-grid td.margin.computed > div {
 			padding: 0.1em 0.3em;
 			font-weight: bold;
 		}
-		table#revenue-control-grid td.price.computed > div {
-			text-align: end;
-		}
-
-		table#revenue-control-grid td.price.comment > div,
-		table#revenue-control-grid td.carrier.comment > div {
+		table#costs-control-grid td.costs.comment > div,
+		table#costs-control-grid td.margin.comment > div {
 			width: 7em;
-			font-weight: bold;
 		}
 
-		table#revenue-control-grid select,
-		table#revenue-control-grid input,
-		table#revenue-control-grid textarea {
+		table#costs-control-grid select,
+		table#costs-control-grid input,
+		table#costs-control-grid textarea {
 			background-color: #ffffff80;
 		}
-		table#revenue-control-grid input {
+		table#costs-control-grid input {
 			width: 3em;
 		}
-		table#revenue-control-grid textarea {
+		table#costs-control-grid textarea {
 			min-width: 6em;
 			field-sizing: content;
 		}
-		table#revenue-control-grid td.carrier.name > div[role="button"] {
+		table#costs-control-grid td.weight.name > div[role="button"] {
 			padding-left: 0.4em;<%-- closer text align with the edit version (html select) --%>
 		}
 
-		/* TODO NAM Q&D : assess Q&Dirtiness ;-) */
-		table#revenue-control-grid tr.highlighted td {
-			background-color: #ff9;
+		table.detailed td {
+			border: solid 1px black;
+			padding: 0 0.5em;
+		}
+
+		table#costs-control-grid td.num,
+		table.detailed td.num {
+			text-align: end;
 		}
 
 	</style>
@@ -96,24 +92,28 @@
 <body>
 	<%@ include file="/WEB-INF/includes/body-inc/bs-confirmDialog.jspf" %>
 
-	<div id="app" class="container-fluid">
-		<h2>Contrôle mensuel des factures Transporteur</h2>
-		<div class="d-flex justify-content-between align-items-end">
-			<div class="d-flex h-50 align-items-baseline mt-1">
-				Période : <datepicker-month v-model="ctrlDate"></datepicker-month>
-				<button class="btn btn-sm bi bi-funnel btn-secondary ms-2" @click="clearGridFilters"></button>
+	<div id="app" class="container-fluid d-flex flex-column vh-100">
+		<div class="overflow-scroll" >
+			<h2>Contrôle mensuel des factures Transporteur</h2>
+			<div class="d-flex justify-content-between align-items-end">
+				<div class="d-flex h-50 align-items-baseline mt-1">
+					Période : <datepicker-month v-model="ctrlDate"></datepicker-month>
+					<button class="btn btn-sm bi bi-funnel btn-secondary ms-2" @click="clearGridFilters"></button>
 
-				<div v-if="dataRowCount" class="mx-2">{{ dataRowCount}} lignes</div>
+					<div v-if="dataRowCount" class="mx-2">{{ dataRowCount}} lignes</div>
+					<a role="button" class="bi bi-sort-up-alt" @click="clearGridSorts"></a>
+				</div>
 			</div>
-<%--
-			<div v-if="pricingSystem['#pgv_metadata']" class="d-flex">
-					Grille tarifaire ACADIA : {{ pricingSystem["#pgv_metadata"].version }}
-					<audit-info class="small text-nowrap" v-model="pricingSystem['#pgv_metadata'].auditingInfo"></audit-info>
-			</div>
---%>
+			<costs-control-grid v-if="sharedReady" ref="gridRoot"
+			  :date="ctrlDate" :view-articles="activeGroup?.articles"
+			  @row-count="dataRowCountChange" @articles-changed="updateProductGroups"></costs-control-grid>
 		</div>
-		<revenue-control-grid :date="ctrlDate" v-if="sharedReady" ref="gridRoot"
-		  @row-count="dataRowCountChange"></revenue-control-grid>
+
+		<ul class="nav nav-pills">
+			<li v-for="group of productGroups" class="nav-item">
+				<a class="nav-link" :class="{active: isGroupActive(group)}" href="#" @click="selectGroup(group)">{{ group.name }}</a>
+			</li>
+		</ul>
 	</div>
 
 	<script type="text/javascript">
@@ -193,7 +193,9 @@
 		}
 
 
-		var RevenueControlGridRow = {
+
+
+		var CostsControlGridRow = {
 			inject: ["priceGrids",
 			  "LEVEL_NULL", "LEVEL_BAD", "LEVEL_WARN", "LEVEL_OK", "COUNT_LEVELS"],
 			props: ["rowData",
@@ -201,181 +203,151 @@
 					"hideTheirAmountOKAbove",
 					"hideOurMarginOKAbove"
 			],
-			data(){
-				return {
-					highlighted: false
-				};
-			},
 			computed: {
 				priceGridResult(){
 					let pgpath_items = this.rowData.article.pricegridPath.split("/");
 					let dbGridName = pgpath_items[0]; // database entity PriceGrid name (home of a list of PriceGridVersion, each containing a JS PricingSystem...)
 					let jsGridName = pgpath_items[1]; // entry key for a PricingGrid JS instance inside a PricingSystem JS object (a tab in the grid-edit.jsp).
-					
+
 					let dbGrid = this.priceGrids.find(pg => pg.name == dbGridName);
 					let applicableVersion = dbGrid["#versions"].find(v => v.publishedDate <= this.rowData.carrierOrderDate);
-					
+
 					if (!applicableVersion) return null;
-					
+
 					let system = applicableVersion["#system"];
-										
+
 					let pricedObject = new PricedObject(
 						this.rowData.totalWeight,
 						this.rowData.shipCountry,
 						this.rowData.shipZipcode
 					);
-	
+
 					return system.applyGrid(jsGridName, pricedObject);
 				},
-				// shortened following a corporate habit
+ 				priceGridFlatResult(){
+					return PricingSystem.summarizeResult(this.priceGridResult);
+				},
 
-				// rowData_invoice(){
-				// 	if (this.rowData.isGroup){
-				// 		return this.rowData.invoice_orig.split(";")
-				// 		  .map(s => AcadiaX3.shortInvoiceNumber(s))
-				// 		  .join("\n");
-				// 	} else {
-				// 		return AcadiaX3.shortInvoiceNumber(this.rowData.invoice);
-				// 	}
-				// },
-				// rowData_order(){
-				// 	return this.rowData.order.replaceAll(";","\n");
-				// },
-
-				// // mitigates 0.001 "dummy weight" in X3 (mandatory field there ;-)
-				// rowData_truncatedWeight(){return Math.floor(this.rowData.weight * 100) / 100;},
-
-				// rowData_customerShipPreferences(){
-				// 	if (this.rowData.customer?.shipPreferences && this.rowData.customer.shipPreferences.length > 0){
-				// 		return this.rowData.customer.shipPreferences[0];
-				// 	} else {
-				// 		return null;
-				// 	}
-				// },
-
-				// rowDataCached_final_b2c(){ //to reduce priceGridResult reeval
-				// 	return typeof this.rowData.userInputs.b2c_override != 'undefined'
-				// 	  ? this.rowData.userInputs.b2c_override
-				// 	  : this.rowData["b2c"];
-				// },
-				// rowDataCached_nonstdPack(){ //to reduce priceGridResult reeval
-				// 	return this.rowData.userInputs.nonstdPack_override;
-				// },
-				// rowData_overridden_price(){
-				// 	//return this.rowData.price;  is much better, since it adds all products regardless of categorization
-				// 	// But in order to support partial override, we have to mimic the way our recommended
-				// 	// price is added up (cf. priceGridFlatResult_overridden_total and priceGridFlatResult.total())
-
-				// 	let sum = //for an unknown reason, i couldn't return it without assigning it to a temp var 1st.
-				// 		(this.rowData.userInputs.price_MAIN_override ?? ((this.rowData['P_MAIN']?.price) ?? 0))
-				// 	  + ((this.rowData['P_B2C']?.price) ?? 0)
-				// 	  + ((this.rowData['P_OPTS']?.price) ?? 0)
-				// 	  + ((this.rowData['P_UNK']?.price) ?? 0);
-				// 	return sum;
-				// },
-				// pricedObject(){
-				// 	return new PricedObject (
-				// 		this.rowData_truncatedWeight,
-				// 		this.rowData["country"],
-				// 		this.rowData["zip"],
-				// 		this.rowData_carrierObj,
-				// 		CustomerFunc.assessMarket(this.rowDataCached_final_b2c, this.rowData.customer, this.rowData_customerShipPreferences),
-				// 		this.rowDataCached_nonstdPack,
-				// 		this.rowData_carrierObj.name == "INTEGRATION"
-				// 	);
-				// },
-				// priceGridResult(){
-				// 	console.debug("res", this.pricedObject);
-				// 	return this.pricingSystem.applyGrid("Toutes livraisons", this.pricedObject);
-				// },
-				// priceGridFlatResult(){
-				// 	console.debug("flatRes");
-				// 	return PricingSystem.summarizeResult(this.priceGridResult);
-				// },
-				// priceGridFlatResult_zone(){
-				// 	//TODO NAM Q&D
-				// 	let resultObj = this.priceGridResult;
-				// 	while (resultObj) {
-				// 		switch(resultObj.gridName){
-				// 			case "Toutes livraisons": {
-				// 				if (resultObj?.gridCell?.coords?.c == "Dom-Tom") return "DOM-TOM";
-				// 			} break;
-				// 			case "Prix Europe": {
-				// 				return "Europe " + resultObj?.gridCell?.coords?.c.replaceAll('Z', '');;
-				// 			} break;
-				// 			case "optim Transporteurs":{
-				// 				return resultObj?.gridCell?.coords?.z?.replaceAll('Zone 0', '');
-				// 			} break;
-				// 			default: break;
-				// 		}
-				// 		resultObj = resultObj.nested;
-				// 	}
-				// },
-				// priceGridFlatResult_carrier(){
-				// 	let reco = this.priceGridFlatResult?.extra_info;
-				// 	return reco ? reco + " ?" : "N/A";
-				// },
+				priceGridFlatResult_zone(){
+					//TODO NAM Q&D
+					let resultObj = this.priceGridResult;
+					while (resultObj) {
+						if (resultObj?.gridCell?.coords?.zone) {
+							return resultObj?.gridCell?.coords?.zone;
+						}
+						resultObj = resultObj.nested;
+					}
+				},
 
 
 				//Related ACADIA Invoices (note: this.rowData.invoices is an old-school Map-like object )
 				amount_from_our_sales(){
 					let total = 0;
 					for (let invoiceNum in this.rowData.invoices){
-						//TODO define behavior for missing
 						let invoice = this.rowData.invoices[invoiceNum];
-						console.log(invoice);
-						if (invoice) total += invoice.price;
-					}
-					return total;
-				},				
-				weight_from_our_sales(){					
-					let total = 0;					
-					for (let invoiceNum in this.rowData.invoices){
-						let invoice = this.rowData.invoices[invoiceNum];
-						if (invoice) total += invoice.weight;
+						total += invoice?.price;
 					}
 					return total;
 				},
+				weight_from_our_sales(){
+					let total = 0;
+					for (let invoiceNum in this.rowData.invoices){
+						let invoice = this.rowData.invoices[invoiceNum];
+						total += invoice?.weight;
+					}
+					return total;
+				},
+				comments_from_our_sales(){
+					let firstComment;
+					let skippedCount = 0;
+					for (let invoiceNum in this.rowData.invoices){
+						let invoice = this.rowData.invoices[invoiceNum];
 
-				
+						let comment = "";
+						if (invoice?.userInputs?.carrierOK_comment)
+							comment += "🚛 " + invoice.userInputs.carrierOK_comment + "\n";
+						if (invoice?.userInputs?.amountOK_comment)
+							comment += "💵 " + invoice.userInputs.amountOK_comment + "\n";
+
+						if (comment) {
+							if (firstComment) {
+								skippedCount++;
+							} else {
+								firstComment = comment;
+							}
+						}
+					}
+
+
+					if (firstComment && skippedCount){
+						firstComment += ` [et \${skippedCount} autre(s)]`;
+					}
+					return firstComment ?? "✏️" ;
+				},
+
+
 				// Comparison columns
 				weight_delta(){
 					return this.weight_from_our_sales - this.rowData.totalWeight;
 				},
 			    assessWeightOK(){
-					return new Assessment(this.rowData.shipComment, (this.weight_delta > 0) ? LEVEL_OK : LEVEL_BAD, this.weight_delta);
+					return new Assessment("TODO à voir",
+					  (this.weight_delta > 0) ? LEVEL_OK : LEVEL_BAD,
+					  this.weight_delta);
 				},
 				weightOKclass(){
 					return _generic_OKclass(this.assessWeightOK.level, true);
 				},
 
 
-				rowData_sumDetailAmount(){
-					return 4444;
-				},
-	
-				
+
 				estimatedAmount_delta(){
 					return this.priceGridResult.amount - this.rowData.totalAmount;
-				},	
-				assessTheirAmountOK(){
-					return new Assessment("TODO tiré de nos calculs", (this.amount_from_our_sales) ? LEVEL_OK : LEVEL_BAD, this.estimatedAmount_delta);
 				},
+				assessTheirAmountOK(){
+					let level = (this.estimatedAmount_delta > 0) ? LEVEL_OK : LEVEL_BAD;
 
+					if (this.rowData.userInputs.theirAmountOK_override)
+						level = this.rowData.userInputs.theirAmountOK_override;
+
+					return new Assessment("TODO à voir", level,	this.estimatedAmount_delta);
+				},
 				theirAmountOKclass(){
 					return _generic_OKclass(this.assessTheirAmountOK.level, true);
 				},
 
-				
+				rowData_totalAmount_detailed(){// html popover
+					let details = this.rowData.detailAmounts;
+
+					let all_keys = Object.keys(details);
+					const std_keys = ["Transport", "Surcharge Carburant", "Eco-participation", "TVA"];
+					let missing_keys = all_keys.filter(k => !std_keys.includes(k));
+
+					let str = "";
+					for (let key of std_keys.concat(missing_keys)) {
+						//Note : "Options" is a sub-total, should never have been imported as sub-article... if only we were confident about importing *all* options :/
+						if (key == "Options") continue;
+						str += "<tr><td>" + key + "</td><td class=\"num\">" + (details[key] ?? "N/A") + "</td></tr>";
+					}
+					return "<table class='detailed'>" + str +"</table>";
+				},
+
 				margin(){
-					return this.amount_from_our_sales - this.rowData.totalAmount;
-				},	
+					let m = this.amount_from_our_sales - this.rowData.totalAmount;
+					this.rowData["#margin"] = m; // horrible border effect to make this calculation available to parent component (for sorting, for ex.)
+					return m;
+				},
 				assessOurMarginOK(){
-					return new Assessment("TODO à voir", (this.margin > 0) ? LEVEL_OK : LEVEL_BAD, this.margin);
+					let level = (this.margin > 0) ? LEVEL_OK : LEVEL_BAD;
+
+					if (this.rowData.userInputs.ourMarginOK_override)
+						level = this.rowData.userInputs.ourMarginOK_override;
+
+					return new Assessment("TODO à voir", level, this.margin);
 				},
 				ourMarginOKclass(){
 					return _generic_OKclass(this.assessOurMarginOK.level, true);
-				},				
+				},
 
 			},
 			watch:{
@@ -392,6 +364,18 @@
 				}
 			},
 			methods: {
+				renderNumber(n, decimals){
+					if (n === null || typeof n == "undefined"){
+						return "";
+					} else if (isNaN(n)) {
+						return "N/A";
+					} else if (decimals) { // too bad for zero ;-)
+						return n.toFixed(decimals);
+					} else {
+						return n;
+					}
+				},
+
 				saveRowData(){
 					let rowDataClone = deepClone(this.rowData);
 
@@ -399,7 +383,7 @@
 					if (rowDataClone.userInputs.b2c_override == rowDataClone.b2c)
 						delete rowDataClone.userInputs.b2c_override;
 
-					axios_backend.put("transport-sales/" + this.rowData.id, rowDataClone)
+					axios_backend.put("transport-purchase/" + this.rowData.id, rowDataClone)
 					.then(response => {
 						let updatedUserInputs = response.data.userInputs;
 						if (updatedUserInputs?._v_lock != this.rowData.userInputs?._v_lock) {
@@ -412,23 +396,27 @@
 				},
 				debug_PricingSystem(){
 					console.info("Interactive debug :",
-						deepClone(this.rowData_carrierObj), // selected Carrier object
 						deepClone(this.priceGridFlatResult), // PricingSystem flattened result, not necessarily used
 						deepClone(this.priceGridResult) // PricingSystem complete result, not necessarily used
 					);
 				},
-				cycleCarrierOKLevels(){
- 					if (!this.rowData.userInputs.carrierOK_override) this.rowData.userInputs.carrierOK_override = 0;
-					this.rowData.userInputs.carrierOK_override ++;
-					this.rowData.userInputs.carrierOK_override %= COUNT_LEVELS;
+
+				cycleOKLevels(ptyName){
+					ptyName += "OK_override";
+
+ 					if (!this.rowData.userInputs[ptyName]) this.rowData.userInputs[ptyName] = 0;
+					this.rowData.userInputs[ptyName] ++;
+					this.rowData.userInputs[ptyName] %= COUNT_LEVELS;
 				},
-				cycleAmountOKLevels(){
- 					if (!this.rowData.userInputs.amountOK_override) this.rowData.userInputs.amountOK_override = 0;
-					this.rowData.userInputs.amountOK_override ++;
-					this.rowData.userInputs.amountOK_override %= COUNT_LEVELS;
-				},
-				init_carrierOK_comment(ev){
-					this.rowData.userInputs.carrierOK_comment = "???";
+
+				init_userInputs_comment(ev, ptyName){
+					ptyName += "OK_comment";
+
+					this.rowData["$userInputs$" + ptyName] = this.rowData.userInputs[ptyName];
+					if (typeof this.rowData["$userInputs$" + ptyName] == "undefined"){
+						this.rowData["$userInputs$" + ptyName] = " "; // will be cleared by the builtin trim
+					}
+
 					const parentCell = ev.target.closest("td");
 					this.$nextTick(()=>{
 						let input = parentCell.getElementsByTagName("textarea")[0]
@@ -436,111 +424,43 @@
 						input.select();
 					});
 				},
-				init_amountOK_comment(ev){
-					this.rowData.userInputs.amountOK_comment = "???";
-					const parentCell = ev.target.closest("td");
-					this.$nextTick(()=>{
-						let input = parentCell.getElementsByTagName("textarea")[0]
-						input.focus();
-						input.select();
-					});
-				},
 
+				validate_userInputs_comment(ptyName){
+					ptyName += "OK_comment";
 
-				validate_carrier_override(){
-					let trueVal = this.rowData.carrier
-					let newVal = this.rowData.$userInputs$carrier_override?.name ?? null;
-					let oldVal = this.rowData.userInputs.carrier_override?.name ?? null;
+					if (this.rowData["$userInputs$" + ptyName].trim() == "")
+						delete this.rowData["$userInputs$" + ptyName];
 
-					switch(newVal){
-					case oldVal:
-						console.debug("carrier_override unchanged");
-						break;
-					case trueVal :
-						console.debug("carrier_override useless");
-						if (oldVal !== null){
-							console.debug("... and discarded");
-							this.rowData.userInputs.carrier_override = null;
-						} else {
-							console.debug("... but was not set");
-						}
-						this.rowData.$userInputs$carrier_override = null;
-						break;
-					default:
-						console.debug("price_MAIN_override changed");
-						this.rowData.userInputs.carrier_override = this.rowData.$userInputs$carrier_override;
+					if (this.rowData["$userInputs$" + ptyName] == this.rowData.userInputs[ptyName]){
+						// unchanged
+					} else {
+						// trigger save
+						this.rowData.userInputs[ptyName] = this.rowData["$userInputs$" + ptyName];
 					}
 				},
 
-				init_price_MAIN_override(ev){
-					this.rowData.$userInputs$price_MAIN_override = ((this.rowData['P_MAIN']?.price) ?? 0);
-					const parentCell = ev.target.closest("td");
-					this.$nextTick(()=>{
-						let input = parentCell.getElementsByTagName("input")[0];
-						input.focus();
-						input.select();
-					});
-				},
-				validate_price_MAIN_override(){
-					/* to make them compatible with === and switch... */
-					function _simpleValueOf(v){
-						if (typeof v == "undefined" || v === null || v === ""){
-							return null;
-						} else if (Number.isFinite(v)){
-							return Number.parseFloat(v);
-						} else {
-							return "NaN";
-						}
-					}
-					let trueVal = _simpleValueOf(this.rowData['P_MAIN']?.price);
-					let newVal = _simpleValueOf(this.rowData.$userInputs$price_MAIN_override);
-					let oldVal = _simpleValueOf(this.rowData.userInputs.price_MAIN_override);
 
-					switch(newVal){
-					case "NaN":
-						console.debug("price_MAIN_override rolled back");
-						this.rowData.$userInputs$price_MAIN_override = oldVal;
-						break;
-					case oldVal:
-						console.debug("price_MAIN_override unchanged");
-						break;
-					case trueVal :
-						console.debug("price_MAIN_override useless");
-						if (oldVal !== null){
-							console.debug("... and discarded");
-							this.rowData.userInputs.price_MAIN_override = null;
-						} else {
-							console.debug("... but was not set");
-						}
-						this.rowData.$userInputs$price_MAIN_override = null;
-						break;
-					default:
-						console.debug("price_MAIN_override changed");
-						this.rowData.userInputs.price_MAIN_override = newVal;
-					}
-				},
 
-				activateCustomer(customerRef){
-					customerRef = encodeURIComponent(customerRef);
-					axios_backend.put(`customers/\${customerRef}/activate`)
-					.then(response => {
-						alert_dialog(`Client \"\${customerRef}\" réactivé`, "Pensez à rafraîchir la page !");
-					})
-					.catch(error => {
-						showAxiosErrorDialog(error);
-					});
+				clickPopover(e){
+					var popover = bootstrap.Popover.getInstance(e.target);
+					if (popover) {
+						popover.dispose();
+					} else {
+						popover = bootstrap.Popover.getOrCreateInstance(e.target, {title:"Détail", "sanitize": false, "html": true});
+						popover.show();
+					}
 				}
 			},
 
-			template: '#RevenueControlGridRow-template'
+
+			template: '#CostsControlGridRow-template'
 		};
 	</script>
 
-	<script type="text/x-template" id="RevenueControlGridRow-template">
+	<script type="text/x-template" id="CostsControlGridRow-template">
 		<tr v-show="assessWeightOK.level <= hideWeightOKAbove
 		       && assessTheirAmountOK.level <= hideTheirAmountOKAbove
-		       && assessOurMarginOK.level <= hideOurMarginOKAbove"
-		 @click="highlighted = !highlighted" :class="{'highlighted':highlighted}">
+		       && assessOurMarginOK.level <= hideOurMarginOKAbove">
 		 	<td>
 				<div>{{ rowData.id }}</div>
 			</td>
@@ -563,209 +483,114 @@
 				<div>{{ rowData.shipCustomerLabel }}</div>
 			</td>
 			<td>
+				<div>
+					<link-to-grid url="../customers" attr="erpReference" :value="rowData.customerErpReference"></link-to-grid>
+				</div>
+			</td>
+			<td>
 				<div>{{ rowData.shipCountry }}</div>
 			</td>
 			<td>
 				<div>{{ rowData.shipZipcode }}</div>
 			</td>
 			<td>
-				<div> extracted_zone </div>
+				<div> {{ priceGridFlatResult_zone }} </div>
 			</td>
-			<td>
+			<td class="intern-ref">
 				<div class="text-truncate" :title="rowData.internalReference">
 					{{ rowData.internalReference }}
 				</div>
 			</td>
-			<td class="erp-ref">
-				<invoices-map :value="rowData.invoices"></invoices-map>
-			</td>
 
 			<td>
-				<div>{{ rowData.parcelCount }}</div>
+				<invoice-map :value="rowData.invoices"></invoice-map>
 			</td>
 
-
-			<td>
-				<div>{{ weight_from_our_sales }}</div>
-			</td>
-			<td>
-				<div :title="'Demandés: '+ rowData.reqTotalWeight ">{{ rowData.totalWeight }}</div>
-			</td>
-			<td>
-				<div :title="assessWeightOK.msg" :class="weightOKclass">{{ assessWeightOK.cellValue }}</div>
-			</td>
-
-			<td>
-				<div :title="rowData_sumDetailAmount">{{ rowData.totalAmount}}</div>
-			</td>
-			<td>
-				{{ priceGridResult.amount }}
-			</td>
-			<td>
-				<div :title="assessTheirAmountOK.msg" :class="theirAmountOKclass">{{ assessTheirAmountOK.cellValue }}</div>
-			</td>
-
-			<td>
-				{{ amount_from_our_sales }}
-			</td>
-			<td>
-				<div :title="assessOurMarginOK.msg" :class="ourMarginclass">{{ assessOurMarginOK.cellValue }}</div>
-			</td>
-
-
-<%--
-			<td class="cust">
-				<div v-if="rowData.customer">
-					<div v-if="rowData.customer.tags.includes('inactive')">
-						{{ rowData.customerRef }}
-						<i role="button" class="bi bi-activity" title="Réactiver" @click="activateCustomer(rowData.customerRef)"></i>
-					</div>
-					<link-to-grid v-else url="../customers" attr="erpReference" :value="rowData.customerRef"></link-to-grid>
-				</div>
-				<div v-else>
-					{{ rowData.customerRef }}
-				</div>
-			</td>
-			<td class="cust lbl">
-				<div :title="rowData.customerLabel" class="text-truncate"
-				  @dblclick="$emit('filter-by-customer-label', rowData.customerLabel)">
-					{{ rowData.customerLabel }}
-				</div>
-			</td>
-
-			<td class="salesrep">
-				<div :title="rowData.salesrep" class="text-truncate">{{ rowData.salesrep }}</div>
-			</td>
-			<td>
-				<div :title="rowData_truncatedWeight" >{{ rowData.weight }}</div>
-			</td>
-			<td class="text-center">
+			<td class="num">
 				<div>
-					<input v-model="rowData.userInputs.nonstdPack_override" type="checkbox" class="align-text-bottom"></input>
+					{{ rowData.parcelCount }}
 				</div>
 			</td>
-			<td class="text-center">
-				<div v-if="typeof rowData.userInputs.b2c_override != 'undefined'">
-					<override-signal />
-					<input v-model="rowData.userInputs.b2c_override" type="checkbox" class="align-text-bottom"></input>
-				</div>
-				<div v-else role="button" @click="rowData.userInputs.b2c_override = !rowData.b2c">
-					<i v-if="rowData.b2c" class="bi bi-check-square-fill"></i>
-					<i v-else             class="bi bi-square"></i>
+
+
+			<td class="weight num">
+				<div>{{ renderNumber(weight_from_our_sales) }}</div>
+			</td>
+			<td class="weight num">
+				<div :title="'Déclaré par ACADIA: '+ rowData.reqTotalWeight ">
+					<span v-if="rowData.shipComment" :title="rowData.shipComment">ℹ️</span>
+					{{ renderNumber(rowData.totalWeight) }}
 				</div>
 			</td>
-			<td class="carrier name" :title="rowData_carrierObj.groupName ? 'Contrôlé comme : '+ rowData_carrierObj.groupName : 'Transporteur non-vérifié'">
-				<div>
-					{{ rowData.carrier }}
+			<td class="weight num computed">
+				<div :title="assessWeightOK.msg" :class="weightOKclass">
+					{{ renderNumber(assessWeightOK.cellValue, 2) }}
 				</div>
 			</td>
-			<td class="carrier computed">
-				<div :title="assessCarrierOK.msg" :class="carrierOKclass">
-					{{ assessCarrierOK.cellValue }}
+
+
+			<td class="costs num">
+				{{ renderNumber(priceGridResult.amount) }}
+			</td>
+			<td class="costs num">
+				<div @click.stop="clickPopover" :data-bs-content="rowData_totalAmount_detailed">
+					{{ renderNumber(rowData.totalAmount) }}
+					<detailed-signal />
 				</div>
 			</td>
-			<td class="carrier comment">
-				<div :class="finalCarrOKclass">
-					<textarea rows="1" v-if="rowData.userInputs.carrierOK_comment"
-					      v-model.lazy.trim="rowData.userInputs.carrierOK_comment"
-					  @keyup.esc="$event.target.blur()">>
+			<td class="costs num computed">
+				<div :class="theirAmountOKclass">{{ renderNumber(assessTheirAmountOK.cellValue, 2) }}</div>
+			</td>
+			<td class="costs comment">
+				<div :class="theirAmountOKclass" class="position-relative">
+					<textarea rows="1"  v-if="rowData.$userInputs$theirAmountOK_comment"
+					            v-model.lazy="rowData.$userInputs$theirAmountOK_comment"
+					  @keyup.esc="$event.target.blur()"
+					  @blur="validate_userInputs_comment('theirAmount')">
 					</textarea>
-					<div v-else role="button" @click="init_carrierOK_comment">
+					<div v-else role="button" @click="init_userInputs_comment($event, 'theirAmount')">
 						✏️
 					</div>
-					<div class="position-absolute bottom-0 end-0" role="button" @click="cycleCarrierOKLevels">
+					<div class="position-absolute bottom-0 end-0" role="button" @click="cycleOKLevels('theirAmount')">
 						🔃
 					</div>
-					<override-signal v-if="rowData.userInputs.carrierOK_override" />
+					<override-signal v-if="rowData.userInputs.theirAmountOK_override" />
 				</div>
 			</td>
 
-			<td class="price">
-				<div v-if="Number.isFinite(rowData.$userInputs$price_MAIN_override)" >
-					<override-signal />
-					<input v-model.lazy.number="rowData.$userInputs$price_MAIN_override"
-					  :title="'(initialement ' + rowData['P_MAIN']?.price + ')'"
-					  @blur="validate_price_MAIN_override"
-					  @keyup.esc="$event.target.blur()"></input>
-				</div>
-				<div v-else role="button" @click="init_price_MAIN_override"
-				  :title="rowData['P_MAIN']?.desc">
-					{{ rowData['P_MAIN']?.price }}
-				</div>
-			</td>
-			<td class="price">
-				<div :title="rowData['P_B2C']?.desc">{{ rowData['P_B2C']?.price}}</div>
-			</td>
-			<td class="price">
-				<div :title="rowData['P_OPTS']?.desc">{{ rowData['P_OPTS']?.price}}
-					<div v-if="rowData['P_UNK']?.price" class="alert alert-warning" role="alert">
-							<i class="text-danger bi bi-exclamation-triangle-fill"></i> Produit non-conforme ici : {{ rowData['P_UNK']?.desc }}: {{ rowData['P_UNK']?.price }}
-					</div>
-				</div>
-			</td>
-<td>
-	<div>{{ priceGridFlatResult_zone }}</div>
-</td>
-<td>
-	<div :title="rowData_truncatedWeight" >{{ rowData.weight }}</div>
-</td>
 
-			<td class="price computed">
-				<div :title="'Prix originel dans X3 : ' + rowData.price">{{ rowData_overridden_price }}</div>
+			<td class="margin num">
+				{{ renderNumber(amount_from_our_sales) }}
 			</td>
-			<td class="price computed">
-				<div :title="assessAmountOK.msg" :class="amountOKclass">
-					{{ assessAmountOK.cellValue }}
+			<td class="margin num computed">
+				<div :title="assessOurMarginOK.msg" :class="ourMarginOKclass">
+					{{ renderNumber(assessOurMarginOK.cellValue, 2) }}
 				</div>
 			</td>
-			<td class="price comment">
-				<div :class="finalAmntOKclass">
-					<textarea rows="1" v-if="rowData.userInputs.amountOK_comment"
-					      v-model.lazy.trim="rowData.userInputs.amountOK_comment"
-					  @keyup.esc="$event.target.blur()">
+			<td class="margin comment">
+				<div :class="ourMarginOKclass" class="position-relative">
+					<textarea rows="1"  v-if="rowData.$userInputs$ourMarginOK_comment"
+					            v-model.lazy="rowData.$userInputs$ourMarginOK_comment"
+					  @keyup.esc="$event.target.blur()"
+					  @blur="validate_userInputs_comment('ourMargin')">
 					</textarea>
-					<div v-else role="button" @click="init_amountOK_comment">
-						✏️
+					<div v-else role="button" @click="init_userInputs_comment($event, 'ourMargin')" class="multiline">
+						{{ comments_from_our_sales }}
 					</div>
-					<div class="position-absolute bottom-0 end-0" role="button" @click="cycleAmountOKLevels">
+					<div class="position-absolute bottom-0 end-0" role="button" @click="cycleOKLevels('ourMargin')">
 						🔃
 					</div>
-					<override-signal v-if="rowData.userInputs.amountOK_override" />
+					<override-signal v-if="rowData.userInputs.ourMarginOK_override" />
 				</div>
 			</td>
-
-			--%>
-
 		</tr>
 	</script>
 
 	<script type="text/javascript">
-		var InvoiceMapRenderer = {
+		var CostsControlGrid = {
 			props: {
-				value: Object
-			},
-			template: "
-				<ul v-for="">
-					<li></li>
-				</ul>
-			"
-		};
-	invoices_from_our_sales(){
-		let str = "";
-		for (let invoiceNum in this.rowData.invoices){
-			str += "\n* " + invoiceNum + " : ";
-			
-			let invoice = this.rowData.invoices[invoiceNum];
-			if (invoice) str += invoice.id;
-		}
-		return str;					
-	},
-	
-	
-	
-		var RevenueControlGrid = {
-			props: {
-				date:String
+				date:String,
+				viewArticles: Array
 			},
 			data() {
 				return {
@@ -792,17 +617,22 @@
 						.then(response => {
 							this.dataList = response.data;
 							this.$emit("rowCount", this.dataList.length);
-/*
+
+							let articles = {};
 							for (let row of this.dataList){
 								// prepare user inputs
 								if (!row.userInputs){
 									row.userInputs = {};
 								} else {
-									row.$userInputs$price_MAIN_override = row.userInputs.price_MAIN_override;
-									row.$userInputs$carrier_override = row.userInputs.carrier_override;
+									row["$userInputs$theirAmountOK_comment"] = row.userInputs["theirAmountOK_comment"];
+									row["$userInputs$ourMarginOK_comment"] = row.userInputs["ourMarginOK_comment"];
 								}
+
+								// collect distinct present Articles
+								articles[row.article.articlePath] = row.article;
 							}
-*/
+
+							this.$emit("articlesChanged", articles);
 						})
 						.catch(error => {
 							showAxiosErrorDialog(error);
@@ -811,14 +641,14 @@
 				},
 			},
 			components:{
-				"grid-row": RevenueControlGridRow,
+				"grid-row": CostsControlGridRow,
 			},
 			computed:{
 
 				hideWeightOKAboveclass(){
 					return _filterBtn_OKclass(this.hideWeightOKAbove);
 				},
-				hideTheirAmountAboveclass(){
+				hideTheirAmountOKAboveclass(){
 					return _filterBtn_OKclass(this.hideTheirAmountOKAbove);
 				},
 				hideOurMarginOKAboveclass(){
@@ -826,6 +656,32 @@
 				},
 			},
 			methods: {
+				sortByAttr(propertyName, direction){
+					this.dataList.sort((a,b) => {
+						let aVal = a[propertyName];
+						if (typeof aVal == "number" && isNaN(aVal))
+							aVal = Number.POSITIVE_INFINITY; // positive because of the specific interest we have here for the negatives
+						else
+							aVal = aVal ?? "";
+
+						let bVal = b[propertyName];
+						if (typeof bVal == "number" && isNaN(bVal))
+							bVal = Number.POSITIVE_INFINITY; // positive because of the specific interest we have here for the negatives
+						else
+							bVal = bVal ?? "";
+
+						if (aVal > bVal)
+							return direction;
+						else if (aVal < bVal)
+							return -direction;
+						else
+							return 0; // to keep it stable
+					});
+				},
+
+				isRowViewed(rowData){
+					return this.viewArticles.some(a => a.articlePath == rowData.article.articlePath);
+				},
 				clearFilters(){
 					this["hideWeightOKAbove"] =
 					this["hideTheirAmountOKAbove"] =
@@ -837,23 +693,19 @@
 						this[attributeName] = LEVEL_OK;
 					else
 						this[attributeName] --;
-				},
-
-				//TODO NAM Q&D
-				filterByCustomerLabel(name){
-					this.filterCustomerLabel = name;
 				}
 			},
 			mounted(){
 				const tooltipTriggerList = this.$refs.rootElement.querySelectorAll('[data-bs-toggle="tooltip"]');
-				const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
+				const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
 			},
-			template: '#RevenueControlGrid-template'
+
+			template: '#CostsControlGrid-template'
 		};
 	</script>
 
-	<script type="text/x-template" id="RevenueControlGrid-template">
-		<table id="revenue-control-grid" class="table table-bordered table-sm table-striped table-hover" ref="rootElement">
+	<script type="text/x-template" id="CostsControlGrid-template">
+		<table id="costs-control-grid" class="table table-bordered table-sm table-striped table-hover" ref="rootElement">
 			<thead class="shadow sticky-top">
 				<tr>
 					<th data-bs-toggle="tooltip" title="ID système (caché)">
@@ -878,17 +730,21 @@
 					<th data-bs-toggle="tooltip" title="Nom du destinataire">
 						<div>Destinataire</div>
 					</th>
-					<th class="cust" data-bs-toggle="tooltip" title="Pays de l'adresse d'expédition">
+					<th data-bs-toggle="tooltip" title="Numéro client, déduit des factures rattachées">
+						<div>Code client</div>
+					</th>
+
+					<th data-bs-toggle="tooltip" title="Pays de l'adresse d'expédition">
 						<div>Pays</div>
 					</th>
-					<th class="cust lbl" data-bs-toggle="tooltip" title="Code postal de l'adresse d'expédition">
+					<th data-bs-toggle="tooltip" title="Code postal de l'adresse d'expédition">
 						<div>CP</div>
 					</th>
 					<th data-bs-toggle="tooltip" title="Zone géographique tarifaire (spécfique à la grille du Transporteur)">
 						<div>Zone</div>
 					</th>
 
-					<th data-bs-toggle="tooltip" title="Référence Client sur l'étiquette d'expédition (= numéro(s) de facture ACADIA)">
+					<th class="intern-ref" data-bs-toggle="tooltip" title="Référence Client sur l'étiquette d'expédition (= numéro(s) de facture ACADIA)">
 						<div>Référence interne</div>
 					</th>
 					<th data-bs-toggle="tooltip" title="Factures ACADIA correspondantes">
@@ -900,103 +756,80 @@
 					</th>
 
 
-					<th data-bs-toggle="tooltip" title="Total des poids sur les factures X3">
+					<th class="weight" data-bs-toggle="tooltip" title="Total des poids sur les factures X3">
 						<div>Poids ACADIA </div>
 					</th>
-					<th data-bs-toggle="tooltip" title="Poids noté sur la facture Transporteur (dans la bulle d'aide, le poids déclaré par ACADIA si présent)">
-						<div>Poids Transporteur</div>
+					<th class="weight" data-bs-toggle="tooltip" title="Poids noté sur la facture Transporteur (dans la bulle d'aide, le poids déclaré par ACADIA si présent). Si présent, ℹ️ signale un commentaire du transporteur.">
+						<div>Poids Facturé</div>
 					</th>
-					<th data-bs-toggle="tooltip" title="Écart de Poids (= poids ACADIA - poids Transp.)">
+					<th class="weight" data-bs-toggle="tooltip" title="Écart de Poids (= poids ACADIA - poids Transp.)">
 						<div>Δ Poids</div>
 						<i @click="cycleFilter('WeightOK')" role="button" :class="hideWeightOKAboveclass"></i>
 					</th>
 
-
-					<th data-bs-toggle="tooltip" title="Montant TTC noté sur la facture Transporteur">
-						<div>Prix Transporteur</div>
+					<th class="costs" data-bs-toggle="tooltip" title="Notre estimation du montant, par application de la grille tarifaire Transporteur">
+						<div>Estim. ACADIA</div>
 					</th>
-					<th data-bs-toggle="tooltip" title="Notre estimation du montant, par application de la grille tarifaire Transporteur">
-						<div>Estim. Transporteur</div>
+					<th class="costs" data-bs-toggle="tooltip" title="Montant TTC noté sur la facture Transporteur. Cliquer pour afficher un détail.">
+						<div>Prix Facturé</div>
 					</th>
-					<th data-bs-toggle="tooltip" title="Écart de prix (= prix ACADIA - prix Transp.)">
+					<th colspan="2"
+					  class="costs computed" data-bs-toggle="tooltip" title="Écart de prix (= prix ACADIA - prix Transp.)">
 						<div>Δ Prix estimé</div>
 						<i @click="cycleFilter('TheirAmountOK')" role="button" :class="hideTheirAmountOKAboveclass"></i>
 					</th>
 
-					<th data-bs-toggle="tooltip" title="Total des montants de factures X3">
+					<th class="margin" data-bs-toggle="tooltip" title="Total des montants de factures X3">
 						<div>Prix ACADIA </div>
 					</th>
-					<th data-bs-toggle="tooltip" title="Écart de prix (= prix ACADIA - prix Transp.)">
-						<div>Marge ACADIA</div>
+					<th colspan="2"
+					  class="margin computed" data-bs-toggle="tooltip" title="Écart de prix (= prix ACADIA - prix Transp.)">
+						<div>Marge ACADIA
+							<a role="button" class="bi bi-sort-numeric-up" @click="sortByAttr('#margin', +1)"></a>
+						</div>
 						<i @click="cycleFilter('OurMarginOK')" role="button" :class="hideOurMarginOKAboveclass"></i>
 					</th>
-<%--
-					<th class="salesrep" data-bs-toggle="tooltip" title="Commercial ayant réalisé la vente">
-						<div>Commercial</div>
-					</th>
-
-					<th class="salesrep" data-bs-toggle="tooltip" title="Commercial ayant réalisé la vente">
-						<div>Commercial</div>
-					</th>
-					<th data-bs-toggle="tooltip" title="Poids selon X3 (voir le poids arrondi pour les calculs dans la bulle d'aide)">
-						<div>Poids</div>
-					</th>
-					<th data-bs-toggle="tooltip" title="Colisage Hors-Normes">
-						<div>HN ? <override-signal /></div>
-					</th>
-					<th data-bs-toggle="tooltip" title="Livraison en Drop/BTC (actuellement déduit de la fiche Client ou de la présence d'un article &quot;Livraison directe&quot;)">
-						<div>B2C ? <override-signal /></div>
-					</th>
-
-					<th class="carrier name" data-bs-toggle="tooltip" title="Transport choisi par le commercial">
-						<div>Transp. choisi <override-signal /></div>
-					</th>
-					<th class="carrier computed" data-bs-toggle="tooltip" title="Transport recommandé (pour ce client ou par la grille standard)">
-						<div>Transp. reco.</div>
- 						<i @click="cycleFilter('CarrierOK')" role="button" :class="hideCarrierOKAboveclass"></i>
-					</th>
-					<th class="carrier comment" data-bs-toggle="tooltip" title="Le transport choisi est-il conforme ?">
-						<div>Transport OK ? <override-signal /></div>
- 						<i @click="cycleFilter('FinalCarrOK')" role="button" :class="hideFinalCarrOKAboveclass"></i>
-					</th>
-
-					<th class="price" data-bs-toggle="tooltip" title="Frais de port de base (voir Article X3 dans la bulle d'aide)">
-						<div>Base <override-signal /></div>
-					</th>
-					<th class="price" data-bs-toggle="tooltip" title="Supplément &quot;Livraison directe&quot; (voir Article X3 dans la bulle d'aide)">
-						<div>B2C</div>
-					</th>
-					<th class="price" data-bs-toggle="tooltip" title="Diverses options (voir Article X3 dans la bulle d'aide)">
-						<div>Opt.</div>
-					</th>
-					<th class="price computed" data-bs-toggle="tooltip" title="Montant total des frais de port payés, selon X3">
-						<div>Total</div>
-					</th>
-					<th class="price computed" data-bs-toggle="tooltip" title="Prix recommandé">
-						<div>Prix reco</div>
-					<i @click="cycleFilter('AmountOK')" role="button" :class="hideAmountOKAboveclass"></i>
-					</th>
-					<th class="price comment" data-bs-toggle="tooltip" title="Le prix recommandé est-il appliqué ?(voir la justification donnée dans la bulle d'aide)">
-						<div>Prix OK ? <override-signal /></div>
-						<i @click="cycleFilter('FinalAmntOK')" role="button" :class="hideFinalAmntOKAboveclass"></i>
-					</th>
---%>
 				</tr>
 			</thead>
 			<tbody>
 				<TransitionGroup name="list">
-				<grid-row v-for="rowData in dataList" :key="rowData.id" :rowData="rowData"
-				  :hide-weightOK-above = "hideWeightOKAbove"
-				  :hide-theirAmountOK-above = "hideTheirAmountOKAbove"
-				  :hide-ourMarginOK-above = "hideOurMarginOKAbove"
-				  @filter-by-customer-label="filterByCustomerLabel"
-				></grid-row>
+				<template v-for="rowData in dataList">
+					<grid-row v-if="isRowViewed(rowData)"
+					  :key="rowData.id" :rowData="rowData"
+					  :hide-weightOK-above = "hideWeightOKAbove"
+					  :hide-theirAmountOK-above = "hideTheirAmountOKAbove"
+					  :hide-ourMarginOK-above = "hideOurMarginOKAbove"
+					></grid-row>
+				</template>
 				</TransitionGroup>
 			</tbody>
 		</table>
 	</script>
 
 	<script type="module">
+		var InvoiceMapComponent = {
+			props: ["value"],
+			computed:{
+				orderedNums(){
+					let keys = [...Object.keys(this.value)];
+					keys.sort();
+					return keys;
+				}
+			},
+			methods:{
+				shorten(invoiceNum){
+					return AcadiaX3.shortInvoiceNumber(invoiceNum);
+				}
+			},
+			template: `<table>
+				<tr v-for="invoiceNum of orderedNums">
+					<td>{{ shorten(invoiceNum) }}</td><td>{{ value[invoiceNum]?.id ? "OK" : ""}}</td>
+				</tr>
+				</table>
+			`
+		};
+
+
 		/* shared state for the page */
 		const app = Vue.createApp({
 			provide(){
@@ -1011,6 +844,9 @@
 					dataRowCount : null,
 
 					carrierPriceGrids: [],
+
+					productGroups: [],
+					activeGroup: null,
 				};
 			},
 			methods:{
@@ -1018,6 +854,16 @@
 					let storedDate = localStorage.getItem("controls/costs/ctrlDate");
 					return storedDate ?? Datepicker.currentDate();
 				},
+
+				// tab navigation based on "product groups"
+				isGroupActive(group){
+					return this.activeGroup?.name == group?.name;
+				},
+				selectGroup(group){
+					this.activeGroup = group;
+				},
+
+				// load PriceGrids of all carriers (TODO can we be more specific ?...)
 				loadRef_allCarrierGrids(){
 					axios_backend.get("price-grids?tag=Transporteur")
 					.then(response => {
@@ -1048,25 +894,52 @@
 					});
 				},
 
+				// exchange with Grid component
 				clearGridFilters(){
 					this.$refs.gridRoot.clearFilters();
 				},
+				clearGridSorts(){
+					this.$refs.gridRoot.sortByAttr('id', +1);
+				},
 				dataRowCountChange(rc){
 					this.dataRowCount = rc;
+				},
+				updateProductGroups(articles){
+					let invertedMap = {};
+					for (let article of Object.values(articles)){
+						if (!invertedMap[article.pricegridPath]) invertedMap[article.pricegridPath] = [];
+						invertedMap[article.pricegridPath].push(article);
+					}
+					let newProductGroups = [];
+					for (let pricegridPath of Object.keys(invertedMap)){
+						let articles = invertedMap[pricegridPath];
+						newProductGroups.push({name : pricegridPath, articles});
+					}
+					this.productGroups = newProductGroups;
+
+					if (this.productGroups.length > 0){
+						this.activeGroup = this.productGroups[0];
+					} else {
+						this.activeGroup = null;
+					}
 				}
 			},
 			computed:{
 				sharedReady(){ // almost a reactivity hack
-					console.debug("shared ready TODO");
-					return true;
+					let pgloaded = 0;
+					for (let pg of this.carrierPriceGrids){
+						if (!pg["#versions"]) continue;
+						for(let pgv of pg["#versions"]){
+							pgloaded ++;
+						}
+					}
+					return pgloaded > 0;
 				}
 			},
 			watch:{
 				ctrlDate: {
 					handler(v){
 						localStorage.setItem("controls/costs/ctrlDate", v);
-						// this.loadRef_MainPricingSystem(v);
-						// this.loadRef_OtherPricingSystem(v);
 					},
 					immediate: true
 				},
@@ -1080,15 +953,17 @@
 			template:"<span class=\"text-warning position-absolute top-0 end-0 me-1 opacity-75 pe-none\">⚠️</span>"
 			//template:"<i class=\"text-warning bi bi-exclamation-octagon-fill position-absolute top-0 end-0 me-1 opacity-75 pe-none\"></i>"
 		});
-		app.component("invoice-map", InvoiceMapRenderer);
+		app.component("detailed-signal", {
+			template:"<i class=\"text-primary bi bi-diagram-3-fill position-absolute top-0 start-0 me-1 opacity-50 pe-none\"></i>"
+		});
 
+		app.component("invoice-map", InvoiceMapComponent);
 
 		app.component("datepicker-month", Datepicker_Month);
-		app.component("audit-info", AuditingInfoRenderer);
 
 		app.component("link-to-grid", LinkToGrid);
 		app.component("datedisplay-day", Datedisplay_Day);
-		app.component("revenue-control-grid", RevenueControlGrid);
+		app.component("costs-control-grid", CostsControlGrid);
 		app.mount('#app');
 	</script>
 </body>

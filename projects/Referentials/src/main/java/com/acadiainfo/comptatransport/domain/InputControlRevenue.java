@@ -44,7 +44,7 @@ public class InputControlRevenue implements Auditable, VersionLockable {
 	private Byte amountOK_override;
 
 	// ============================================
-	// Control results
+	// Order / Invoice input overrides
 
 	@Column(name = "is_b2c_override")
 	private Boolean b2c_override;

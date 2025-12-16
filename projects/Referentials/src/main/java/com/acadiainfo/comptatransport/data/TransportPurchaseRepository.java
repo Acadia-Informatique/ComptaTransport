@@ -3,6 +3,7 @@ package com.acadiainfo.comptatransport.data;
 import java.time.LocalDateTime;
 import java.util.stream.Stream;
 
+import com.acadiainfo.comptatransport.domain.InputControlCosts;
 import com.acadiainfo.comptatransport.domain.TransportPurchaseHeader;
 import com.acadiainfo.util.persistence.CrudRepositoryImpl;
 
@@ -26,6 +27,16 @@ public class TransportPurchaseRepository extends CrudRepositoryImpl<TransportPur
 		super(em);
 	}
 
+	@Override
+	protected Class<TransportPurchaseHeader> getEntityClass() {
+		return TransportPurchaseHeader.class;
+	}
+
+	@Override
+	protected Long getEntityKey(TransportPurchaseHeader t) {
+		return t.getId();
+	}
+
 	/**
 	 * Get all rows of "Carrier invoices", regardless of  Company or Products,
 	 * based on the date of invoice
@@ -40,8 +51,11 @@ public class TransportPurchaseRepository extends CrudRepositoryImpl<TransportPur
 		 * The relationship between xxxHeader and xxxDetail would change too (FK to
 		 * doc(=invoice) -> order).
 		 */
-		Query query = em.createQuery(
-		    "SELECT tph FROM TransportPurchaseHeader tph WHERE tph.carrierInvoiceDate >= ?1 AND tph.carrierInvoiceDate < ?2");
+		Query query = em.createQuery("SELECT DISTINCT tph FROM TransportPurchaseHeader tph "
+		   + " LEFT JOIN FETCH tph.article"
+		   + " LEFT JOIN FETCH tph.resolvedDocReferences"
+		   + " LEFT JOIN FETCH tph.userInputs"
+		   + " WHERE tph.carrierInvoiceDate >= ?1 AND tph.carrierInvoiceDate < ?2");
 		query.setParameter(1, start_date);
 		query.setParameter(2, end_date);
 
@@ -50,35 +64,4 @@ public class TransportPurchaseRepository extends CrudRepositoryImpl<TransportPur
 
 		return stream;
 	}
-
-//
-//	/**
-//	 *
-//	 * @param docReference - more accurately,the *original* invoice number (before grouping)
-//	 * @return
-//	 */
-//	public TransportSalesHeader getOne(String docReference) {
-//		Query query = em.createNamedQuery("findOne_TransportSalesHeader_as_INVOICE");
-//		query.setParameter(1, docReference);
-//
-//		try {
-//			TransportSalesHeader header = (TransportSalesHeader) query.getSingleResult();
-//			return header;
-//		} catch (jakarta.persistence.NoResultException exc) {
-//			return null;
-//		}
-//	}
-
-	@Override
-	protected Class<TransportPurchaseHeader> getEntityClass() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	protected Long getEntityKey(TransportPurchaseHeader t) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
 }

@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Set;
 
 import com.acadiainfo.comptatransport.fileimport.ArticleTransportAchete;
-import com.acadiainfo.comptatransport.fileimport.Import;
 import com.acadiainfo.comptatransport.fileimport.ImportTransportAcheteDetail;
 
 import jakarta.persistence.CollectionTable;
@@ -23,12 +22,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
 /**
  * This is a read-only view of imported rows as Transport purchase HEADERS.
  *
- * It could be dismissed as a mostly duplicate of ImportTransportAchete, but it was created
+ * It could be dismissed as a (mostly) duplicate of ImportTransportAchete, but it was created
  * for the sake of symmetry with the pair ImportTransportVendu (=file import) / TransportSalesHeader (=displayed).
  *
  * @see com.acadiainfo.comptatransport.fileimport.ImportTransportAchete
@@ -44,11 +44,7 @@ public class TransportPurchaseHeader {
 	@Column(name = "id")
 	private Long id;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "import_id", referencedColumnName = "id", nullable = false, updatable = false)
-	private Import importHeader;
-
-	@ManyToOne(fetch = FetchType.LAZY)
+	@ManyToOne
 	@JoinColumn(name = "article_id", referencedColumnName = "id", nullable = false, updatable = false)
 	private ArticleTransportAchete article;
 
@@ -114,24 +110,23 @@ public class TransportPurchaseHeader {
 	@Column(name = "total_amount")
 	private BigDecimal totalAmount;
 
-	@OneToMany(fetch = FetchType.EAGER, cascade = jakarta.persistence.CascadeType.PERSIST, mappedBy = "parent")
+	@OneToMany(mappedBy = "parent", fetch = FetchType.EAGER) // + JOIN FETCH in repository query
 	private Set<ImportTransportAcheteDetail> details = new HashSet<ImportTransportAcheteDetail>();
 
 	/* ========== Invoice links ========== */
 	@Convert(disableConversion = true)
-	@ElementCollection
+	@ElementCollection // + JOIN FETCH in repository query
 	@CollectionTable(name = "MAP_TRANSPORT_INVOICE", joinColumns = @JoinColumn(name = "tr_achete_id"))
 	@Column(name = "doc_reference")
 	private List<String> resolvedDocReferences;
 
 
+	/** The user inputs from Contrôle Quotidien (revenue control) */
+	@OneToOne(optional = true, mappedBy = "header", fetch = FetchType.EAGER) // + JOIN FETCH in repository query
+	private InputControlCosts userInputs;
+
 	public Long getId() {
 		return id;
-	}
-
-	@jakarta.json.bind.annotation.JsonbTransient
-	public Import getImportHeader() {
-		return importHeader;
 	}
 
 	public ArticleTransportAchete getArticle() {
@@ -190,6 +185,12 @@ public class TransportPurchaseHeader {
 		return totalAmount;
 	}
 
+	/**
+	 * Not serialized to JSON, but transferred using a somewhat more compact form.
+	 * (And also feeling guilty about using a fileimport package object here.)
+	 * @see TransportPurchaseHeader#getDetailAmounts()
+	 * @return
+	 */
 	@jakarta.json.bind.annotation.JsonbTransient
 	public Set<ImportTransportAcheteDetail> getDetails() {
 		return details;
@@ -198,6 +199,14 @@ public class TransportPurchaseHeader {
 	@jakarta.json.bind.annotation.JsonbTransient
 	public List<String> getResolvedDocReferences() {
 		return resolvedDocReferences;
+	}
+
+	public InputControlCosts getUserInputs() {
+		return userInputs;
+	}
+
+	public void setUserInputs(InputControlCosts userInputs) {
+		this.userInputs = userInputs;
 	}
 
 	// ============================
@@ -214,7 +223,7 @@ public class TransportPurchaseHeader {
 	// ============================
 	// Serializing from invoice numbers to TransportSalesHeader...
 	@jakarta.persistence.Transient
-	private Map<String, TransportSalesHeader> invoices = new java.util.HashMap<>();
+	private Map<String, TransportSalesHeader> invoices = new java.util.TreeMap<>();
 
 	/**
 	 * Add an entry to the serialized Map "invoices".
@@ -227,6 +236,20 @@ public class TransportPurchaseHeader {
 
 	public java.util.Map<String, TransportSalesHeader> getInvoices() {
 		return this.invoices;
+	}
+
+	// ------------------------------
+	// Computed not JPA-mapped
+
+	@jakarta.persistence.Transient
+	private String customerErpReference;
+
+	public String getCustomerErpReference() {
+		return customerErpReference;
+	}
+
+	public void setCustomerErpReference(String customerErpReference) {
+		this.customerErpReference = customerErpReference;
 	}
 
 }
