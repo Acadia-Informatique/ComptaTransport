@@ -1,5 +1,6 @@
 package com.acadiainfo.comptatransport.ws;
 
+import com.acadiainfo.comptatransport.data.TransportSalesRepository;
 import com.acadiainfo.comptatransport.domain.*;
 import com.acadiainfo.util.WSUtils;
 
@@ -27,6 +28,7 @@ public class ApplicationConfig extends Application {
 		ENTITY_CLASS_MAP.put(PriceGridVersion.class, "Version de Grille Tarifaire");
 		ENTITY_CLASS_MAP.put(Customer.class, "Client");
 		ENTITY_CLASS_MAP.put(CustomerShipPreferences.class, "Préférences Transport du Client");
+		ENTITY_CLASS_MAP.put(TransportSalesRepository.class, "Ligne de facture de Contrôle Quotidien");
 		ENTITY_CLASS_MAP.put(InputControlRevenue.class, "Saisie utilisateur de Contrôle Quotidien");
 	}
 

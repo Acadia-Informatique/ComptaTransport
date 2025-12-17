@@ -41,7 +41,7 @@ import jakarta.ws.rs.core.UriBuilder;
 @Stateless
 @Path("/customers")
 public class CustomerWS {
-	private Logger logger = Logger.getLogger(getClass().getName());
+	private static final Logger logger = Logger.getLogger(CustomerWS.class.getName());
 
 	@Context
 	private HttpServletRequest servReq;
@@ -78,25 +78,29 @@ public class CustomerWS {
 	@GET
 	@Produces(value = MediaType.APPLICATION_JSON)
 	public StreamingOutput getAll_WS(
+	    @QueryParam("name-like") String nameLike,
 	  @QueryParam("tag") Set<String> tags,
 	  @QueryParam("show-inactive") Boolean showInactive) {
+		CustomersRepository repo = CustomersRepository.getInstance(em);
 
-		Stream<Customer> customers = getAll(tags, showInactive != null && showInactive.booleanValue());
-		return WSUtils.entityJsonStreamingOutput(customers);
-	}
+		Stream<Customer> customers;
+		if (nameLike != null && !nameLike.equals("")) {
+			customers = repo.findAllByLabel(nameLike);
+		} else {
+			customers = repo.findAll();
+		}
 
-	public Stream<Customer> getAll(Set<String> tags, boolean showInactive) {
-		Stream<Customer> customers = CustomersRepository.getInstance(em).findAll();
-
-		if (!showInactive)
+		if (showInactive == null || !showInactive.booleanValue())
 			customers = customers.filter(c -> !c.getTags().contains("inactive"));
 
 		if (tags != null && !tags.isEmpty()) {
 			logger.finer("tags detected : " + tags);
 			customers = customers.filter(c -> c.getTags().containsAll(tags));
 		}
-		return customers;
+
+		return WSUtils.entityJsonStreamingOutput(customers);
 	}
+
 
 	@POST
 	@Consumes(value = MediaType.APPLICATION_JSON)
@@ -276,7 +280,7 @@ public class CustomerWS {
 					customer = customersRepo.findById(id);
 				} catch (NumberFormatException exc) {
 					throw new IllegalArgumentException(
-					    idOrRef + " hasn't been found as ERP reference, not is parseable as a numeric id.");
+					    idOrRef + " n'a pu être trouvé comme réf. ERP, mais n'est pas un identifiant numérique non plus.");
 				}
 			}
 			if (customer == null)
@@ -351,7 +355,7 @@ public class CustomerWS {
 
 			// collect custom tags already set
 			Set<String> collectedTags = java.util.Collections.synchronizedSet(new java.util.TreeSet<String>());
-			this.getAll(null, false).forEach(t -> collectedTags.addAll(t.getTags()));
+			CustomersRepository.getInstance(em).findAll().forEach(t -> collectedTags.addAll(t.getTags()));
 			collectedTags.removeAll(VIP_TAGS);
 			collectedTags.removeAll(SYS_TAGS);
 

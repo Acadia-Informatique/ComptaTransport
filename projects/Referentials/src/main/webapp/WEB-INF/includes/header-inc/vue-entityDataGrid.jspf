@@ -282,6 +282,7 @@ Dependencies :
 			},
 			stopEditingRow(){
 				let payload = this._buildPayload(this.editingEntity);
+				let changedEntity = this.entityList.find(e => this.isEditingRow(e));
 
 				this.validateAllField(payload);
 				if (this.editingValidation.size > 0) {
@@ -301,7 +302,6 @@ Dependencies :
 				} else {
 					axios_backend.put(this.resourceUri + "/" + encodeURIComponent(this.editingEntity[this.identifier]), payload)
 					.then(()=>{
-						let changedEntity = this.entityList.find(e => this.isEditingRow(e));
 						this.clearEditingRow();
 						this.refreshGridRow(changedEntity);
 					})
@@ -335,10 +335,14 @@ Dependencies :
 				case 'none':
 					break;
 				case 'edit': {
-					this.selectedEntity = entity;
 					if (!this.isEditingRow(entity)){
+						 //-> auto-save when selecting another row
+						 /// (happens to break editing of the newly selected row, which is sort of... OK ?!)
+						if (this.editingEntity) this.stopEditingRow();
+
 						this.startEditingRow(entity);
 					}
+					this.selectedEntity = entity;
 					break;
 				}
 				default:
@@ -541,19 +545,17 @@ Dependencies :
 				<col v-if="column.widthCSS" :style="'width:' + column.widthCSS" /><%-- needs table-layout: fixed --%>
 				<col v-else />
 			</template>
-			<col style="width:55px" /><%-- class="btns-last" --%>
+			<col style="width:3.8em" /><%-- class="btns-last" --%>
 		</colgroup>
 		<thead class="shadow sticky-top">
 			<tr>
 				<th v-if="!readonly" class="btns-first">
-					<div>
-						<button type="button" class="btn bi bi-plus-lg btn-primary"
-						  @click="createEntity(entity)" title="Ajouter une ligne"></button>
-						<button type="button" class="btn bi bi-escape btn-secondary"
-						  @click.stop="clearEditingRow()" title="Annuler la modification"
-						  :disabled="editingEntity == null"
-						  v-if="this.config.selectRowAction=='edit'"></button>
-					</div>
+					<button type="button" class="btn bi bi-check-lg btn-success"
+					  @click.stop="stopEditingRow()" title="Enregistrer la ligne"
+					  v-if="config.selectRowAction=='edit' && editingEntity"></button>
+					<button type="button" class="btn bi bi-plus-lg btn-primary"
+					  @click="createEntity(entity)" title="Ajouter une ligne"
+					  v-else></button>
 				</th>
 				<th v-for="column in columnList.filter(c=>c.visible)"
 				  class="position-relative" :class="columnClassObj(column)"
@@ -587,10 +589,10 @@ Dependencies :
 					<div v-if="isEditingRow(entity)" >
 						<button type="button" class="btn bi bi-check-lg btn-success"
 						  @click.stop="stopEditingRow()" title="Enregistrer la ligne"
-						  ref="scrollAnchor"></button>
+						  v-if="config.selectRowAction!='edit'"></button>
 						<button type="button" class="btn bi bi-escape btn-secondary"
 						  @click.stop="clearEditingRow()" title="Annuler la modification"
-						  v-if="this.config.selectRowAction!='edit'"></button>
+						  ref="scrollAnchor"></button>
 					</div>
 					<div v-else class="position-relative">
 						<i class="position-absolute bi-exclamation" v-if="isRowHighlight(entity)" ref="highlightAnchor"></i>
@@ -598,7 +600,8 @@ Dependencies :
 						since this one can be hidden --%>
 
 						<button type="button" class="btn bi bi-pencil" ref="random"
-						  @click.stop="startEditingRow(entity)" title="Modifier la ligne"></button>
+						  @click.stop="startEditingRow(entity)" title="Modifier la ligne"
+						  v-if="config.selectRowAction!='edit'"></button>
 					</div>
 				</td>
 				<td v-for="column in columnList.filter(c=>c.visible)" :class="columnClassObj(column)">
@@ -606,7 +609,7 @@ Dependencies :
 
 						<template v-if="(isNew(entity) && column.insertable) || (!isNew(entity) && column.updatable)">
 							<textarea v-if="column.editor == 'textarea'"
-							  style="width:100%"
+							  style="width:100%;field-sizing: content;"
 							  v-model.trim="editingEntity[column.name]" @input="validateField(editingEntity,column)">
 							</textarea>
 							<div v-else-if="column.editor == 'none'"

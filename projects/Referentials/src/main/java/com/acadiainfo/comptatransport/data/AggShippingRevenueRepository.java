@@ -5,8 +5,6 @@ import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 import com.acadiainfo.comptatransport.domain.AggShippingRevenue;
-import com.acadiainfo.comptatransport.domain.Carrier;
-import com.acadiainfo.comptatransport.domain.TransportSalesHeader;
 import com.acadiainfo.util.persistence.CrudRepositoryImpl;
 
 import jakarta.persistence.EntityManager;

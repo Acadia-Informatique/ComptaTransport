@@ -6,7 +6,6 @@ import java.util.stream.Stream;
 
 import com.acadiainfo.comptatransport.domain.TransportSalesHeader;
 
-import jakarta.persistence.Column;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 
@@ -43,6 +42,38 @@ public class TransportSalesRepository {
 		Stream<TransportSalesHeader> stream = query.getResultStream();
 
 		return stream;
+	}
+
+
+	/**
+	 * Find a TransportSalesHeader by invoice number.
+	 * @param docReference - more accurately,the *original* invoice number (before grouping)
+	 * @return
+	 */
+	public TransportSalesHeader getOne(String docReference) {
+		Query query = em.createNamedQuery("findOne_TransportSalesHeader_as_INVOICE");
+		query.setParameter(1, docReference);
+
+		try {
+			TransportSalesHeader header = (TransportSalesHeader) query.getSingleResult();
+			return header;
+		} catch (jakarta.persistence.NoResultException exc) {
+			return null;
+		}
+	}
+
+	/**
+	 * Find a TransportSalesHeader by order number.
+	 * @param orderNum
+	 * @return
+	 */
+	public TransportSalesHeader findByOrderNum(String orderNum) {
+		Query query = em
+		    .createNativeQuery("SELECT max(doc_reference) FROM I_TRANSPORT_VENDU WHERE order_reference = ?1");
+		query.setParameter(1, orderNum);
+		String docReference = (String) query.getSingleResult();
+		if (docReference == null) return null;
+		return this.getOne(docReference);
 	}
 
 }

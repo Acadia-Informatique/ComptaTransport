@@ -42,7 +42,7 @@ import jakarta.ws.rs.core.Response.Status;
 @Stateless
 @Path("/transport-sales")
 public class TransportSalesWS {
-	private Logger logger = Logger.getLogger(getClass().getName());
+	private static final Logger logger = Logger.getLogger(TransportSalesWS.class.getName());
 
 	@Context
 	private HttpServletRequest servReq;
@@ -91,8 +91,9 @@ public class TransportSalesWS {
 
 			// - disconnect Customer entity before manipulating it for serialization
 			em.detach(customer);
+
 			// ... we mainly need customer.getTags();
-			customer.setDescription(null);
+			// customer.setDescription(null); requested by users
 			customer.setErpReference(null); // useful, but redundant with TransportSalesHeader.customerRef
 			customer.setLabel(null);
 			customer.setSalesrep(null);
@@ -181,6 +182,7 @@ public class TransportSalesWS {
 			}
 			em.flush();
 
+			// prepare response payload
 			row.setUserInputs(saved);
 			// all others are just irrelevent, we send them back unchanged.
 			row.setDetails(null); // except details is nullified
@@ -219,7 +221,7 @@ public class TransportSalesWS {
 			groupReference = oGroupReference.get(); // keeping existing group name to preserve user inputs
 		} else {
 			groupReference = TransportSalesHeader.GROUPREF_PREFIX
-			    + new java.util.TreeSet<String>(docReferences).getLast();
+			    + new java.util.TreeSet<String>(docReferences).last();
 			// 1st, last, by date order ?...business decision ;-)
 		}
 
@@ -273,6 +275,55 @@ public class TransportSalesWS {
 
 		return Response.ok(updateCount + " lignes dégroupées").build();
 	}
+
+	@GET
+	@Path("/{mixedId}")
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response findOneBy(@PathParam("mixedId") String mixedId, @QueryParam("type") String idType) {
+		TransportSalesRepository repo = TransportSalesRepository.getInstance(em);
+		try {
+			TransportSalesHeader header;
+			if (idType == null || idType.equals(""))
+				idType = "doc";
+			switch (idType) {
+			case "order":
+				header = repo.findByOrderNum(mixedId);
+				break;
+			case "doc":
+				header = repo.getOne(mixedId);
+				break;
+			default:
+				return WSUtils.response(Status.BAD_REQUEST, servReq,
+				    "Paramètre de requête \"type\" inconnu, valeur attendue parmi \"doc\" (par défaut) ou \"order\" pour interpréter ID : "
+				        + mixedId);
+			}
+
+			if (header == null) {
+				return WSUtils.response(Status.NOT_FOUND, servReq,
+				    "Aucune facture trouvée avec ce numéro (essayer avec le paramètre \"type\" ?).");
+			} else {
+				// simplify JSON payload
+				em.detach(header);
+
+				Customer customer = header.getCustomer();
+				if (customer != null) {
+					em.detach(customer);
+					customer.setShipPreferences(null); // deemed a bit overkill
+					customer.setAggShippingRevenues(null); // should already be null, since not mapped in JPA
+					customer.setSalesrep(null);
+					customer.set_v_lock(null);
+					customer.emptyAuditingInfo();
+				}
+
+				return Response.ok(header).build();
+			}
+
+			// TODO
+		} catch (jakarta.persistence.PersistenceException exc) {
+			return ApplicationConfig.response(exc, servReq, TransportSalesRepository.class);
+		}
+	}
+
 //
 //
 //

@@ -15,12 +15,13 @@
 
 <script src="${webJarsUrl}/popperjs__core/2.11.8/dist/umd/popper.min.js"></script>
 <script src="${webJarsUrl}/bootstrap/5.3.8/js/bootstrap.min.js"></script>
-<script src="${webJarsUrl}/vue/3.5.22/dist/vue.global.js"></script>
+<%-- <script src="${webJarsUrl}/vue/3.5.22/dist/vue.global.js"></script> TODO create a dev mode --%>
+<script src="${webJarsUrl}/vue/3.5.22/dist/vue.global.prod.js"></script>
 
 <style>
 	/** Bootstrap global overrides */
 	html {
-	  font-size: 0.7em;
+	  font-size: 0.8em;
 	}
 	
 	/** List animations */

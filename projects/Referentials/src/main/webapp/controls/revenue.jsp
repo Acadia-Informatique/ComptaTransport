@@ -41,7 +41,7 @@
 			border: dotted 1px black;
 			z-index: 500;
 		}
-		table#revenue-control-grid td > div.multiline {
+		table#revenue-control-grid td div.multiline {
 			white-space:pre-wrap;
 		}
 		table#revenue-control-grid th.carrier,
@@ -106,6 +106,17 @@
 				<div v-if="dataRowCount" class="mx-2">{{ dataRowCount}} lignes</div>
 			</div>
 
+			<table class="mx-3 fst-italic">
+				<tr>
+					<td>Grilles spécifiques : </td>
+					<td v-for="[name, system] in otherPricingSystems">
+					 {{name}}
+						<span v-if="system['#pgv_metadata'] == 'NO_VERSION_AVAILABLE'">🔴<%-- emoji "red dot" --%></span> 						
+						<span v-else :title="system['#pgv_metadata']?.auditingInfo.dateModified">🟢<%-- emoji "green dot" --%></span>
+					</td>
+				</tr>
+			</table>
+
 			<div v-if="pricingSystem['#pgv_metadata']" class="d-flex">
 					Grille tarifaire ACADIA : {{ pricingSystem["#pgv_metadata"].version }}
 					<audit-info class="small text-nowrap" v-model="pricingSystem['#pgv_metadata'].auditingInfo"></audit-info>
@@ -131,6 +142,13 @@
 				// so we need this.poids as an equivalent to CommandeALivrer
 				// currently used in grid-edit.jsp :
 				this.poids = weight;
+
+				Object.defineProperty(this, "poids_100_arr_10", {
+				  get: ()=>{
+					  return Math.ceil(this.poids / 10) / 10; //nb de centaines, après arrondi par 10 sup.
+				  },
+				  enumerable: true,
+				});
 			}
 			getPPGRawCoordinates(){
 				let departement = (this.country=="FR" && this.zip &&  this.zip.length==5) ? this.zip.substring(0,2) : "00";
@@ -264,7 +282,7 @@
 						this.rowData_carrierObj,
 						CustomerFunc.assessMarket(this.rowDataCached_final_b2c, this.rowData.customer, this.rowData_customerShipPreferences),
 						this.rowDataCached_nonstdPack,
-						this.rowData_carrierObj.name == "INTEGRATION"
+						this.rowData["carrier"] == "INTEGRATION" //instead of the overridden version : this.rowData_carrierObj.name == "INTEGRATION"
 					);
 				},
 				priceGridResult(){
@@ -274,6 +292,25 @@
 				priceGridFlatResult(){
 					console.debug("flatRes");
 					return PricingSystem.summarizeResult(this.priceGridResult);
+				},
+				priceGridFlatResult_zone(){
+					//TODO NAM Q&D
+					let resultObj = this.priceGridResult;
+					while (resultObj) {
+						switch(resultObj.gridName){
+							case "Toutes livraisons": {
+								if (resultObj?.gridCell?.coords?.c == "Dom-Tom") return "DOM-TOM";
+							} break;
+							case "Prix Europe": {
+								return "Europe " + resultObj?.gridCell?.coords?.c.replaceAll('Z', '');;
+							} break;
+							case "optim Transporteurs":{
+								return resultObj?.gridCell?.coords?.z?.replaceAll('Zone 0', '');
+							} break;
+							default: break;
+						}
+						resultObj = resultObj.nested;
+					}
 				},
 				priceGridFlatResult_carrier(){
 					let reco = this.priceGridFlatResult?.extra_info;
@@ -593,24 +630,27 @@
 	</script>
 
 	<script type="text/x-template" id="RevenueControlGridRow-template">
-		<tr v-if="assessCarrierOK.level <= hideCarrierOKAbove
+		<tr v-show="assessCarrierOK.level <= hideCarrierOKAbove
 		       && assessFinalCarrOK_level <= hideFinalCarrOKAbove
 		       && assessAmountOK.level <= hideAmountOKAbove
 		       && assessFinalAmntOK_level <= hideFinalAmntOKAbove"
 		 @click="highlighted = !highlighted" :class="{'highlighted':highlighted}">
 			<td class="erp-ref">
-				<div :title="rowData.invoice_orig??''" class="multiline" >{{ rowData_invoice }}</div>
+				<div :title="rowData.invoice" class="multiline" >{{ rowData_invoice }}</div>
 			</td>
 			<td>
-				<div :title="rowData.order" class="multiline">{{ rowData_order }}</div>
+				<div class="multiline">{{ rowData_order }}</div>
 			</td>
 			<td class="cust">
 				<div v-if="rowData.customer">
-					<div v-if="rowData.customer.tags.includes('inactive')">
+					<template v-if="rowData.customer.tags.includes('inactive')">
 						{{ rowData.customerRef }}
 						<i role="button" class="bi bi-activity" title="Réactiver" @click="activateCustomer(rowData.customerRef)"></i>
-					</div>
-					<link-to-grid v-else url="../customers" attr="erpReference" :value="rowData.customerRef"></link-to-grid>
+					</template>
+					<template v-else>
+						<link-to-grid url="../customers" attr="erpReference" :value="rowData.customerRef"></link-to-grid>
+ 						<span v-if="rowData.customer.description" :title="rowData.customer.description">ℹ️</span>
+					</template>
 				</div>
 				<div v-else>
 					{{ rowData.customerRef }}
@@ -628,6 +668,10 @@
 			<td>
 				<div>{{ rowData.zip }}</div>
 			</td>
+<td><%-- TODO NAM Q&D --%>
+	<div>{{ priceGridFlatResult_zone }}</div>
+</td>
+
 			<td>
 				<div @click="debug_PricingSystem"> <%-- hidden debug feature --%>
 					<datedisplay-day :value="rowData.date"></datedisplay-day>
@@ -659,7 +703,7 @@
 					<override-signal />
 					<select v-model="rowData.$userInputs$carrier_override"
 					  :title="'(initialement ' + rowData.carrier + ')'"
-					  @blur="validate_carrier_override"
+					  @change="validate_carrier_override"
 					  @keyup.esc="$event.target.blur()">
 						<option v-for="carrierObj in reflist_carriers.values()" :value="carrierObj">
 							{{ carrierObj.name }}
@@ -679,7 +723,7 @@
 				<div :class="finalCarrOKclass">
 					<textarea rows="1" v-if="rowData.userInputs.carrierOK_comment"
 					      v-model.lazy.trim="rowData.userInputs.carrierOK_comment"
-					  @keyup.esc="$event.target.blur()">>
+					  @keyup.esc="$event.target.blur()">
 					</textarea>
 					<div v-else role="button" @click="init_carrierOK_comment">
 						✏️
@@ -714,11 +758,6 @@
 					</div>
 				</div>
 			</td>
-
-<td>
-	<div :title="rowData_truncatedWeight" >{{ rowData.weight }}</div>
-</td>
-
 			<td class="price computed">
 				<div :title="'Prix originel dans X3 : ' + rowData.price">{{ rowData_overridden_price }}</div>
 			</td>
@@ -872,7 +911,7 @@
 		<table id="revenue-control-grid" class="table table-bordered table-sm table-striped table-hover" ref="rootElement">
 			<thead class="shadow sticky-top">
 				<tr>
-					<th data-bs-toggle="tooltip" title="Numéro de facture X3" class="position-sticky">
+					<th data-bs-toggle="tooltip" title="Numéro de facture X3">
 						<div>N° de facture</div>
 					</th>
 					<th data-bs-toggle="tooltip" title="Numéro Commande(s) correspondante(s) X3">
@@ -890,6 +929,10 @@
 					<th data-bs-toggle="tooltip" title="Code postal de l'adresse d'expédition">
 						<div>CP</div>
 					</th>
+					<th data-bs-toggle="tooltip" title="Zone géographique tarifaire. N'est disponible que quand lorsqu'une grille est applicable.">
+						<div>Zone</div>
+					</th><%-- TODO NAM Q&D --%>
+
 					<th data-bs-toggle="tooltip" title="Date de facture X3">
 						<div>Date de facture</div>
 					</th>
@@ -927,7 +970,6 @@
 					<th class="price" data-bs-toggle="tooltip" title="Diverses options (voir Article X3 dans la bulle d'aide)">
 						<div>Opt.</div>
 					</th>
-<th title="reprise du poids">Nam</th><%-- TODO NAM Q&D --%>
 					<th class="price computed" data-bs-toggle="tooltip" title="Montant total des frais de port payés, selon X3">
 						<div>Total</div>
 					</th>
@@ -955,24 +997,28 @@
 
 	<script type="module">
 		function _updatePricingSystem(gridName, dt, system){
+			if (dt == null) return; // transient state while using datepicker
+
 			let pgv_metadata_uri = "price-grids/*/versions/latest-of?grid-name="+ gridName +"&published-at=" + dt;
 			axios_backend.get(pgv_metadata_uri)
 			.then(response => {
 				let pgv_metadata = response.data;
 
 				if (!(pgv_metadata?.id)) {
-					delete(system["#pgv_metadata"]);
+					//delete(system["#pgv_metadata"]);
+					system["#pgv_metadata"] = "NO_VERSION_AVAILABLE";
 					system.clear();
-
-					throw new Error("Aucune grille publiée à la date demandée");
+					return;
 				}
 
 				if (system["#pgv_metadata"]
 				&& system["#pgv_metadata"]["id"] == pgv_metadata["id"]
 					&& system["#pgv_metadata"]["_v_lock"] == pgv_metadata["_v_lock"]
 				) {
-					return; // pricingSystem already OK
+					// pricingSystem already cached
+					return;
 				} else {
+					// clean before loading
 					delete(system["#pgv_metadata"]);
 					system.clear();
 				}
@@ -1043,7 +1089,7 @@
 				sharedReady(){ // almost a reactivity hack
 					console.debug("shared ready");
 					return !this.pricingSystem.isEmpty() > 0
-					  && ![...this.otherPricingSystems.values()].some(system => system.isEmpty())
+					  && ![...this.otherPricingSystems.values()].some(system => system.isEmpty() && system["#pgv_metadata"] != "NO_VERSION_AVAILABLE")
 					  && this.reflist_carriers.size > 0;
 				}
 			},

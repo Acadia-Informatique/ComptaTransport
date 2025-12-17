@@ -118,7 +118,7 @@ var Datepicker_Month = {
 		<button v-if="editable" type="button" @click="addMonth(-1)"
 		  class="btn bi bi-caret-left-fill px-0">
 		</button>
-		<input type="text" :readonly="!editable" v-model.lazy="monthValue" length="7" style="width:4.2em"></input>
+		<input type="text" :readonly="!editable" v-model.lazy="monthValue" length="7" style="width:4.6em"></input>
 		<button v-if="editable" type="button" @click="addMonth(+1)"
 		  class="btn bi bi-caret-right-fill px-0">
 		</button>

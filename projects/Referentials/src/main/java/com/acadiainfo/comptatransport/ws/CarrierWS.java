@@ -6,6 +6,7 @@ import java.util.stream.Stream;
 
 import com.acadiainfo.comptatransport.data.CarriersRepository;
 import com.acadiainfo.comptatransport.domain.Carrier;
+import com.acadiainfo.comptatransport.fileimport.RowsProvider;
 import com.acadiainfo.util.WSUtils;
 
 import jakarta.ejb.Stateless;
@@ -21,7 +22,7 @@ import jakarta.ws.rs.core.Response.Status;
 @Stateless
 @Path("/carriers")
 public class CarrierWS {
-	private Logger logger = Logger.getLogger(getClass().getName());
+	private static final Logger logger = Logger.getLogger(CarrierWS.class.getName());
 
 	@Context
 	private HttpServletRequest servReq;
