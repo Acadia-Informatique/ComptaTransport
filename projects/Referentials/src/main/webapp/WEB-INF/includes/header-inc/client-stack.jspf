@@ -2,9 +2,9 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 
 <%-- =============================
- This include represents the base client stack 
+ This include represents the base client stack
  for this project, regarding frameworks, UI, etc.
- 
+
  We added some of our global choices and utilities.
 ================================== --%>
 
@@ -23,7 +23,7 @@
 	html {
 	  font-size: 0.8em;
 	}
-	
+
 	/** List animations */
 	.list-move, /* apply transition to moving elements */
 	.list-enter-active,
@@ -42,7 +42,7 @@
 	.list-leave-active {
 		position: absolute;
 	}
-	
+
 </style>
 
 
@@ -72,6 +72,18 @@
 				timer = undefined;
 			}, timeout);
 		};
+	}
+
+	function renderNumber(n, decimals){
+		if (n === null || typeof n == "undefined"){
+			return "";
+		} else if (isNaN(n)) {
+			return "N/A";
+		} else if (decimals) { // too bad for zero ;-)
+			return n.toFixed(decimals);
+		} else {
+			return n;
+		}
 	}
 </script>
 

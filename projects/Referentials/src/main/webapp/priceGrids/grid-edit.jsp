@@ -34,6 +34,16 @@
 				this.transporteur100 = "";
 				this.market = "B2B";
 				this.isIntegration = false;
+
+
+				// could theoretically be computed by pricegrid.js, but i just don't want ppl
+				// to enter 1/100 of cents (with prices like 0.4748 per kg).
+				Object.defineProperty(this, "poids_100_arr_10", {
+				  get: ()=>{
+					  return Math.ceil(this.poids / 10) / 10; //nb de centaines, après arrondi par 10 sup.
+				  },
+				  enumerable: true,
+				});
 			}
 			getPPGRawCoordinates(){
 				let departement = (this.pays=="FR" && this.codePostal &&  this.codePostal.length==5) ? this.codePostal.substring(0,2) : "00";
@@ -146,7 +156,7 @@
 		}
 
 		.gridCell input.money-input {
-			width:4.5em;
+			width: 5em;
 			border:1px dotted lightgrey;
 			padding: 0.1em 0.2em;
 			text-align:right;
@@ -226,7 +236,7 @@
 				</h2>
 				<div id="collapseOne" class="accordion-collapse collapse show" data-bs-parent="#tool-pane">
 					<div class="accordion-body">
-						<pricingtest-form :test-priced-obj="testPricedObj" :ui_state="ui_state" ></pricingtest-form>
+						<pricingtest-form :test-priced-obj="testPricedObj"></pricingtest-form>
 					</div>
 				</div>
 			</div>
@@ -276,14 +286,14 @@
 		</div>
 
 		<div id="pricinggrid-pane" class="pt-2">
-			<pricinggrids-tabs :ui_state="ui_state"></pricinggrids-tabs>
+			<pricinggrids-tabs></pricinggrids-tabs>
 
 			<div id="gridViewport" class="mb-3">
-				<pricinggrids-grid :ui_state="ui_state"></pricinggrids-grid>
+				<pricinggrids-grid></pricinggrids-grid>
 			</div>
 
 			<h3 id="dimension-list"><a href="#dimension-list">Légende</a></h3>
-			<pricinggrids-dim-list :ui_state="ui_state"></pricinggrids-dim-list>
+			<pricinggrids-dim-list></pricinggrids-dim-list>
 		</div>
 
 
@@ -580,7 +590,7 @@
 								</div>
 							</template>
 							<template v-else>
-								<pricinggrids-policy v-if="currCopy" :policy="currCopy" editMode="full" :ui_state="ui_state" />
+								<pricinggrids-policy v-if="currCopy" :policy="currCopy" editMode="full" />
 								<div v-else class="text-bg-danger">
 									UNKNOWN "editingPolicyChoice" : {{ ui_state.editingPolicyChoice }}
 									<!-- meaning not listed in nav > nav-item -->
@@ -605,6 +615,7 @@
 					<span class="input-group-text">de</span>
 					<money-input class="form-control" min="0" v-model="policy.price" required />
 					<span class="input-group-text">€</span>
+					<amounttype-input class="form-select" v-model="policy.amountType" />
 					<div class="invalid-feedback">
 						Prix en euros
 					</div>
@@ -617,12 +628,14 @@
 			</template>
 			<template v-else-if="editMode=='quick'">
 				<money-input v-model="policy.price" required/>
+				{{ amountTypeLabelOf(policy.amountType) }}
 				<div class="quick-extra-info" v-if="policy.extra_info">
 					{{ policy.extra_info }}
 				</div>
 			</template>
 			<template v-else>
 				Prix fixe de {{ policy.price }}€
+				{{ amountTypeLabelOf(policy.amountType) }}
 				<div v-if="policy.extra_info">
 					<hr>
 					Transporteur: {{policy.extra_info}}
@@ -644,17 +657,18 @@
 						Sélectionnez un attribute de volume.
 					</div>
 					<span class="input-group-text">arrondi au</span>
-					<input class="form-control" type="number" step="0.25" min="0.25" v-model.number="policy.rounding" required>
+					<input class="form-control" type="number" step="0.25" min="0.25" v-model.number="policy.rounding">
 					<span class="input-group-text">supérieur</span>
 					<div class="invalid-feedback">
-						Taille du "paquet" auquel appliquer le prix unitaire (ex. 0.5, 1, 10, 50, 100)
+						Taille du "paquet" auquel appliquer le prix unitaire (ex. 0.5, 1, 10, 50, 100... vide pour ne pas arrondir)
 					</div>
 				</div>
 				<div class="input-group has-validation mt-3">
 					<span class="input-group-text">de</span>
-					<money-input class="form-control" min="0" v-model="policy.price" required />
+					<money-input class="form-control" min="0" v-model="policy.price" decimals="4" required />
 					<span class="input-group-text">€</span>
 					<span class="input-group-text">par unité</span>
+					<amounttype-input class="form-select" v-model="policy.amountType" />
 					<div class="invalid-feedback">
 						Prix en euros pour 1 unité (indépendant de l'arrondi)
 					</div>
@@ -686,13 +700,14 @@
 				</div>
 			</template>
 			<template v-else-if="editMode=='quick'">
-				<money-input v-model="policy.price" required />*{{policy.attribute}}
+				<money-input v-model="policy.price" decimals="4" required />*{{policy.attribute}}
+				<div class="secondary" v-if="policy.rounding">
+					(arrondi à {{ policy.rounding }})
+				</div>
 				<div class="secondary" v-if="policy.offset">
 					à partir de {{ policy.offset.attribute }} pour {{ policy.offset.price }}€
 				</div>
-				<div class="secondary">
-					(arrondi à {{ policy.rounding }})
-				</div>
+				{{ amountTypeLabelOf(policy.amountType) }}
 				<div class="quick-extra-info" v-if="policy.extra_info">
 					{{ policy.extra_info }}
 				</div>
@@ -704,6 +719,7 @@
 				<template v-if="policy.offset">
 					(à partir de {{ policy.offset.attribute }} pour {{ policy.offset.price }}€)
 				</template>
+				{{ amountTypeLabelOf(policy.amountType) }}
 				<div v-if="policy.extra_info">
 					<hr>
 					Transporteur: {{policy.extra_info}}
@@ -728,12 +744,8 @@
 				<div class="input-group has-validation mt-3">
 					<span class="input-group-text">Frais supplémentaire : </span>
 					<money-input class="form-control" v-model="policy.delegated_additiveAmount" />
-					<select class="form-select" v-model="policy.delegated_additiveAmountType">
-						<option value="MAIN">(Base)</option>
-						<option value="B2C">option B2C</option>
-						<option value="OPTS">Autres options</option>
-					</select>
 					<span class="input-group-text">€</span>
+					<amounttype-input class="form-select" v-model="policy.delegated_additiveAmountType" />
 					<i class="input-group-text">(optionnel)</i>
 					<div class="invalid-feedback">
 						Frais à ajouter en €, après avoir appliqué la griller à suivre.
@@ -748,7 +760,7 @@
 			<template v-else-if="editMode=='quick'">
 				voir grille "{{ policy.delegated_gridName }}"<br>
 				{{ policy.delegated_additiveAmount != null ? "+ ajout "+policy.delegated_additiveAmount+"€" : ""}}
-				{{ (!policy.delegated_additiveAmountType || policy.delegated_additiveAmountType=='MAIN') ? '' : policy.delegated_additiveAmountType }}
+				{{ amountTypeLabelOf(policy.delegated_additiveAmountType) }}
 				<!-- quick mode is no edit for now... may change -->
 				<div class="quick-extra-info" v-if="policy.extra_info">
 					{{ policy.extra_info }}
@@ -757,7 +769,7 @@
 			<template v-else>
 				voir grille "{{ policy.delegated_gridName }}"<br>
 				{{ policy.delegated_additiveAmount != null ? "+ ajout "+policy.delegated_additiveAmount+"€" : ""}}
-				{{ (!policy.delegated_additiveAmountType || policy.delegated_additiveAmountType=='MAIN') ? '' : policy.delegated_additiveAmountType }}
+				{{ amountTypeLabelOf(policy.delegated_additiveAmountType) }}
 				<div v-if="policy.extra_info">
 					<hr>
 					Transporteur: {{policy.extra_info}}
@@ -893,7 +905,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					<pricingtest-result :result="testResult"/>
+					<pricingtest-result :result-list="testResult"/>
 				</tbody>
 				<tfoot class="table-group-divider">
 					<tr>
@@ -903,13 +915,13 @@
 								--
 							</template>
 							<template v-else-if="!isNaN(grandTotal?.MAIN)">
-								{{grandTotal.total().toFixed(2)}} €
+								{{ renderNumber(grandTotal.total())}} €
 							</template>
 							<span v-else class="text-bg-danger">
 								&nbsp;???&nbsp;
 							</span>
 							<div class="fs-4" v-if="grandTotal.extra_info">
-								{{ grandTotal.extra_info }}
+								Transporteur: {{ grandTotal.extra_info }}
 							</div>
 						</td>
 					</tr>
@@ -923,8 +935,7 @@
 
 
 	<script type="text/x-template" id="PricingTest-Result-template">
-		<pricingtest-result v-if="result.nested" :result="result.nested" />
-		<tr>
+		<tr v-for="result of resultList">
 			<td>
 				{{ result.gridName}}<br>
 				<span v-if="result.gridCell?.coords" style="white-space:pre;">
@@ -944,7 +955,7 @@
 					--
 				</template>
 				<template v-else-if="!isNaN(result.amount)">
-					{{result.amount.toFixed(2)}}
+					{{ result.amount.toFixed(2)}}
 				</template>
 				<span v-else class="text-bg-danger">
 					&nbsp;???&nbsp;
@@ -966,14 +977,31 @@
 		const numericProperties = typicalProperties.filter(([k,v]) => typeof v == "number").map(([k,v]) => k);
 		const numericRawCoords =  typicalRawCoords.filter(([k,v]) => typeof v == "number").map(([k,v]) => k);
 		const stringRawCoords =  typicalRawCoords.filter(([k,v]) =>typeof v == "string").map(([k,v]) => k);
+		const predefinedAmountTypes = [
+			{value:"MAIN" , label: "Base"},
+			{value:"B2C" , label: "Supplém. Livraison directe"},
+			{value:"OPTS" , label: "Autres options"},
+			{value:"GAS" , label: "Surcharge Carburant"},
+			{value:"TAX" , label: "Taxes (TVA, Éco-taxe, etc.)"},
+		];
+		function amountTypeLabelOf(type){
+			if (!type || type=="MAIN") return "";
 
-		/* shared state for the page */
-		//const gridBuilderApp_UI = Vue.reactive( ui_state); TODO need explicit call ?!
+			let typeObj = predefinedAmountTypes.find(t => t.value == type);
+			return  typeObj ? typeObj.label : "[[" + type + "]]";
+		}
+
 
 		const gridBuilderApp = Vue.createApp({
+			provide(){
+				return {
+					ui_state: this.ui_state, // TODO utiliser un bus global ?...
+					sharedPricegridTextTags: this.selectableTags, // inject is in shared component lib
+				};
+			},
 			data() {
 				return {
-					ui_state: { // TODO utiliser un bus global ?...
+					ui_state: {/* shared state for the page */
 						system: EMPTY_PRICINGSYSTEM,
 						currentGrid: EMPTY_PRICINGSYSTEM.grids[0],
 
@@ -1037,11 +1065,6 @@
         	},
 			created(){
 				PricegridTextTags.initSharedTags(this.selectableTags)
-			},
-			provide(){
-				return {
-					sharedPricegridTextTags: this.selectableTags,
-				};
 			},
 			mounted(){
 				this.apiGetMetadata();
@@ -1303,9 +1326,7 @@
 
 
 		var PricingGrids_Tabs = {
-			props: {
-				ui_state: Object
-			},
+			inject:["ui_state"],
 			data(){
 				return {
 					old_gridName: "",
@@ -1432,9 +1453,9 @@
 
 
 		var _AbstractDimension = {
+			inject:["ui_state"],
 			props: {
-				dimension: Object,
-				ui_state: Object
+				dimension: Object
 			},
 			data(){
 				return {
@@ -1451,9 +1472,7 @@
 
 
 		var PricingGrids_DimensionList = {
-			props: {
-				ui_state: Object
-			},
+			inject:["ui_state"],
 			data(){
 				return {
 					newDimType:"ThresholdCategory" // default, because more common
@@ -1792,7 +1811,7 @@
 							</div>
 							<div class="col-10">
 								<component :is="dim.type+'Dimension'"
-									:dimension="dim" :ui_state="ui_state"></component>
+									:dimension="dim"></component>
 							</div>
 						</div></form>
 					</li>
@@ -1818,10 +1837,17 @@
 
 
 		var PricingGrids_GridCell = {
+			inject:["ui_state"],
 			props: {
 				cell: Object
 			},
 			emits: ["editGridCell"],
+			methods:{
+				quickInitEmptyCell(){
+					let srcPolicy = this.ui_state.editingPolicyCopies["clipboardPolicy"];
+					this.cell.policy = deepClone(srcPolicy);
+				}
+			},
 			template: `
 				<div class="gridCell">
 					<a class="position-absolute top-0 end-0" data-bs-toggle="modal" data-bs-target="#grid-cell-customizer"
@@ -1833,7 +1859,8 @@
 							<pricinggrids-policyQuick :policy="cell.policy" />
 						</template>
 						<template v-else>
-							<span class="badge text-bg-warning">N/A</span>
+							<div @dblclick="quickInitEmptyCell"
+							  class="badge text-bg-warning">N/A</div>
 						</template>
 					</template>
 					<template v-else>
@@ -1844,9 +1871,9 @@
 		};
 
 		var PricingGrids_Policy = {
+			inject:["ui_state"],
 			props: {
 				policy: Object,
-				ui_state: Object,
 				editMode: String, // among "full", "quick", "no"
 			},
 			data(){
@@ -1864,7 +1891,8 @@
 					} else {
 						this.policy.offset = {attribute:0, price:0};
 					}
-				}
+				},
+				amountTypeLabelOf,
 			},
 			template: '#PricingGrids_Policy-template' // template is shared !
 		};
@@ -1879,14 +1907,15 @@
 					editMode: "quick"
 				}
 			},
+			methods:{
+				amountTypeLabelOf
+			},
 			template: '#PricingGrids_Policy-template' // template is shared !
 		};
 
 
 		var PricingGrids_Grid = {
-			props: {
-				ui_state: Object
-			},
+			inject:["ui_state"],
 			computed:{
 				grid(){
 					return this.ui_state.currentGrid;
@@ -2025,9 +2054,9 @@
 
 
 		var PricingTest_Form = {
+			inject:["ui_state"],
 			props: {
-				testPricedObj : Object,
-				ui_state: Object
+				testPricedObj : Object
 			},
 			computed:{
 				testResult(){
@@ -2041,16 +2070,18 @@
 				}
 
 			},
+			methods:{
+				renderNumber
+			},
 			template: '#PricingTest-Form-template'
 		};
 
 		/**
 		 * Table rows based on PricingSystem.apply()'s result.
-		 * It is *recursive* because of the nested results.
 		 */
 		var PricingTest_Result = {
 			props: {
-				result: Object
+				resultList: Object
 			},
 			methods:{
 				/* render a pretty print JSON coords, to be displayed in a PRE element */
@@ -2088,12 +2119,42 @@
 			template: `<input v-model="value" />`
 		};
 
+		/** Amount Type selector */
+		var AmountTypeInput = {
+			props: {
+				modelValue: String,
+				modelModifiers: { default: () => ({}) } //capture and ignore this.modelModifiers
+			},
+			data(){
+				return {
+					predefinedAmountTypes
+				};
+			},
+			emits: ['update:modelValue'],
+			computed: {
+				value: {
+					get() {
+						return this.modelValue;
+					},
+					set(value) {
+						this.$emit('update:modelValue', value);
+					}
+				}
+			},
+			template:
+				`<select v-model="value">
+					<option v-for="t of predefinedAmountTypes" :value="t.value">
+						{{t.label}}
+					</option>
+				</select>`
+		};
 
 		gridBuilderApp.component("audit-info", AuditingInfoRenderer);
 		gridBuilderApp.component("pricegrid-text-tags", PricegridTextTags);
 
 		gridBuilderApp.component("money-input", MoneyInput);
 		gridBuilderApp.component("splitting-input", SplittingInput);
+		gridBuilderApp.component("amounttype-input", AmountTypeInput);
 
 		gridBuilderApp.component("pricinggrids-tabs", PricingGrids_Tabs);
 

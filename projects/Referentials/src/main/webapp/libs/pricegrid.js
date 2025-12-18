@@ -31,13 +31,51 @@ const POLICY_PROTOTYPES = [
 		}
 	},
 	{
+		//TODO LEGACY, to be removed and replace with AggregatedPrice
 		type: "DelegatedPrice",
 		delegated_gridName: "B2B",
 		delegated_additiveAmount: 3,
 		delegated_additiveAmountType: "B2C" // optional, default to "MAIN"
 	},
+
+	{
+		// first available "amountType" and "extra_info" are kept, drills deeper only for "amount"
+		type: "AggregatedPrice",
+		delegates:[
+			{  // each delegate defines a "aX+b" linear amount, namely "factor * [delegated.amount] + amount"
+				amountType : "MAIN", // optional, overrides delgated is set
+				addAmount : 0, // optional, additive part (no delegated grid required)
+				factor: 1, // optional, relies on delegated grid's amount
+				delegated_gridName : "tarif_base", // name of another grid in the system
+				extra_info : "" // optional, overrides delgated is set
+			},
+			{
+				amountType : "TAX",
+				factor: 0.195, //19.5% tax rate
+				delegated_gridName : "tarif_base"
+			},
+			{
+				amountType : "TAX"
+				addAmount : 5, // 5€ fixed tax
+			}
+		]
+	},
+
 ];
 */
+
+/** When a PricingGrid.apply() returns one of these,
+ * a PricingSystem.applyGrid() returns a list of them.
+ */
+class PricingResult {
+	constructor(gridName, gridCell, amountType, amount, extra_info){
+		this.gridName = gridName;
+		this.gridCell = gridCell;
+		this.amountType = amountType;
+		this.amount = amount;
+		this.extra_info = extra_info;
+	}
+}
 
 class PricingSystem {
 	constructor() {
@@ -93,38 +131,45 @@ class PricingSystem {
 	 * @param {*} gridName
 	 * @param {*} pricedObject
 	 * @see PricingGrid.apply()
-	 * @returns same as PricingGrid.apply(), plus "gridName" and optional "nested" (chaining)
+	 * @returns returns a list of PricingResult instances (possibly a list of 0 or 1).
 	 */
 	applyGrid(gridName, pricedObject){
 		let grid = this.findGridByName(gridName);
 		if (grid) {
-
 			let returnVal = grid.apply(pricedObject); //{gridCell, amount}
 			let policy = returnVal?.gridCell?.policy;
-			if (policy?.type == "DelegatedPrice"){
-				let nestedReturnVal = this.applyGrid(policy.delegated_gridName, pricedObject);
-				return {
-					gridName,
-					gridCell:returnVal.gridCell,
-					// Change of semantics : for DelegatedPrice, "amount" and "extra_info" are collected "as is".
-					// A static method (summarizeResult) will have to make all the additions and decisions.
 
-					//no more -> amount: nestedReturnVal.amount + policy.delegated_additiveAmount,
-					amount: policy.delegated_additiveAmount,
-					amountType: policy.delegated_additiveAmountType,
-
-					//not more -> extra_info: returnVal.extra_info ? returnVal.extra_info : nestedReturnVal.extra_info, //meaning : non-cascading, 1st available info is kept and deeper ones are discarded
-					extra_info: returnVal.extra_info,
-					nested: nestedReturnVal //<- chaining extension to grid.apply()'s return
-					//TODO since it has evolve to be less recursive (= less nesting, and more chaining), maybe just return a list instead of a ... linked list.
-				};
-			} else {
-				return {
-					gridName,
-					...returnVal
+			switch(policy?.type){
+				case "DelegatedPrice":{// TODO legacy, to be removed
+					let delegatedReturnVal = this.applyGrid(policy.delegated_gridName, pricedObject);
+					delegatedReturnVal.push(returnVal);
+					return delegatedReturnVal;
+				} break;
+				case "AggregatedPrice":{
+					let aggregRes = [];
+					for (let delegate of policy.delegates) {
+						let amount = 0;
+						let first_amountType = delegate.amountType;
+						let first_extra_info = delegate.extra_info;
+						if (delegate.factor){
+							if (!delegate.gridName) throw new Error(`AggregatedPrice has a factor "${delegate.factor}" without a delegated grid to apply it ?!`);
+							let delegateRes = this.applyGrid(delegate.gridName, pricedObject);
+							let delegateFlatRes = PricingSystem.summarizeResult(delegateRes);
+							amount += delegate.factor * delegateFlatRes.total();
+							if (!first_amountType) first_amountType = delegateFlatRes.amountType;
+							if (!first_extra_info) first_extra_info = delegateFlatRes.extra_info;
+						}
+						if (delegated.addAmount){
+							amount += delegate.addAmount;
+						}
+						aggregRes.push(new PricingResult(gridName, gridCell, first_amountType, amount, first_extra_info));
+					}
+					return aggregRes;
+				} break;
+				default: { // standard case
+					return [returnVal];
 				}
 			}
-
 		} else {
 			throw new Error(`Grid "${gridName}" not found in system.`);
 		}
@@ -133,30 +178,43 @@ class PricingSystem {
 
 	/**
 	 * Make a flat total.
-	 * @argument res - result of applyGrid
+	 * @argument resultList - result of applyGrid
 	 */
-	static summarizeResult(res){
+	static summarizeResult(resultList){
+
 		let flatResult = {
 			total(){
-				return (this["MAIN"]??0) + (this["B2C"]??0) + (this["OPTS"]??0) + (this["UNK"]??0);
+				let s = 0;
+				for (let key of Object.keys(this)){
+					switch(key){
+						// sorry for Q&D, i'd like to nest the amounts deeper but i have some VueJS reactivity issues
+						case "amountType":
+						case "extra_info":
+						case "total":
+							continue;
+						default: {
+							let amountType = key;
+							s += this[amountType];
+						}
+					}
+				}
+				return s;
 			}
 		};
 
-		while (res){
+		for (let res of resultList){
 			// 1) handle amount
-			let amountType = res.amountType ?? 'MAIN';
 			if (res.amount === null){
 				// leave unchanged
 			} else if (isNaN(res.amount)){
-				flatResult[amountType] = NaN; // a single NaN in the chain destroys the total
+				flatResult[res.amountType] = NaN; // a single NaN in the chain destroys the total
 			} else {
-				if (!flatResult[amountType]) flatResult[amountType] = 0;
-				flatResult[amountType] += res.amount;
+				if (!flatResult[res.amountType]) flatResult[res.amountType] = 0;
+				flatResult[res.amountType] += res.amount;
 			}
-			// 2) handle extra_info
-			if (!flatResult.extra_info) flatResult.extra_info = res.extra_info; //meaning : non-cascading, 1st available info is kept and deeper ones are discarded
-
-			res = res.nested;
+			// 2) handle non-cascading data collection (1st available is kept and deeper ones are discarded)
+			if (!flatResult.amountType) flatResult.amountType = res.amountType;
+			if (!flatResult.extra_info) flatResult.extra_info = res.extra_info;
 		}
 		return flatResult;
 	}
@@ -243,16 +301,18 @@ class PricingGrid {
 	/**
 	 * Run the pricing engine, to return the computed amount (and how it finds it)
 	 * @param {*} pricedObject - expected to provide a getPPGRawCoordinates() method, returning a raw 'coordinates' Object"
-	 * @returns returns {gridCell, amount, extra_info}. If something goes wrong, "gridCell" can be null or empty, and "amount" may be NaN.
+	 * @returns returns a PricingResult instance. If something goes wrong, "gridCell" can be null or empty, and "amount" may be NaN.
 	 */
 	apply(pricedObject){
 		let gridCell = this._findGridCellFor(pricedObject);
 		if (gridCell == null || gridCell.policy == null){
-			return {gridCell, amount:NaN}; //or throw ?..
+			return new PricingResult(this.name, gridCell, null, NaN, null);
 		} else {
 			let policy = gridCell.policy;
-			let amount = null;
+			let amountType = policy.amountType;
 			let extra_info = policy.extra_info;
+
+			let amount = null;
 			switch(policy.type){ // try with POLYMORPHISM ;-)
 				case "FixedPrice": {
 					amount = policy.price;
@@ -261,20 +321,26 @@ class PricingGrid {
 					let offset = policy.offset ?? {attribute: 0, price: 0};
 					let volume = pricedObject[policy.attribute] - offset.attribute;
 					if (volume >= 0) {
-						let roundedVolume = policy.rounding * Math.ceil(volume / policy.rounding);
-						amount = roundedVolume * policy.price + offset.price;
+						if (policy.rounding) {
+							let roundedVolume = policy.rounding * Math.ceil(volume / policy.rounding);
+							amount = roundedVolume * policy.price + offset.price;
+						} else {
+							amount = volume * policy.price + offset.price;
+						}
 					} else {// better not support negative offsetting...
 						amount = NaN;
 					}
 				} break;
-				case "DelegatedPrice": {
-					amount = null; /* = will have to be resolved at PricingSystem level */
+				case "DelegatedPrice": { // TODO legacy, to be removed
+					amountType =  policy.delegated_additiveAmountType;
+					amount = policy.delegated_additiveAmount;
 				} break;
 				default : {
 					throw new Error("Unsupported type of Pricing Policy : " + policy.type);
 				}
 			}
-			return {gridCell, amount, extra_info};// <- important structure !
+			if (!amountType) amountType = "MAIN";
+			return new PricingResult(this.name, gridCell, amountType, amount, extra_info);
 		}
 	}
 

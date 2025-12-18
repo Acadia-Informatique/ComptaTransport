@@ -35,14 +35,13 @@
 			position: relative; /* for signal icons overlay */
 		}
 
-		table#revenue-control-grid td.erp-ref {
+		table#revenue-control-grid td.row-header {
 			position : sticky;
 			left: 0;
-			border: dotted 1px black;
 			z-index: 500;
 		}
 		table#revenue-control-grid td div.multiline {
-			white-space:pre-wrap;
+			white-space:pre-wrap; /* TODO not used ? assess remove when finished with Q&D NAM+RKW */
 		}
 		table#revenue-control-grid th.carrier,
 		table#revenue-control-grid td.carrier {
@@ -52,6 +51,10 @@
 		table#revenue-control-grid th.price,
 		table#revenue-control-grid td.price {
 			background-color: rgb(255, 230, 230);
+		}
+
+		table#revenue-control-grid td.erp-ref a {
+			text-decoration: none;
 		}
 
 		table#revenue-control-grid td.price.computed > div,
@@ -111,7 +114,7 @@
 					<td>Grilles spécifiques : </td>
 					<td v-for="[name, system] in otherPricingSystems">
 					 {{name}}
-						<span v-if="system['#pgv_metadata'] == 'NO_VERSION_AVAILABLE'">🔴<%-- emoji "red dot" --%></span> 						
+						<span v-if="system['#pgv_metadata'] == 'NO_VERSION_AVAILABLE'">🔴<%-- emoji "red dot" --%></span>
 						<span v-else :title="system['#pgv_metadata']?.auditingInfo.dateModified">🟢<%-- emoji "green dot" --%></span>
 					</td>
 				</tr>
@@ -233,6 +236,7 @@
 					} else {
 						return AcadiaX3.shortInvoiceNumber(this.rowData.invoice);
 					}
+//					https://acadia-informatique.absyscyborg.cloud/syracuse-main/html/main.html?url=%2Ftrans%2Fx3%2Ferp%2FACADIA%2F%24sessions%3Ff%3DGESSOH~STD%2F2%2F%2FM%2FCMV2511038179
 				},
 				rowData_order(){
 					return this.rowData.order.replaceAll(";","\n");
@@ -622,7 +626,19 @@
 					.catch(error => {
 						showAxiosErrorDialog(error);
 					});
-				}
+				},
+
+
+				//Q&D NAM+RKW
+				X3_invoice_url(invoiceNum){
+					let urlBase = `https://acadia-informatique.absyscyborg.cloud/syracuse-main/html/main.html?url=%2Ftrans%2Fx3%2Ferp%2FACADIA%2F%24sessions%3Ff%3DGESSIH~STD%2F2%2F%2FM%2F`;
+					return urlBase + invoiceNum;
+				},
+				X3_order_url(orderNum){
+					let urlBase = `https://acadia-informatique.absyscyborg.cloud/syracuse-main/html/main.html?url=%2Ftrans%2Fx3%2Ferp%2FACADIA%2F%24sessions%3Ff%3DGESSOH~STD%2F2%2F%2FM%2F`;
+					return urlBase + orderNum;
+				},
+
 			},
 
 			template: '#RevenueControlGridRow-template'
@@ -635,11 +651,16 @@
 		       && assessAmountOK.level <= hideAmountOKAbove
 		       && assessFinalAmntOK_level <= hideFinalAmntOKAbove"
 		 @click="highlighted = !highlighted" :class="{'highlighted':highlighted}">
-			<td class="erp-ref">
-				<div :title="rowData.invoice" class="multiline" >{{ rowData_invoice }}</div>
+			<td class="row-header erp-ref">
+				<%-- Q&D NAM+RKW --%>
+				<div :title="rowData.invoice" class="multiline" >
+					<a :href="X3_invoice_url(rowData.invoice)" target="X3Window">{{ rowData_invoice }}</a>
+				</div>
 			</td>
-			<td>
-				<div class="multiline">{{ rowData_order }}</div>
+			<td class="erp-ref">
+				<div class="multiline">
+					<a :href="X3_order_url(rowData_order)" target="X3Window">{{ rowData_order }}</a>
+				</div>
 			</td>
 			<td class="cust">
 				<div v-if="rowData.customer">

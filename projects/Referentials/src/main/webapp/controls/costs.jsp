@@ -204,10 +204,16 @@
 					"hideOurMarginOKAbove"
 			],
 			computed: {
+				rowData_shortArticle(){
+					let pgpath_items = /^(.*?)\/(.*)$/.exec(this.rowData.article.articlePath);
+					let companyName = pgpath_items[1]; //Note : see how RowImporter build articlePaths using "ARTICLE_COMPANY"
+					let articleRelativePath = pgpath_items[2];
+					return articleRelativePath;
+				},
 				priceGridResult(){
-					let pgpath_items = this.rowData.article.pricegridPath.split("/");
-					let dbGridName = pgpath_items[0]; // database entity PriceGrid name (home of a list of PriceGridVersion, each containing a JS PricingSystem...)
-					let jsGridName = pgpath_items[1]; // entry key for a PricingGrid JS instance inside a PricingSystem JS object (a tab in the grid-edit.jsp).
+					let pgpath_items = /^(.*?)\/(.*)$/.exec(this.rowData.article.pricegridPath);
+					let dbGridName = pgpath_items[1]; // database entity PriceGrid name (home of a list of PriceGridVersion, each containing a JS PricingSystem...)
+					let jsGridName = pgpath_items[2]; // entry key for a PricingGrid JS instance inside a PricingSystem JS object (a tab in the grid-edit.jsp).
 
 					let dbGrid = this.priceGrids.find(pg => pg.name == dbGridName);
 					let applicableVersion = dbGrid["#versions"].find(v => v.publishedDate <= this.rowData.carrierOrderDate);
@@ -364,17 +370,7 @@
 				}
 			},
 			methods: {
-				renderNumber(n, decimals){
-					if (n === null || typeof n == "undefined"){
-						return "";
-					} else if (isNaN(n)) {
-						return "N/A";
-					} else if (decimals) { // too bad for zero ;-)
-						return n.toFixed(decimals);
-					} else {
-						return n;
-					}
-				},
+				renderNumber,
 
 				saveRowData(){
 					let rowDataClone = deepClone(this.rowData);
@@ -465,7 +461,7 @@
 				<div>{{ rowData.id }}</div>
 			</td>
 		 	<td>
-				<div :title="rowData.article.pricegridPath">{{ rowData.article.articlePath }}</div>
+				<div :title="'Grille appliquée : ' + rowData.article.pricegridPath">{{ rowData_shortArticle }}</div>
 			</td>
 		 	<td>
 				<div>{{ rowData.carrierInvoiceNum }}</div>
@@ -680,7 +676,8 @@
 				},
 
 				isRowViewed(rowData){
-					return this.viewArticles.some(a => a.articlePath == rowData.article.articlePath);
+					//return this.viewArticles.some(a => a.articlePath == rowData.article.articlePath);
+					return this.viewArticles.includes(rowData.article.articlePath);
 				},
 				clearFilters(){
 					this["hideWeightOKAbove"] =
@@ -908,7 +905,7 @@
 					let invertedMap = {};
 					for (let article of Object.values(articles)){
 						if (!invertedMap[article.pricegridPath]) invertedMap[article.pricegridPath] = [];
-						invertedMap[article.pricegridPath].push(article);
+						invertedMap[article.pricegridPath].push(article.articlePath); // or .push(article) if you really need the full obj
 					}
 					let newProductGroups = [];
 					for (let pricegridPath of Object.keys(invertedMap)){
