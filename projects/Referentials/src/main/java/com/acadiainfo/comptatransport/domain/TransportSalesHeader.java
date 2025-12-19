@@ -38,6 +38,7 @@ import jakarta.persistence.OneToOne;
         max(vto.ship_zipcode) as ship_zipcode,
         max(vto.doc_date) as doc_date,
         max(vto.salesrep) as salesrep,
+        max(vto.salesrep2) as salesrep2,
 		max(vto.is_b2c) as is_b2c,
         sum(vto.total_weight) as total_weight
     from (
@@ -52,6 +53,7 @@ import jakarta.persistence.OneToOne;
     	max(ship_zipcode) as ship_zipcode,
     	max(doc_date) as doc_date,
     	max(salesrep) as salesrep,
+    	max(salesrep2) as salesrep2,
 		max(is_b2c) as is_b2c,
     	max(total_weight) as total_weight
     	from I_TRANSPORT_VENDU
@@ -76,6 +78,7 @@ import jakarta.persistence.OneToOne;
         max(vto.ship_zipcode) as ship_zipcode,
         max(vto.doc_date) as doc_date,
         max(vto.salesrep) as salesrep,
+        max(vto.salesrep2) as salesrep2,
 		max(vto.is_b2c) as is_b2c,
         sum(vto.total_weight) as total_weight
     from (
@@ -91,6 +94,7 @@ import jakarta.persistence.OneToOne;
     	max(ship_zipcode) as ship_zipcode,
     	max(doc_date) as doc_date,
     	max(salesrep) as salesrep,
+    	max(salesrep2) as salesrep2,
 		max(is_b2c) as is_b2c,
     	max(total_weight) as total_weight
     	from I_TRANSPORT_VENDU
@@ -159,6 +163,9 @@ public class TransportSalesHeader {
 
 	@Column(name = "salesrep", insertable = false, updatable = false)
 	private String salesrep;
+
+	@Column(name = "salesrep2", insertable = false, updatable = false)
+	private String salesrep2;
 
 	@Column(name = "is_b2c", insertable = false, updatable = false)
 	private Boolean b2c;
@@ -284,14 +291,20 @@ public class TransportSalesHeader {
 		this.docDate = docDate;
 	}
 
-
 	public String getSalesrep() {
 		return salesrep;
 	}
 
-
 	public void setSalesrep(String salesrep) {
 		this.salesrep = salesrep;
+	}
+
+	public String getSalesrep2() {
+		return salesrep2;
+	}
+
+	public void setSalesrep2(String salesrep2) {
+		this.salesrep2 = salesrep2;
 	}
 
 	/** TODO currently deemed unusable, need better qualification at source (from ERP X3 ? SEI report ?...)

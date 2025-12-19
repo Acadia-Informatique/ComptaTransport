@@ -74,6 +74,12 @@ public class ImportTransportVenduWS {
 		AtomicInteger rowCount = new AtomicInteger(0);
 		RowsProvider rowsProvider = new RowsProvider(config);
 		rowsProvider.walkRows(m -> {
+
+			if (!"38".equals(m.get("PROD_FAMILY_CODE")) //38 for "DIVERS"
+			  || !"105".equals(m.get("PRODUCT_CODE")) // 105 for "PORT"
+			  || ("" + m.get("DESCRIPTION_1")).contains("mensuel"))
+				return; // "continue" the loop
+
 			ImportTransportVendu entity = new ImportTransportVendu();
 
 			entity.setImportHeader(importHeader);
@@ -99,6 +105,7 @@ public class ImportTransportVenduWS {
 			entity.setDocDate((java.time.LocalDateTime) m.get("DATE_COMPTA"));
 
 			entity.setSalesrep((String) m.get("SALESREP"));
+			entity.setSalesrep2((String) m.get("SALESREP2"));
 
 			entity.setTotalWeight((BigDecimal) m.get("POIDS"));
 

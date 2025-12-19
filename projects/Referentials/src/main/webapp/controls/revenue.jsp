@@ -699,7 +699,10 @@
 				</div>
 			</td>
 			<td class="salesrep">
-				<div :title="rowData.salesrep" class="text-truncate">{{ rowData.salesrep }}</div>
+				<div class="d-flex">
+					<div :title="rowData.salesrep" class="text-truncate">{{ rowData.salesrep }}</div>
+					<span v-if="rowData.salesrep2" :title="'2e commercial : ' + rowData.salesrep2">ℹ️</span>
+				</div>
 			</td>
 			<td>
 				<div :title="rowData_truncatedWeight" >{{ rowData.weight }}</div>

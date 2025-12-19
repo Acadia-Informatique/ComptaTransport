@@ -100,6 +100,9 @@ public class ImportTransportVendu {
 	@Column(name = "salesrep")
 	private String salesrep;
 
+	@Column(name = "salesrep2")
+	private String salesrep2;
+
 	@Column(name = "total_weight")
 	private BigDecimal totalWeight;
 
@@ -217,6 +220,14 @@ public class ImportTransportVendu {
 
 	public void setSalesrep(String salesrep) {
 		this.salesrep = salesrep;
+	}
+
+	public String getSalesrep2() {
+		return salesrep2;
+	}
+
+	public void setSalesrep2(String salesrep2) {
+		this.salesrep2 = salesrep2;
 	}
 
 	public BigDecimal getTotalWeight() {
