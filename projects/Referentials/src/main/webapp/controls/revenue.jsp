@@ -277,7 +277,9 @@
 						this.rowData_carrierObj,
 						CustomerFunc.assessMarket(this.rowDataCached_final_b2c, this.rowData.customer, this.rowData_customerShipPreferences),
 						this.rowDataCached_nonstdPack,
+
 						this.rowData["carrier"] == "INTEGRATION" //instead of the overridden version : this.rowData_carrierObj.name == "INTEGRATION"
+						//TODO: better base Integration on a serverside detail with PROD_FAMILY_* = "38"(DIVERS) & PRODUCT_* ="106"(MONTAGE), like we do for isB2C
 					);
 				},
 				priceGridResult(){
@@ -290,8 +292,8 @@
 				},
 				priceGridFlatResult_zone(){
 					//TODO NAM Q&D
-					let resultObj = this.priceGridResult;
-					while (resultObj) {
+					let resultList = this.priceGridResult;
+					for (let resultObj of resultList) {
 						switch(resultObj.gridName){
 							case "Toutes livraisons": {
 								if (resultObj?.gridCell?.coords?.c == "Dom-Tom") return "DOM-TOM";
@@ -304,7 +306,6 @@
 							} break;
 							default: break;
 						}
-						resultObj = resultObj.nested;
 					}
 				},
 				priceGridFlatResult_carrier(){

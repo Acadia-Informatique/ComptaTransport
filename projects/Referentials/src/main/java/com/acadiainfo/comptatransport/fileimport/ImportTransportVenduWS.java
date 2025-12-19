@@ -75,7 +75,8 @@ public class ImportTransportVenduWS {
 		RowsProvider rowsProvider = new RowsProvider(config);
 		rowsProvider.walkRows(m -> {
 
-			if (!"38".equals(m.get("PROD_FAMILY_CODE")) //38 for "DIVERS"
+			if ("FAC".equals(m.get("TYPE_DOC")) // FAC for invoice
+			  || !"38".equals(m.get("PROD_FAMILY_CODE")) //38 for "DIVERS"
 			  || !"105".equals(m.get("PRODUCT_CODE")) // 105 for "PORT"
 			  || ("" + m.get("DESCRIPTION_1")).contains("mensuel"))
 				return; // "continue" the loop

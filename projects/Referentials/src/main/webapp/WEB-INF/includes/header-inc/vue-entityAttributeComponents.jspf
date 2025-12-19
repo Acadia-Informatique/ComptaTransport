@@ -36,7 +36,10 @@ Dependencies :
 <script type="text/javascript">
 	var AcadiaX3 = {
 		shortInvoiceNumber: function(v){
-			return (v && v.startsWith("ACA-")) ? v.substring(4, v.length) : v;
+			return (v && v.startsWith("ACA-FC")) ? v.substring(4, v.length) : v; // 4 = "ACA-".length
+		},
+		restoreLongInvoiceNumber: function(v){
+			return (v && v.startsWith("FC")) ? "ACA-" + v : v;
 		}
 	};
 

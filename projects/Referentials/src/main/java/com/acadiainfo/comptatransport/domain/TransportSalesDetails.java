@@ -46,6 +46,7 @@ public class TransportSalesDetails {
 
 	@JsonbProperty("type")
 	public ProductType getProductType() {
+		//TODO use the new export columns PROD_FAMILY_* and PRODUCT_*
 		return switch(this.productDesc) {
 		case "Frais de port Europe", "Frais de port Export", "Frais de port France",
 			"Frais de port Dropshipper",

@@ -18,12 +18,12 @@
 
 	<style>
 		/** Table styling */
-		table#costs-control-grid th div {
+		table#costs-control-grid > thead > tr > th > div {
 			height: 3em;
 		}
 
-		table#costs-control-grid th,
-		table#costs-control-grid td {
+		table#costs-control-grid > thead > tr > th,
+		table#costs-control-grid > tbody > tr > td {
 			position: relative; /* for signal icons overlay */
 			padding-left: 0.3em;
 			padding-right: 0.4em;
@@ -32,31 +32,28 @@
 		table#costs-control-grid td.intern-ref > div {
 			width: 8em;
 		}
-		table#costs-control-grid td  div.multiline {
-			white-space: pre-wrap;
-		}
 
-		table#costs-control-grid th.weight,
-		table#costs-control-grid td.weight {
+		table#costs-control-grid  th.weight,
+		table#costs-control-grid  td.weight {
 			background-color: rgb(230, 255, 255);
 		}
-		table#costs-control-grid th.costs,
-		table#costs-control-grid td.costs {
+		table#costs-control-grid  th.costs,
+		table#costs-control-grid  td.costs {
 			background-color: rgb(255, 255, 230);
 		}
-		table#costs-control-grid th.margin,
-		table#costs-control-grid td.margin {
+		table#costs-control-grid  th.margin,
+		table#costs-control-grid  td.margin {
 			background-color: rgb(255, 230, 255);
 		}
 
-		table#costs-control-grid td.weight.computed > div,
-		table#costs-control-grid td.costs.computed > div,
-		table#costs-control-grid td.margin.computed > div {
+		table#costs-control-grid  td.weight.computed > div,
+		table#costs-control-grid  td.costs.computed > div,
+		table#costs-control-grid  td.margin.computed > div {
 			padding: 0.1em 0.3em;
 			font-weight: bold;
 		}
-		table#costs-control-grid td.costs.comment > div,
-		table#costs-control-grid td.margin.comment > div {
+		table#costs-control-grid  td.costs.comment > div,
+		table#costs-control-grid  td.margin.comment > div {
 			width: 7em;
 		}
 
@@ -65,10 +62,8 @@
 		table#costs-control-grid textarea {
 			background-color: #ffffff80;
 		}
-		table#costs-control-grid input {
-			width: 3em;
-		}
-		table#costs-control-grid textarea {
+
+		table#costs-control-grid  td.comment textarea {
 			min-width: 6em;
 			field-sizing: content;
 		}
@@ -236,12 +231,11 @@
 
 				priceGridFlatResult_zone(){
 					//TODO NAM Q&D
-					let resultObj = this.priceGridResult;
-					while (resultObj) {
+					let resultList = this.priceGridResult;
+					for (let resultObj of resultList) {
 						if (resultObj?.gridCell?.coords?.zone) {
 							return resultObj?.gridCell?.coords?.zone;
 						}
-						resultObj = resultObj.nested;
 					}
 				},
 
@@ -367,7 +361,18 @@
 					},
 					deep: 1
 
-				}
+				},
+				"rowData.invoices":{
+					handler(newV, oldV){
+						if (newV._v_lock != oldV._v_lock) {
+							// post-update reload, skip save
+						} else {
+							this.saveRowData();
+						}
+					},
+					deep: true
+				},
+			
 			},
 			methods: {
 				renderNumber,
@@ -499,7 +504,7 @@
 			</td>
 
 			<td>
-				<invoice-map :value="rowData.invoices"></invoice-map>
+				<invoice-map v-model="rowData.invoices"></invoice-map>
 			</td>
 
 			<td class="num">
@@ -570,7 +575,7 @@
 					  @keyup.esc="$event.target.blur()"
 					  @blur="validate_userInputs_comment('ourMargin')">
 					</textarea>
-					<div v-else role="button" @click="init_userInputs_comment($event, 'ourMargin')" class="multiline">
+					<div v-else role="button" @click="init_userInputs_comment($event, 'ourMargin')">
 						{{ comments_from_our_sales }}
 					</div>
 					<div class="position-absolute bottom-0 end-0" role="button" @click="cycleOKLevels('ourMargin')">
@@ -805,26 +810,63 @@
 
 	<script type="module">
 		var InvoiceMapComponent = {
-			props: ["value"],
-			computed:{
-				orderedNums(){
-					let keys = [...Object.keys(this.value)];
-					keys.sort();
-					return keys;
+			props: {
+				modelValue: Object, //	Map-like object, key="invoice Number" and value="serialized TransportSalesHeader"
+				modelModifiers: Object, //	modelModifiers: capture and ignore
+			},
+			emits: ['update:modelValue'],
+			computed: {
+				arrayValue: {
+					get() {
+						console.info("GET");
+						let res = [];
+						if (this.modelValue){
+							let keys = [...Object.keys(this.modelValue)];
+							keys.sort();
+							for (let key of keys){
+								res.push({"num": AcadiaX3.shortInvoiceNumber(key), "obj" : this.modelValue[key]});
+							}
+						}
+						if (res.length == 0){
+							res.push({"num": "", "obj" : null});
+						}
+						return res;
+					},
+					set(v) {
+						console.info("SET", v);
+						let res= {};
+						for (let item of v){
+							let invNumber = AcadiaX3.restoreLongInvoiceNumber(item["num"]);
+							res[invNumber] = item["obj"];
+						}
+						this.$emit('update:modelValue', res);
+					},
 				}
 			},
 			methods:{
-				shorten(invoiceNum){
-					return AcadiaX3.shortInvoiceNumber(invoiceNum);
+				addEntry(){
+					this.arrayValue.push({"num":"", "obj":null});
+					this.arrayValue = this.arrayValue; // that "useless" line triggers the setter
+				},
+				removeEntry(index){
+					this.arrayValue.splice(index, 1);
+					this.arrayValue = this.arrayValue; // that "useless" line triggers the setter
 				}
 			},
-			template: `<table>
-				<tr v-for="invoiceNum of orderedNums">
-					<td>{{ shorten(invoiceNum) }}</td><td>{{ value[invoiceNum]?.id ? "OK" : ""}}</td>
+			template:
+			`<table class="detailed">
+				<tr v-for="(item, index) in arrayValue">
+					<td :class="{linked: !!item['obj']}">
+						<input v-model="item['num']"></input>
+					</td>
+					<td>
+						<button v-if="index == 0" @click="addEntry">+</button>
+						<button v-else         @click="removeEntry(index)">-</button>
+					</td>
 				</tr>
-				</table>
-			`
+			</table>`
 		};
+
 
 
 		/* shared state for the page */
