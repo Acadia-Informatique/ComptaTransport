@@ -54,7 +54,7 @@ assessZeroFee: function(isB2C, customer, shipPreferences, arr_aggShippingRevenue
 	if (shipPreferences?.overrideCarriers?.length > 0){
 		let areAllCarriersFree = shipPreferences.overrideCarriers
 		.map(name => reflist_carriers.get(name))
-		.every(c => c.tags.includes("Sans frais"));
+		.every(c => c.tags.includes("Sans frais")); //not controlled Carriers like "Affrètement" are not free, stricto sensu
 
 		if (areAllCarriersFree){
 			reasons.push(`Transports gratuits uniquement`);

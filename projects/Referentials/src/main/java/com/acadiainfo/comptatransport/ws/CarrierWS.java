@@ -140,7 +140,7 @@ public class CarrierWS {
 	static {
 		SYSTEM_TAGS = new java.util.ArrayList<String>();
 		SYSTEM_TAGS.add("Sans frais");
-		SYSTEM_TAGS.add("Virtuel");
+		SYSTEM_TAGS.add("Affrètement");
 	}
 
 

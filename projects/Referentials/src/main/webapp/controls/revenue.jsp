@@ -40,9 +40,7 @@
 			left: 0;
 			z-index: 500;
 		}
-		table#revenue-control-grid td div.multiline {
-			white-space:pre-wrap; /* TODO not used ? assess remove when finished with Q&D NAM+RKW */
-		}
+
 		table#revenue-control-grid th.carrier,
 		table#revenue-control-grid td.carrier {
 			background-color: rgb(230, 255, 255);
@@ -227,19 +225,12 @@
 				};
 			},
 			computed: {
-				// shortened following a corporate habit
-				rowData_invoice(){
-					if (this.rowData.isGroup){
-						return this.rowData.invoice_orig.split(";")
-						  .map(s => AcadiaX3.shortInvoiceNumber(s))
-						  .join("\n");
-					} else {
-						return AcadiaX3.shortInvoiceNumber(this.rowData.invoice);
-					}
-//					https://acadia-informatique.absyscyborg.cloud/syracuse-main/html/main.html?url=%2Ftrans%2Fx3%2Ferp%2FACADIA%2F%24sessions%3Ff%3DGESSOH~STD%2F2%2F%2FM%2FCMV2511038179
+				rowData_invoice_as_list(){
+					let displayedInvoices = this.rowData.isGroup ? this.rowData.invoice_orig : this.rowData.invoice;
+					return displayedInvoices.split(";");
 				},
-				rowData_order(){
-					return this.rowData.order.replaceAll(";","\n");
+				rowData_order_as_list(){
+					return this.rowData.order.split(";");
 				},
 
 				// mitigates 0.001 "dummy weight" in X3 (mandatory field there ;-)
@@ -396,6 +387,10 @@
 						return new Assessment("\"" + selectedCarrier.name + "\" est un transport sans frais",
 						  LEVEL_OK, 0.0);
 					}
+					if (selectedCarrier.tags.includes("Affrètement")) {
+						return new Assessment("\"" + selectedCarrier.name + "\", en tant qu'affrètement, n'est pas contrôlé.",
+						  LEVEL_WARN, NaN);
+					}
 
 					if (this.rowData.customer) {
 						let zeroFee =  CustomerFunc.assessZeroFee(this.rowDataCached_final_b2c, this.rowData.customer, this.rowData_customerShipPreferences, this.rowData.customer.aggShippingRevenues, this.reflist_carriers);
@@ -448,11 +443,11 @@
 						baseMessage += ` (+ option "supplém. B2C à \${cust_b2cAmount_override}")`;
 					}
 
-					let baseFlatResult_total = Math.round(100 * baseFlatResult.total()) / 100;
-					let margin = Math.floor(100 * (this.rowData_overridden_price - baseFlatResult_total)) / 100;
+					let baseFlatResult_total = baseFlatResult.total(); // caching
+					let margin = this.rowData_overridden_price - baseFlatResult_total;
 					return new Assessment(baseMessage,
-					  margin === 0 ? LEVEL_OK : (margin > 0 ? LEVEL_WARN : LEVEL_BAD),
-					  isNaN(baseFlatResult_total) ? "N/A" : baseFlatResult_total);
+					  Math.abs(margin) < 0.0001 /* float epsilon ;-) */ ? LEVEL_OK : (margin > 0 ? LEVEL_WARN : LEVEL_BAD),
+					  baseFlatResult_total);
 				},
 
 				amountOKclass(){
@@ -482,6 +477,9 @@
 				}
 			},
 			methods: {
+				renderNumber,
+				shortInvoiceNumber: AcadiaX3.shortInvoiceNumber,
+
 				saveRowData(){
 					let rowDataClone = deepClone(this.rowData);
 
@@ -653,13 +651,17 @@
 		 @click="highlighted = !highlighted" :class="{'highlighted':highlighted}">
 			<td class="row-header erp-ref">
 				<%-- Q&D NAM+RKW --%>
-				<div :title="rowData.invoice" class="multiline" >
-					<a :href="X3_invoice_url(rowData.invoice)" target="X3Window">{{ rowData_invoice }}</a>
+				<div>
+					<div v-for="invoiceNum in rowData_invoice_as_list">
+						<a :href="X3_invoice_url(invoiceNum)" target="X3Window">{{ shortInvoiceNumber(invoiceNum) }}</a>
+					</div>
 				</div>
 			</td>
 			<td class="erp-ref">
-				<div class="multiline">
-					<a :href="X3_order_url(rowData_order)" target="X3Window">{{ rowData_order }}</a>
+				<div>
+					<div v-for="orderNum in rowData_order_as_list">
+						<a :href="X3_order_url(orderNum)" target="X3Window">{{ orderNum }}</a>
+					</div>
 				</div>
 			</td>
 			<td class="cust">
@@ -787,7 +789,7 @@
 			</td>
 			<td class="price computed">
 				<div :title="assessAmountOK.msg" :class="amountOKclass">
-					{{ assessAmountOK.cellValue }}
+					{{ renderNumber(assessAmountOK.cellValue, 2) }}
 				</div>
 			</td>
 			<td class="price comment">
