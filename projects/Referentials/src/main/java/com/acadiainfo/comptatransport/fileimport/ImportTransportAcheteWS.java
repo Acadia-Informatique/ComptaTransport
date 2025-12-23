@@ -41,7 +41,7 @@ public class ImportTransportAcheteWS {
 			em.persist(importHeader);
 			em.flush();
 
-			RowImporter rowImporter = new RowImporter(em, importHeader, refArticles);
+			RowImporter_TransportAchete rowImporter = new RowImporter_TransportAchete(em, importHeader, refArticles);
 			rowsProvider.walkRows(rowImporter::process);
 			em.flush();
 

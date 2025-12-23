@@ -14,6 +14,7 @@ import com.acadiainfo.comptatransport.domain.Carrier;
 import com.acadiainfo.comptatransport.domain.Customer;
 import com.acadiainfo.comptatransport.domain.CustomerShipPreferences;
 import com.acadiainfo.comptatransport.domain.InputControlRevenue;
+import com.acadiainfo.comptatransport.domain.TransportPurchaseHeader;
 import com.acadiainfo.comptatransport.domain.TransportSalesHeader;
 import com.acadiainfo.util.WSUtils;
 
@@ -55,18 +56,21 @@ public class TransportSalesWS {
 	/**
 	 * Get data row for a date interval.
 	 * @param startDate - included
-	 * @param endDate -excluded
+	 * @param endDate - excluded
+	 * @param showMapped - optional, returns the "map to TransportPurchaseHeader"  of not (default : false)
 	 * @return
 	 */
 	@GET
 	@Produces(value = MediaType.APPLICATION_JSON)
 	public Response getAll_WS(
 	  @QueryParam("start-date") String startDate,
-	  @QueryParam("end-date") String endDate) {
+	  @QueryParam("end-date") String endDate,
+	  @QueryParam("show-mapped") Boolean showMappedObj) {
 			if (startDate == null)
 				return WSUtils.response(Status.BAD_REQUEST, servReq, "Paramètre de requête \"start-date\" obligatoire.");
 
 			LocalDateTime startDateObj, endDateObj;
+			boolean showMapped = (showMappedObj == null ? false : showMappedObj.booleanValue());
 			try {
 				startDateObj = WSUtils.parseParamDate(startDate);
 				// end-date is optional, if not set use start-date + 1
@@ -74,15 +78,27 @@ public class TransportSalesWS {
 			} catch (java.time.format.DateTimeParseException exc) {
 				return WSUtils.response(Status.BAD_REQUEST, servReq, "Format de paramètres de date incorrect (\"start-date\" et/ou \"end-date\").");
 			}
-			Stream<TransportSalesHeader> headers = getAll(startDateObj, endDateObj);
+			Stream<TransportSalesHeader> headers = getAll(startDateObj, endDateObj, showMapped);
 			return Response.ok(WSUtils.entityJsonStreamingOutput(headers)).build();
 	}
 
-	public Stream<TransportSalesHeader> getAll(LocalDateTime startDate, LocalDateTime endDate) {
+	public Stream<TransportSalesHeader> getAll(LocalDateTime startDate, LocalDateTime endDate, boolean showMapped) {
 		TransportSalesRepository repo = TransportSalesRepository.getInstance(em);
 
 		List<TransportSalesHeader> headers = repo.getAllBetween(startDate, endDate).toList();
 		for (TransportSalesHeader header : headers) {
+			em.detach(header);
+
+			// show map to Purchase (means: used in "Contrôle Mensuel")
+			if (showMapped) {
+				TransportPurchaseHeader purchase = header.getMappedPurchase();
+				if (purchase != null) {
+					header.setMappedPurchase(purchase.asRef());
+				}
+			} else {
+				header.setMappedPurchase(null);
+			}
+
 			// Simplify and enrich Customer, if any, to make it contain only pricing details
 
 			Customer customer = header.getCustomer();
@@ -276,10 +292,19 @@ public class TransportSalesWS {
 		return Response.ok(updateCount + " lignes dégroupées").build();
 	}
 
+	/**
+	 * Get ONE invoice entry by "mixed id".
+	 * @param mixedId - either invoice (ACA-FCxxxx) or order (CMVxxxxx)
+	 * @param idType - either "doc" (for invoice) or... "order" ;-)
+	 * @param showMappedObj - if true, the return payload will contain an additional "mappedPurchase" property,
+	 *  showing to which "carrier invoice" it has been correlated.
+	 * @return a JSON serialized form of it.
+	 */
 	@GET
 	@Path("/{mixedId}")
 	@Produces(MediaType.APPLICATION_JSON)
-	public Response findOneBy(@PathParam("mixedId") String mixedId, @QueryParam("type") String idType) {
+	public Response findOneBy(@PathParam("mixedId") String mixedId, @QueryParam("type") String idType,
+	    @QueryParam("show-mapped") Boolean showMappedObj) {
 		TransportSalesRepository repo = TransportSalesRepository.getInstance(em);
 		try {
 			TransportSalesHeader header;
@@ -297,6 +322,7 @@ public class TransportSalesWS {
 				    "Paramètre de requête \"type\" inconnu, valeur attendue parmi \"doc\" (par défaut) ou \"order\" pour interpréter ID : "
 				        + mixedId);
 			}
+			boolean showMapped = (showMappedObj == null ? false : showMappedObj.booleanValue());
 
 			if (header == null) {
 				return WSUtils.response(Status.NOT_FOUND, servReq,
@@ -313,6 +339,15 @@ public class TransportSalesWS {
 					customer.setSalesrep(null);
 					customer.set_v_lock(null);
 					customer.emptyAuditingInfo();
+				}
+
+				if (showMapped) {
+					TransportPurchaseHeader purchase = header.getMappedPurchase();
+					if (purchase != null) {
+						header.setMappedPurchase(purchase.asRef());
+					}
+				} else {
+					header.setMappedPurchase(null);
 				}
 
 				return Response.ok(header).build();

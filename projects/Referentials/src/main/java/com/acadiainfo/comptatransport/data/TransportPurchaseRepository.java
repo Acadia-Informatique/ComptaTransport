@@ -3,7 +3,6 @@ package com.acadiainfo.comptatransport.data;
 import java.time.LocalDateTime;
 import java.util.stream.Stream;
 
-import com.acadiainfo.comptatransport.domain.InputControlCosts;
 import com.acadiainfo.comptatransport.domain.TransportPurchaseHeader;
 import com.acadiainfo.util.persistence.CrudRepositoryImpl;
 
@@ -53,8 +52,8 @@ public class TransportPurchaseRepository extends CrudRepositoryImpl<TransportPur
 		 */
 		Query query = em.createQuery("SELECT DISTINCT tph FROM TransportPurchaseHeader tph "
 		   + " LEFT JOIN FETCH tph.article"
-		   + " LEFT JOIN FETCH tph.resolvedDocReferences"
-		   + " LEFT JOIN FETCH tph.userInputs"
+		   + " LEFT JOIN FETCH tph.userInputs uimp"
+		   + " LEFT JOIN FETCH uimp.mappedInvoices"
 		   + " WHERE tph.carrierInvoiceDate >= ?1 AND tph.carrierInvoiceDate < ?2");
 		query.setParameter(1, start_date);
 		query.setParameter(2, end_date);

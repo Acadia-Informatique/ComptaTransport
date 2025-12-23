@@ -2,6 +2,7 @@ package com.acadiainfo.comptatransport.fileimport;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.LocalDate;
@@ -9,6 +10,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -83,7 +85,58 @@ public class RowsProvider {
 		}
 	}
 
-	private Map<String, Object> recycledMap = new java.util.HashMap<>(); // recycled as a flyw weight
+	TODO recycledMap
+	should be
+	a ComputedValue-aware map
+	thin wrapper
+
+	private final Map<String, Object> recycledMap = new java.util.HashMap<>(); // recycled as a flyweight
+
+	private class NumberSumOf implements ComputedValue<BigDecimal> {
+
+		private List<String> terms;
+
+		private NumberSumOf(List<String> terms) {
+			this.terms = terms;
+		}
+
+		/**
+		 * return sum built on float values.
+		 * @return
+		 */
+		@Override
+		public BigDecimal getValue() {
+			float total = 0;
+
+			for (String term : this.terms) {
+				Object value = RowsProvider.this.recycledMap.get(term);
+				if (value == null) {
+					// skip nulls
+				} else if (value instanceof Number numValue) {
+					total += numValue.floatValue();
+				} else {
+					throw new IllegalStateException("NumberSumOf cannot be computed with term \"" + term
+					    + "\" since it is not a number : " + value);
+				}
+			}
+			return new BigDecimal(total);
+		}
+
+	}
+
+	private final Map<String, NumberSumOf> instanceCache = new java.util.HashMap<>();
+
+	private NumberSumOf getNumberSumOf(String desc) {
+		if (instanceCache.containsKey(desc)) {
+			return instanceCache.get(desc);
+		} else {
+			java.util.List<String> terms = java.util.Arrays.asList(desc.split(";")).stream().map(t -> t.trim())
+			    .toList();
+			NumberSumOf instance = new NumberSumOf(terms);
+			instanceCache.put(desc, instance);
+			return instance;
+		}
+	}
 
 	private void processRow(Row row, Consumer<Map<String, Object>> callback) {
 		if (this.config.src_col_condition != null) {
@@ -100,11 +153,14 @@ public class RowsProvider {
 			if (columnConf.colIndex < 0) {
 				// A) negative index : computed and constant values
 				colValue = switch (columnConf.datatype) {
-				// Basic Excel types
+				// Basic Excel typed constants
 				case "STRING" -> columnConf.colLabel;
 				case "NUMBER" -> new java.math.BigDecimal(columnConf.colLabel);
 				case "DATE" -> LocalDateTime.parse(columnConf.colLabel);
 				case "BOOLEAN" -> Boolean.valueOf(columnConf.colLabel);
+
+				// Computations
+				case "NUMBER_SUM_OF" -> getNumberSumOf(columnConf.colLabel);
 				default ->
 				    throw new UnsupportedOperationException("Const datatype not supported : " + columnConf.datatype);
 				};
@@ -161,5 +217,9 @@ public class RowsProvider {
 		if (value == null) return null;
 		LocalDate parsedDate = LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE);
 		return LocalDateTime.of(parsedDate, LocalTime.MIDNIGHT);
+	}
+
+	public interface ComputedValue<V> {
+		V getValue();
 	}
 }

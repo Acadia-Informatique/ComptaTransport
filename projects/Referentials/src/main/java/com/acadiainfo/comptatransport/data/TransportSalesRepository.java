@@ -69,7 +69,7 @@ public class TransportSalesRepository {
 	 */
 	public TransportSalesHeader findByOrderNum(String orderNum) {
 		Query query = em
-		    .createNativeQuery("SELECT max(doc_reference) FROM I_TRANSPORT_VENDU WHERE order_reference = ?1");
+		    .createNativeQuery("SELECT max(orig_doc_reference) FROM I_TRANSPORT_VENDU WHERE order_reference = ?1");
 		query.setParameter(1, orderNum);
 		String docReference = (String) query.getSingleResult();
 		if (docReference == null) return null;

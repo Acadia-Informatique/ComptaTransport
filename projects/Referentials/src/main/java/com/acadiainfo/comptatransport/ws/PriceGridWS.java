@@ -9,7 +9,6 @@ import com.acadiainfo.comptatransport.data.PriceGridVersionsRepository;
 import com.acadiainfo.comptatransport.data.PriceGridsRepository;
 import com.acadiainfo.comptatransport.domain.PriceGrid;
 import com.acadiainfo.comptatransport.domain.PriceGridVersion;
-import com.acadiainfo.comptatransport.fileimport.RowsProvider;
 import com.acadiainfo.util.WSUtils;
 
 import jakarta.ejb.Stateless;

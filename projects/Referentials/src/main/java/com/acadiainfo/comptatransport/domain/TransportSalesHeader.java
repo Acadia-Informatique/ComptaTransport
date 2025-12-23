@@ -28,8 +28,8 @@ import jakarta.persistence.OneToOne;
     select
         max(vto.id) as id,
     	vto.doc_reference,
-      	group_concat(orig_doc_reference ORDER BY orig_doc_reference SEPARATOR ';' ) as orig_doc_reference,
-        group_concat(vto.order_reference ORDER BY vto.order_reference SEPARATOR ';' ) as order_reference,
+        group_concat(distinct orig_doc_reference ORDER BY orig_doc_reference SEPARATOR ';' ) as orig_doc_reference,
+        group_concat(distinct vto.order_reference ORDER BY vto.order_reference SEPARATOR ';' ) as order_reference,
         max(CUSTOMER.id) as customer_id,
         max(vto.customer_erp_reference) as customer_erp_reference,
         max(vto.customer_label) as customer_label,
@@ -40,7 +40,13 @@ import jakarta.persistence.OneToOne;
         max(vto.salesrep) as salesrep,
         max(vto.salesrep2) as salesrep2,
 		max(vto.is_b2c) as is_b2c,
-        sum(vto.total_weight) as total_weight
+           sum(vto.total_weight) as total_weight,
+
+    (select min(INPUT_CTRL_COSTS.tr_achete_id)
+     from INPUT_CTRL_COSTS
+     inner join MAP_TRANSPORT_INVOICE on INPUT_CTRL_COSTS.id = MAP_TRANSPORT_INVOICE.input_ctrl_costs_id
+     where MAP_TRANSPORT_INVOICE.doc_reference = max(vto.orig_doc_reference)) as tr_achete_id
+
     from (
     	select
     	max(id) as id,
@@ -69,7 +75,7 @@ import jakarta.persistence.OneToOne;
         max(vto.id) as id,
     	max(vto.doc_reference) as doc_reference,
       	orig_doc_reference as orig_doc_reference,
-        group_concat(vto.order_reference ORDER BY vto.order_reference SEPARATOR ';' ) as order_reference,
+        group_concat(distinct vto.order_reference ORDER BY vto.order_reference SEPARATOR ';' ) as order_reference,
         max(CUSTOMER.id) as customer_id,
         max(vto.customer_erp_reference) as customer_erp_reference,
         max(vto.customer_label) as customer_label,
@@ -80,7 +86,13 @@ import jakarta.persistence.OneToOne;
         max(vto.salesrep) as salesrep,
         max(vto.salesrep2) as salesrep2,
 		max(vto.is_b2c) as is_b2c,
-        sum(vto.total_weight) as total_weight
+           sum(vto.total_weight) as total_weight,
+
+    (select min(INPUT_CTRL_COSTS.tr_achete_id)
+     from INPUT_CTRL_COSTS
+     inner join MAP_TRANSPORT_INVOICE on INPUT_CTRL_COSTS.id = MAP_TRANSPORT_INVOICE.input_ctrl_costs_id
+     where MAP_TRANSPORT_INVOICE.doc_reference = max(vto.orig_doc_reference)) as tr_achete_id
+
     from (
     	select
     	max(id) as id,
@@ -104,7 +116,6 @@ import jakarta.persistence.OneToOne;
        left outer join CUSTOMER on CUSTOMER.erp_reference = vto.customer_erp_reference
          group by vto.orig_doc_reference
    """, resultClass = TransportSalesHeader.class)
-
 
 @Entity
 public class TransportSalesHeader {
@@ -186,6 +197,10 @@ public class TransportSalesHeader {
 	// represents an Invoice (it could have been an Order).
 	private InputControlRevenue userInputs;
 
+	/** map table to Purchase - note: we take the min(id) to get the oldest mapped one (there can be more than one, but it is... wrong)  */
+	@OneToOne(optional = true, fetch = FetchType.LAZY)
+	@JoinColumn(name = "tr_achete_id", insertable = false, updatable = false)
+	private TransportPurchaseHeader mappedPurchase;
 
 	// Note : even for this non-writable entity we still have setters.
 	// For instance, in TransportSalesWS.saveOne(), they are needed for :
@@ -356,6 +371,14 @@ public class TransportSalesHeader {
 
 	public void setUserInputs(InputControlRevenue userInputs) {
 		this.userInputs = userInputs;
+	}
+
+	public TransportPurchaseHeader getMappedPurchase() {
+		return mappedPurchase;
+	}
+
+	public void setMappedPurchase(TransportPurchaseHeader mappedPurchase) {
+		this.mappedPurchase = mappedPurchase;
 	}
 
 	/**

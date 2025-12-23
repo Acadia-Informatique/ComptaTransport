@@ -147,11 +147,10 @@ Dependencies :
 			}
 		},
 		template: `
-			<button v-if="modelValue" type="button" class="btn bi" :class="'bi-' + icon"
-			  @click.stop="clickPopover" data-bs-trigger="focus"
-			  title="Informations d'audit"
-			  data-bs-html="true" :data-bs-content="computedString"></button>
-			<i v-else-if="iconEmpty" class="btn bi" :class="'bi-' + iconEmpty" />
+			<a v-if="modelValue" role="button" class="btn btn-outline-dark bi" :class="'bi-' + icon"
+			  @click.stop="clickPopover" data-bs-trigger="focus" tabindex="0"
+			  data-bs-html="true" :data-bs-content="computedString"></a>
+			<a v-else-if="iconEmpty" class="btn btn-outline-dark disabled bi" :class="'bi-' + iconEmpty" aria-disabled="true"></a>
 			<span v-else>&nbsp;&mdash;&nbsp;</span>`
 	};
 
@@ -195,13 +194,13 @@ Dependencies :
 			}
 		},
 		template: `
-			<button v-if="modelValue" type="button" class="btn bi bi-info-square"
-			  @click.stop="clickPopover" data-bs-trigger="focus"
+			<a v-if="modelValue" role="button" class="btn bi bi-info-square"
+			  @click.stop="clickPopover" data-bs-trigger="focus" tabindex="0"
 			  title="Informations d'audit"
 			  data-bs-html="true" :data-bs-content=
 				"(local_dateCreated ? 'Créé le '+ local_dateCreated : '')
 				+(local_dateCreated && local_dateModified ? '<br>' : '')
-				+(local_dateModified ? 'Modifié le '+ local_dateModified : '')"></button>
+				+(local_dateModified ? 'Modifié le '+ local_dateModified : '')"></a>
 			<em v-else>(nouveau)</em>`// TODO mettre utilisateur (si nouveau, utilis. en cours) quand dispo
 	};
 

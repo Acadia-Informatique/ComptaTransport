@@ -11,7 +11,7 @@ import jakarta.persistence.Table;
 
 /**
  * Generic configuration for a tabular File Import job.
- * This is mainly interpreted by {@link RowImporter} and {@link RowsProvider} classes.
+ * This is mainly interpreted by {@link RowImporter_TransportAchete} and {@link RowsProvider} classes.
  */
 @Entity
 @Table(schema = "ComptaTransport", name = "I_CONFIG_IMPORT")

@@ -2,16 +2,14 @@ package com.acadiainfo.comptatransport.ws;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
-import com.acadiainfo.comptatransport.data.CustomersRepository;
 import com.acadiainfo.comptatransport.data.TransportPurchaseRepository;
 import com.acadiainfo.comptatransport.data.TransportSalesRepository;
-import com.acadiainfo.comptatransport.domain.Customer;
 import com.acadiainfo.comptatransport.domain.InputControlCosts;
 import com.acadiainfo.comptatransport.domain.InputControlRevenue;
+import com.acadiainfo.comptatransport.domain.MapTransportInvoice;
 import com.acadiainfo.comptatransport.domain.TransportPurchaseHeader;
 import com.acadiainfo.comptatransport.domain.TransportSalesHeader;
 import com.acadiainfo.util.WSUtils;
@@ -81,39 +79,50 @@ public class TransportPurchaseWS {
 
 		List<TransportPurchaseHeader> headers = purchaseRepo.getAllBetween(startDate, endDate).toList();
 		for (TransportPurchaseHeader header : headers) {
-			// get linked Invoices
-			for (String mixedReference : header.getResolvedDocReferences()) {
-				TransportSalesHeader salesHeader;
-				if (mixedReference.startsWith("ACA-FC"))
-					salesHeader = salesRepo.getOne(mixedReference);
-				else if (mixedReference.startsWith("CMV"))
-					salesHeader = salesRepo.findByOrderNum(mixedReference);
-				else
-					salesHeader = null;
-
-				header.putInvoice(mixedReference, salesHeader);
-			}
-
-			// infer Customer from already matched invoices
-			String customerErpReference = null;
-			for (Entry<String, TransportSalesHeader> entry : header.getInvoices().entrySet()) {
-				TransportSalesHeader salesHeader = entry.getValue();
-
-				// for every invoice present in system...
-				if (salesHeader != null) {
-					if (customerErpReference == null) {
-						customerErpReference = salesHeader.getCustomerErpReference();
-					} else {
-						// if customer already found, check consistency
-						if (!customerErpReference.equals(salesHeader.getCustomerErpReference()))
-							customerErpReference = "(???)";
-					}
-				}
-			}
-			header.setCustomerErpReference(customerErpReference);
+			detachAndEnrich(salesRepo, header);
 		}
 
 		return headers.stream();
+	}
+
+	/**
+	 * Add info for JSON WS payload: linked Invoices & associated Customer
+	 * @param salesRepo
+	 * @param header
+	 */
+	private void detachAndEnrich(TransportSalesRepository salesRepo, TransportPurchaseHeader header) {
+		em.detach(header);
+
+		String customerErpReference = null;
+		for (MapTransportInvoice mti : header.getUserInputs().getMappedInvoices()) {
+			String mixedReference = mti.getDocReference();
+			if (mixedReference == null) continue;
+
+			TransportSalesHeader salesHeader = null;
+			if (mixedReference.startsWith("ACA-FC")) {
+				salesHeader = salesRepo.getOne(mixedReference);
+			} else if (mixedReference.startsWith("CMV")) {
+				salesHeader = salesRepo.findByOrderNum(mixedReference);
+			}
+
+			if (salesHeader != null) {
+				// to break circular reference in JSON
+				if (salesHeader.getMappedPurchase() != null)
+					salesHeader.setMappedPurchase(salesHeader.getMappedPurchase().asRef());
+
+				// infer Customer from already matched invoices
+				if (customerErpReference == null) {
+					customerErpReference = salesHeader.getCustomerErpReference();
+				} else {
+					// if customer already found, check consistency
+					if (!customerErpReference.equals(salesHeader.getCustomerErpReference()))
+						customerErpReference = "(???)";
+				}
+				mti.setMapped(salesHeader);
+			}
+		}
+
+		header.setCustomerErpReference(customerErpReference);
 	}
 
 	/**
@@ -130,8 +139,10 @@ public class TransportPurchaseWS {
 	@Produces(value = MediaType.APPLICATION_JSON)
 	public Response saveOne(@PathParam("id") Long id, TransportPurchaseHeader row) {
 		try {
-			TransportPurchaseRepository repo = TransportPurchaseRepository.getInstance(em);
-			TransportPurchaseHeader header = repo.findById(id);
+			TransportPurchaseRepository puchaseRepo = TransportPurchaseRepository.getInstance(em);
+			TransportSalesRepository salesRepo = TransportSalesRepository.getInstance(em);
+
+			TransportPurchaseHeader header = puchaseRepo.findById(id);
 
 			// As a wrapper, TransportSalesHeader itself will not be updated.
 
@@ -141,19 +152,16 @@ public class TransportPurchaseWS {
 			else
 				realPayload.setHeader(header);
 
-			InputControlCosts saved;
 			if (realPayload.getId() == null) {
 				em.persist(realPayload);
-				saved = realPayload;
 			} else {
-				saved = em.merge(realPayload);
+				em.merge(realPayload);
 			}
 			em.flush();
 
-			row.setUserInputs(saved);
-			// all others are just irrelevent, we send them back unchanged.
-
-			return Response.ok(row).build();
+			em.refresh(header);
+			detachAndEnrich(salesRepo, header);
+			return Response.ok(header).build();
 		} catch (IllegalArgumentException exc) {
 			return WSUtils.response(Status.BAD_REQUEST, servReq, exc.getMessage());
 		} catch (jakarta.persistence.PersistenceException exc) {

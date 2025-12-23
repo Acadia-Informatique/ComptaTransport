@@ -1071,7 +1071,7 @@
 				this.apiGetJsonContent();
 
 				let saved = localStorage.getItem("priceGrids/save.system");
-				this.localStorage_hasSystem = !(saved == null || typeof saved == "undefined" || saved == "");
+				this.localStorage_hasSystem = !(saved == null || saved == "");
 
 				window.addEventListener('beforeunload',()=>{
 					console.info(`Emergency autosave of current PriceGrid to localStorage`);

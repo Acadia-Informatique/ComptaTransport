@@ -1,6 +1,10 @@
 package com.acadiainfo.comptatransport.domain;
 
+import java.util.TreeSet;
+
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -24,8 +28,15 @@ public class InputControlCosts implements Auditable, VersionLockable {
 	/** FK to parent entity */
 	@jakarta.json.bind.annotation.JsonbTransient
 	@OneToOne
-	@JoinColumn(name = "tr_achete_id")
+	@JoinColumn(name = "tr_achete_id", referencedColumnName = "id")
 	private TransportPurchaseHeader header;
+
+	/* ========== Invoice links ========== */
+	@ElementCollection // + JOIN FETCH in repository query
+	@CollectionTable(name = "MAP_TRANSPORT_INVOICE", joinColumns = @JoinColumn(name = "input_ctrl_costs_id"))
+	@Column(name = "doc_reference")
+	private TreeSet<MapTransportInvoice> mappedInvoices;
+
 
 	// ============================================
 	// Control results
@@ -69,6 +80,14 @@ public class InputControlCosts implements Auditable, VersionLockable {
 
 	public void setHeader(TransportPurchaseHeader header) {
 		this.header = header;
+	}
+
+	public TreeSet<MapTransportInvoice> getMappedInvoices() {
+		return mappedInvoices;
+	}
+
+	public void setMappedInvoices(TreeSet<MapTransportInvoice> mappedInvoices) {
+		this.mappedInvoices = mappedInvoices;
 	}
 
 	public String getTheirAmountOK_comment() {

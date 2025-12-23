@@ -73,7 +73,7 @@
 		table#revenue-control-grid select,
 		table#revenue-control-grid input,
 		table#revenue-control-grid textarea {
-			background-color: #ffffff80;
+			background-color: #ffffffa0;
 		}
 		table#revenue-control-grid input {
 			width: 3em;
@@ -250,7 +250,7 @@
 				},
 
 				rowDataCached_final_b2c(){ //to reduce priceGridResult reeval
-					return typeof this.rowData.userInputs.b2c_override != 'undefined'
+					return this.rowData.userInputs.b2c_override == null
 					  ? this.rowData.userInputs.b2c_override
 					  : this.rowData["b2c"];
 				},
@@ -580,7 +580,7 @@
 				validate_price_MAIN_override(){
 					/* to make them compatible with === and switch... */
 					function _simpleValueOf(v){
-						if (typeof v == "undefined" || v === null || v === ""){
+						if (v == null || v === ""){
 							return null;
 						} else if (Number.isFinite(v)){
 							return Number.parseFloat(v);
@@ -716,7 +716,7 @@
 				</div>
 			</td>
 			<td class="text-center">
-				<div v-if="typeof rowData.userInputs.b2c_override != 'undefined'">
+				<div v-if="rowData.userInputs.b2c_override == null">
 					<override-signal />
 					<input v-model="rowData.userInputs.b2c_override" type="checkbox" class="align-text-bottom"></input>
 				</div>

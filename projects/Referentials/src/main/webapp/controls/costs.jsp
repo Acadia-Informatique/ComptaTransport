@@ -55,12 +55,17 @@
 		table#costs-control-grid  td.costs.comment > div,
 		table#costs-control-grid  td.margin.comment > div {
 			width: 7em;
+			padding-right: 0.5em;
 		}
 
 		table#costs-control-grid select,
 		table#costs-control-grid input,
 		table#costs-control-grid textarea {
-			background-color: #ffffff80;
+			background-color: #ffffffa0;
+		}
+
+		table#costs-control-grid td.num {
+			text-align: end;
 		}
 
 		table#costs-control-grid  td.comment textarea {
@@ -71,16 +76,31 @@
 			padding-left: 0.4em;<%-- closer text align with the edit version (html select) --%>
 		}
 
+		/* mini-table for details */
+		table.detailed {
+			table-layout: fixed;
+		}
+
 		table.detailed td {
 			border: solid 1px black;
 			padding: 0 0.5em;
 		}
 
-		table#costs-control-grid td.num,
-		table.detailed td.num {
-			text-align: end;
+		table.detailed.invoicemap {
+			width:20em;
 		}
-
+		table.detailed.invoicemap input {
+			width: 100%;
+		}
+		table.detailed.invoicemap td:nth-child(1) {
+			width:50%;
+		}
+		table.detailed.invoicemap td:nth-child(2) {
+			width:25%;
+		}
+		table.detailed.invoicemap td:nth-child(2) {
+			width:25%;
+		}
 	</style>
 </head>
 
@@ -229,8 +249,8 @@
 					return PricingSystem.summarizeResult(this.priceGridResult);
 				},
 
-				priceGridFlatResult_zone(){
-					//TODO NAM Q&D
+				priceGridFlat_zone(){
+					//TODO NAM Q&D - inspired
 					let resultList = this.priceGridResult;
 					for (let resultObj of resultList) {
 						if (resultObj?.gridCell?.coords?.zone) {
@@ -240,29 +260,30 @@
 				},
 
 
-				//Related ACADIA Invoices (note: this.rowData.invoices is an old-school Map-like object )
+				//Related ACADIA Invoices
 				amount_from_our_sales(){
 					let total = 0;
-					for (let invoiceNum in this.rowData.invoices){
-						let invoice = this.rowData.invoices[invoiceNum];
-						total += invoice?.price;
+					for (let mapEntry of this.rowData.userInputs.mappedInvoices){
+						if (mapEntry['docReference'] && mapEntry['docReference'].startsWith("*")) continue;
+						let price = mapEntry.totalPrice_override ?? mapEntry?.mapped?.price;
+						total += price;
 					}
 					return total;
 				},
 				weight_from_our_sales(){
 					let total = 0;
-					for (let invoiceNum in this.rowData.invoices){
-						let invoice = this.rowData.invoices[invoiceNum];
-						total += invoice?.weight;
+					for (let mapEntry of this.rowData.userInputs.mappedInvoices){
+						if (mapEntry['docReference'] && mapEntry['docReference'].startsWith("*")) continue;
+						let weight = mapEntry.totalWeight_override ?? mapEntry?.mapped?.weight;
+						total += weight;
 					}
 					return total;
 				},
 				comments_from_our_sales(){
 					let firstComment;
 					let skippedCount = 0;
-					for (let invoiceNum in this.rowData.invoices){
-						let invoice = this.rowData.invoices[invoiceNum];
-
+					for (let mapEntry of this.rowData.userInputs.mappedInvoices){
+						let invoice = mapEntry.mapped;
 						let comment = "";
 						if (invoice?.userInputs?.carrierOK_comment)
 							comment += "🚛 " + invoice.userInputs.carrierOK_comment + "\n";
@@ -280,7 +301,7 @@
 
 
 					if (firstComment && skippedCount){
-						firstComment += ` [et \${skippedCount} autre(s)]`;
+						firstComment += ` [et \${skippedCount} autre(s) commentaire(s)]`;
 					}
 					return firstComment ?? "✏️" ;
 				},
@@ -292,7 +313,7 @@
 				},
 			    assessWeightOK(){
 					return new Assessment("TODO à voir",
-					  (this.weight_delta > 0) ? LEVEL_OK : LEVEL_BAD,
+					  (this.weight_delta >= 0) ? LEVEL_OK : LEVEL_BAD,
 					  this.weight_delta);
 				},
 				weightOKclass(){
@@ -302,10 +323,10 @@
 
 
 				estimatedAmount_delta(){
-					return this.priceGridResult.amount - this.rowData.totalAmount;
+					return this.priceGridFlatResult.total() - this.rowData.totalAmount;
 				},
 				assessTheirAmountOK(){
-					let level = (this.estimatedAmount_delta > 0) ? LEVEL_OK : LEVEL_BAD;
+					let level = (this.estimatedAmount_delta >= 0) ? LEVEL_OK : LEVEL_BAD;
 
 					if (this.rowData.userInputs.theirAmountOK_override)
 						level = this.rowData.userInputs.theirAmountOK_override;
@@ -325,9 +346,16 @@
 
 					let str = "";
 					for (let key of std_keys.concat(missing_keys)) {
+						switch (key) {
 						//Note : "Options" is a sub-total, should never have been imported as sub-article... if only we were confident about importing *all* options :/
-						if (key == "Options") continue;
-						str += "<tr><td>" + key + "</td><td class=\"num\">" + (details[key] ?? "N/A") + "</td></tr>";
+							case "Options" :
+						//All taxes are skipped too (irrelevant here) :
+							case "TVA" :
+							case "Eco-participation" :
+								continue;
+							default :
+								str += "<tr><td>" + key + "</td><td class=\"num\">" + (details[key] ?? "N/A") + "</td></tr>";
+						}
 					}
 					return "<table class='detailed'>" + str +"</table>";
 				},
@@ -338,7 +366,7 @@
 					return m;
 				},
 				assessOurMarginOK(){
-					let level = (this.margin > 0) ? LEVEL_OK : LEVEL_BAD;
+					let level = (this.margin >= 0) ? LEVEL_OK : LEVEL_BAD;
 
 					if (this.rowData.userInputs.ourMarginOK_override)
 						level = this.rowData.userInputs.ourMarginOK_override;
@@ -359,20 +387,8 @@
 							this.saveRowData();
 						}
 					},
-					deep: 1
-
+					deep: 1 // But not deeper ! rowData.userInputs.mappedInvoices are best modified without triggering a save
 				},
-				"rowData.invoices":{
-					handler(newV, oldV){
-						if (newV._v_lock != oldV._v_lock) {
-							// post-update reload, skip save
-						} else {
-							this.saveRowData();
-						}
-					},
-					deep: true
-				},
-			
 			},
 			methods: {
 				renderNumber,
@@ -380,14 +396,22 @@
 				saveRowData(){
 					let rowDataClone = deepClone(this.rowData);
 
-					// clean the "hard to track" useless overrides (like checkboxes)
-					if (rowDataClone.userInputs.b2c_override == rowDataClone.b2c)
-						delete rowDataClone.userInputs.b2c_override;
+					// clean the "hard to track" useless overrides
+					if (rowDataClone.userInputs.mappedInvoices){
+						for (let item of rowDataClone.userInputs.mappedInvoices){
+							if (typeof item["totalWeight_override"] != "number")
+								delete item["totalWeight_override"];
+							if (typeof item["totalPrice_override"] != "number")
+								delete item["totalPrice_override"];
+						}
+					}
+
 
 					axios_backend.put("transport-purchase/" + this.rowData.id, rowDataClone)
 					.then(response => {
 						let updatedUserInputs = response.data.userInputs;
 						if (updatedUserInputs?._v_lock != this.rowData.userInputs?._v_lock) {
+							console.warn("pdate wirth", updatedUserInputs);
 							this.rowData.userInputs = updatedUserInputs;
 						}
 					})
@@ -414,7 +438,7 @@
 					ptyName += "OK_comment";
 
 					this.rowData["$userInputs$" + ptyName] = this.rowData.userInputs[ptyName];
-					if (typeof this.rowData["$userInputs$" + ptyName] == "undefined"){
+					if (this.rowData["$userInputs$" + ptyName] == null){
 						this.rowData["$userInputs$" + ptyName] = " "; // will be cleared by the builtin trim
 					}
 
@@ -495,7 +519,7 @@
 				<div>{{ rowData.shipZipcode }}</div>
 			</td>
 			<td>
-				<div> {{ priceGridFlatResult_zone }} </div>
+				<div> {{ priceGridFlat_zone }} </div>
 			</td>
 			<td class="intern-ref">
 				<div class="text-truncate" :title="rowData.internalReference">
@@ -504,7 +528,8 @@
 			</td>
 
 			<td>
-				<invoice-map v-model="rowData.invoices"></invoice-map>
+				<invoice-map :data-list="rowData.userInputs.mappedInvoices" :consistency-data="rowData"
+				  @change="saveRowData"></invoice-map>
 			</td>
 
 			<td class="num">
@@ -515,7 +540,7 @@
 
 
 			<td class="weight num">
-				<div>{{ renderNumber(weight_from_our_sales) }}</div>
+				<div>{{ renderNumber(weight_from_our_sales, 3) }}</div>
 			</td>
 			<td class="weight num">
 				<div :title="'Déclaré par ACADIA: '+ rowData.reqTotalWeight ">
@@ -531,13 +556,13 @@
 
 
 			<td class="costs num">
-				{{ renderNumber(priceGridResult.amount) }}
+				{{ renderNumber(priceGridFlatResult.total(), 2) }}
 			</td>
 			<td class="costs num">
-				<div @click.stop="clickPopover" :data-bs-content="rowData_totalAmount_detailed">
+				<div><a @click.stop="clickPopover" :data-bs-content="rowData_totalAmount_detailed" data-bs-trigger="focus" tabindex="0">
 					{{ renderNumber(rowData.totalAmount) }}
 					<detailed-signal />
-				</div>
+				</a></div>
 			</td>
 			<td class="costs num computed">
 				<div :class="theirAmountOKclass">{{ renderNumber(assessTheirAmountOK.cellValue, 2) }}</div>
@@ -561,7 +586,7 @@
 
 
 			<td class="margin num">
-				{{ renderNumber(amount_from_our_sales) }}
+				{{ renderNumber(amount_from_our_sales, 2) }}
 			</td>
 			<td class="margin num computed">
 				<div :title="assessOurMarginOK.msg" :class="ourMarginOKclass">
@@ -661,13 +686,13 @@
 					this.dataList.sort((a,b) => {
 						let aVal = a[propertyName];
 						if (typeof aVal == "number" && isNaN(aVal))
-							aVal = Number.POSITIVE_INFINITY; // positive because of the specific interest we have here for the negatives
+							aVal = Number.NEGATIVE_INFINITY; // because of the specific interest we have here for the negatives
 						else
 							aVal = aVal ?? "";
 
 						let bVal = b[propertyName];
 						if (typeof bVal == "number" && isNaN(bVal))
-							bVal = Number.POSITIVE_INFINITY; // positive because of the specific interest we have here for the negatives
+							bVal = Number.NEGATIVE_INFINITY; // because of the specific interest we have here for the negatives
 						else
 							bVal = bVal ?? "";
 
@@ -749,7 +774,7 @@
 					<th class="intern-ref" data-bs-toggle="tooltip" title="Référence Client sur l'étiquette d'expédition (= numéro(s) de facture ACADIA)">
 						<div>Référence interne</div>
 					</th>
-					<th data-bs-toggle="tooltip" title="Factures ACADIA correspondantes">
+					<th data-bs-toggle="tooltip" title="Factures ACADIA correspondantes. Double-clic pour modifier une valeur, <Entrée> pour ajouter une ligne, et préfixez d'un astérisque &quot;*&quot; le num. de facture pour l'ignorer.">
 						<div>Factures ACADIA</div>
 					</th>
 
@@ -811,58 +836,164 @@
 	<script type="module">
 		var InvoiceMapComponent = {
 			props: {
-				modelValue: Object, //	Map-like object, key="invoice Number" and value="serialized TransportSalesHeader"
-				modelModifiers: Object, //	modelModifiers: capture and ignore
+				dataList: Array, // the edited model : a *reactive* List of serialized MapTransportInvoice instances (userInputs.mappedInvoices)
+				consistencyData : Object // the while RowData can be *read* for consistency
 			},
-			emits: ['update:modelValue'],
-			computed: {
-				arrayValue: {
-					get() {
-						console.info("GET");
-						let res = [];
-						if (this.modelValue){
-							let keys = [...Object.keys(this.modelValue)];
-							keys.sort();
-							for (let key of keys){
-								res.push({"num": AcadiaX3.shortInvoiceNumber(key), "obj" : this.modelValue[key]});
-							}
-						}
-						if (res.length == 0){
-							res.push({"num": "", "obj" : null});
-						}
-						return res;
-					},
-					set(v) {
-						console.info("SET", v);
-						let res= {};
-						for (let item of v){
-							let invNumber = AcadiaX3.restoreLongInvoiceNumber(item["num"]);
-							res[invNumber] = item["obj"];
-						}
-						this.$emit('update:modelValue', res);
-					},
-				}
-			},
+			emits:["change"],
 			methods:{
+				shortInvoiceNumber: AcadiaX3.shortInvoiceNumber,
+
 				addEntry(){
-					this.arrayValue.push({"num":"", "obj":null});
-					this.arrayValue = this.arrayValue; // that "useless" line triggers the setter
+					this.dataList.push({
+						"docReference" : "???",
+						//"originalReference": "", being empty or non-existent makes the entry deletable
+						"totalWeight_override" : 1,
+						"totalPrice_override" : 1,
+					});
 				},
 				removeEntry(index){
-					this.arrayValue.splice(index, 1);
-					this.arrayValue = this.arrayValue; // that "useless" line triggers the setter
+					if (this.dataList.length <= 1) return; // UI-choice : you need at least a row to add one
+					this.dataList.splice(index, 1);
+				},
+				validateEntry(item, index){
+					// remove the forced edit tags, just in case
+					delete item['#edit_invnum'];
+
+					// 0) Normalize the overrides
+					if (!item["docReference"]){
+						if (!item["originalReference"]) {
+							this.removeEntry(index);
+							return; // and remove empty entry
+						} else {
+							item["docReference"] = item["originalReference"];
+						}
+					}
+
+					// 1) Search corresponding invoice from typed number...
+					item["mapped"] = null;
+					// 1.a) ... first as invoice number...
+					axios_backend.get("/transport-sales/" + AcadiaX3.restoreLongInvoiceNumber(item["docReference"] + "?show-mapped=true"))
+					.then(response => {
+						item["mapped"] = response.data;
+						item["docReference"] = item["mapped"].isGroup ? item["mapped"].invoice_orig : item["mapped"].invoice;
+					})
+					.catch(error => {
+					// 1.b)... if not found, try as a order number
+						if (error.status == 404) {
+							axios_backend.get("/transport-sales/" + item["docReference"] +"?type=order&show-mapped=true" )
+							.then(response => {
+								item["mapped"] = response.data;
+								item["docReference"] = item["mapped"].isGroup ? item["mapped"].invoice_orig : item["mapped"].invoice;
+							});
+						}
+					});
+
+					// 2) Force deduplication
+					if (this.dataList.some(r => (r !== item) && (r["docReference"] == item["docReference"]))){
+						item["docReference"] = "*" + item["docReference"];
+					}
+				},
+				validateEntryNumbers(item, index){
+					// remove the forced edit tags, just in case
+					delete item['#edit_weight'];
+					delete item['#edit_price'];
+
+					// 0) Normalize the overrides
+					if (typeof item["totalWeight_override"] != "number"
+					  || item["totalWeight_override"] == item["mapped"]?.weight) {
+						item["totalWeight_override"] = null;
+					}
+					if (typeof item["totalPrice_override"] != "number"
+					  || item["totalPrice_override"] == item["mapped"]?.price)
+						item["totalPrice_override"] = null;
+
+					// 1)... that's all ;-)
+				},
+
+
+				linkageClass(item){
+					if (item["docReference"] && item['docReference'].startsWith("*")) return "text-bg-warning";
+					if (item["mapped"]){
+						if (this.linkageIssue(item)){
+							return "text-bg-warning";
+						} else {
+							return "text-bg-success";
+						}
+					} else {
+						return "text-bg-danger";
+					}
+				},
+				linkageIssue(item){
+					let alreadyMappedId = item["mapped"]?.mappedPurchase?.id;
+					if (alreadyMappedId && alreadyMappedId != this.consistencyData["id"]){
+						return "Facture ACADIA déjà associée à une autre ligne (Récép.# "+ item["mapped"]?.mappedPurchase?.carrierOrderNum + ")";
+					}
+
+					if (alreadyMappedId && item["mapped"]?.customer?.erpReference != this.consistencyData.customerErpReference){
+						return "Facture ACADIA d'un client différent : " + item["mapped"]?.customer?.label;
+					}
+				},
+
+
+				editEntry(ev, item, pty, edit){
+					if (edit){
+						item['#edit_' + pty] = true;
+						const parentCell = ev.target.closest("td");
+						this.$nextTick(()=>{
+							parentCell.getElementsByTagName("input")[0].focus();
+						});
+					} else {
+						delete item['#edit_'+ pty];
+					}
 				}
 			},
 			template:
-			`<table class="detailed">
-				<tr v-for="(item, index) in arrayValue">
-					<td :class="{linked: !!item['obj']}">
-						<input v-model="item['num']"></input>
+			`<table class="detailed invoicemap">
+				<tr v-for="(item, index) in dataList" :key="item['originalReference']">
+					<td :class="linkageClass(item)">
+						<div v-if="!item['#edit_invnum'] && item['docReference'] == item['originalReference']" @dblclick="editEntry($event,item,'invnum',true)">
+							{{ item['docReference'] ? shortInvoiceNumber(item['docReference']) : '(vide)' }}
+						</div>
+						<input v-else v-model.trim="item['docReference']"
+						  :title="item['originalReference'] ? 'Valeur originelle : ' + item['originalReference'] : '(Ligne ajoutée manuellement)'"
+						  class="text-bg-warning"
+						  @input="validateEntry(item, index)" @change="$emit('change',$event);"
+						  @blur="editEntry($event,item,'invnum',false)"
+						  @keyup.esc="$event.target.blur();"
+						  @keyup.enter="addEntry"
+						></input>
+						{{ linkageIssue(item) }}
 					</td>
-					<td>
-						<button v-if="index == 0" @click="addEntry">+</button>
-						<button v-else         @click="removeEntry(index)">-</button>
+					<td class="num weight">
+						<div v-if="!item['#edit_weight'] && item['totalWeight_override'] == null" @dblclick="editEntry($event,item,'weight',true)">
+							{{ item["mapped"]?.weight }}
+						</div>
+						<input v-else v-model.number="item['totalWeight_override']"
+						  :title="item['mapped']?.weight ? 'Poids originel : ' + item['mapped']?.weight : ''"
+						  class="text-bg-warning"
+						  @input="validateEntryNumbers(item, index)" @change="$emit('change',$event);"
+						  @blur="editEntry($event,item,'weight',false)"
+						  @keyup.esc="$event.target.blur();"
+						  @keyup.enter="addEntry"
+						></input>
 					</td>
+					<td class="num costs">
+						<div v-if="!item['#edit_price'] && item['totalPrice_override'] == null" @dblclick="editEntry($event,item,'price',true)">
+							{{ item["mapped"]?.price }}
+						</div>
+						<input v-else v-model.number="item['totalPrice_override']"
+						  :title="item['mapped']?.price ? 'Montant originel : ' + item['mapped']?.price : ''"
+						  class="text-bg-warning"
+						  @input="validateEntryNumbers(item, index)" @change="$emit('change',$event);"
+						  @blur="editEntry($event,item,'price',false)"
+						  @keyup.esc="$event.target.blur();"
+						  @keyup.enter="addEntry"
+						></input>
+					</td>
+				</tr>
+
+				<tr v-if="dataList.length == 0">
+					<td @dblclick="addEntry">(double-clic pour ajouter</td>
 				</tr>
 			</table>`
 		};

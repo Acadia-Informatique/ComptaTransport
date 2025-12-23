@@ -140,10 +140,12 @@
 				  style="width:40px">
 					<div>ℹ️</div>
 				</th>
-				<th style="width:4em">
+				<th data-bs-toggle="tooltip" title="Cliquer sur l'icône pour savoir ce qui motive la mention &quot;Franco&quot;."
+				  style="width:8em">
 					<div>Franco ?</div>
 				</th>
-				<th style="width:8em">
+				<th
+				  style="width:8em">
 					<div><datepicker-month v-model="shipPrefMonth"></datepicker-month></div>
 				</th>
 			</tr>
@@ -196,7 +198,7 @@
 					</template>
 					<td>
 						<div>
-							<icon-with-popover :model-value="assessZeroFee(editingCustomer)" title="Franco de port"
+							<icon-with-popover :model-value="assessZeroFee(editingCustomer)" data-bs-title="Franco de port"
 							  icon="hand-thumbs-up-fill" icon-empty="hand-thumbs-down"/>
 						</div>
 					</td>
@@ -237,7 +239,7 @@
 					</template>
 					<td>
 						<div>
-							<icon-with-popover :model-value="assessZeroFee(customer)" title="Franco de port"
+							<icon-with-popover :model-value="assessZeroFee(customer)" data-bs-title="Franco de port"
 							  icon="hand-thumbs-up-fill" icon-empty="hand-thumbs-down"/>
 						</div>
 					</td>
@@ -285,7 +287,7 @@
 							{
 								name: "description",
 								label: "Description",
-								renderer: "textarea",		
+								renderer: "textarea",
 								description: "Commentaire libre"
 							},
 							{

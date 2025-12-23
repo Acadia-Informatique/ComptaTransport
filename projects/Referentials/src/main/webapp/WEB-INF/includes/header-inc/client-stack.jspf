@@ -75,7 +75,7 @@
 	}
 
 	function renderNumber(n, decimals){
-		if (n === null || typeof n == "undefined"){
+		if (n === null || typeof n != "number"){
 			return "";
 		} else if (isNaN(n)) {
 			return "N/A";
